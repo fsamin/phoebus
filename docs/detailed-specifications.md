@@ -65,7 +65,7 @@ Each section describes the detailed behavior, rules, edge cases, and UI expectat
 **Sync Process (detailed):**
 
 1. Set `sync_status = syncing`
-2. Execute `git pull` on the tracked branch (or `git clone` if first sync)
+2. If the clone URL uses the `file://` protocol, use the local directory path directly (no `git clone`). Otherwise, execute `git clone --depth 1` on the tracked branch.
 3. Parse directory structure:
    - Read `phoebus.yaml` → update `learning_paths` table
    - For each module directory (ordered by numeric prefix):
