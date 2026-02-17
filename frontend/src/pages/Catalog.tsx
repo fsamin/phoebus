@@ -28,8 +28,6 @@ const Catalog: React.FC = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <Spin size="large" style={{ display: 'block', marginTop: 100 }} />;
-
   const allTags = [...new Set(paths.flatMap((p) => p.tags || []))].sort();
 
   // We don't have path_id in progress entries, so status filter is approximate
@@ -50,6 +48,8 @@ const Catalog: React.FC = () => {
     else if (sortBy === 'za') result = [...result].sort((a, b) => b.title.localeCompare(a.title));
     return result;
   }, [paths, search, tagFilter, sortBy]);
+
+  if (loading) return <Spin size="large" style={{ display: 'block', marginTop: 100 }} />;
 
   return (
     <div>
