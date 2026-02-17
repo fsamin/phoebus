@@ -50,6 +50,16 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 		r.Post("/api/exercises/{stepId}/reset", h.ResetExercise)
 		r.Get("/api/exercises/{stepId}/attempts", h.GetStepAttempts)
 
+		// Analytics (instructor/admin)
+		r.Group(func(r chi.Router) {
+			r.Use(h.RequireRole(model.RoleInstructor))
+			r.Get("/api/analytics/overview", h.AnalyticsOverview)
+			r.Get("/api/analytics/activity", h.AnalyticsActivity)
+			r.Get("/api/analytics/paths/{pathId}", h.AnalyticsPath)
+			r.Get("/api/analytics/paths/{pathId}/steps/{stepId}", h.AnalyticsStep)
+			r.Get("/api/analytics/learners/{learnerId}", h.AnalyticsLearner)
+		})
+
 		// Admin only
 		r.Group(func(r chi.Router) {
 			r.Use(h.RequireRole(model.RoleAdmin))

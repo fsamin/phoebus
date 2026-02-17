@@ -12,6 +12,8 @@ import RepoForm from './pages/admin/RepoForm';
 import Users from './pages/admin/Users';
 import Health from './pages/admin/Health';
 import Analytics from './pages/analytics/Analytics';
+import PathAnalyticsView from './pages/analytics/PathAnalytics';
+import LearnerDetail from './pages/analytics/LearnerDetail';
 
 function RequireRole({ role, children }: { role: string; children: React.ReactNode }) {
   const { user } = useAuth();
@@ -36,6 +38,8 @@ function App() {
               <Route path="/paths/:pathId" element={<PathOverview />} />
               <Route path="/paths/:pathId/steps/:stepId" element={<StepView />} />
               <Route path="/analytics" element={<RequireRole role="instructor"><Analytics /></RequireRole>} />
+              <Route path="/analytics/paths/:pathId" element={<RequireRole role="instructor"><PathAnalyticsView /></RequireRole>} />
+              <Route path="/analytics/learners/:learnerId" element={<RequireRole role="instructor"><LearnerDetail /></RequireRole>} />
               <Route path="/admin/repositories" element={<RequireRole role="admin"><Repositories /></RequireRole>} />
               <Route path="/admin/repositories/new" element={<RequireRole role="admin"><RepoForm /></RequireRole>} />
               <Route path="/admin/repositories/:repoId/edit" element={<RequireRole role="admin"><RepoForm /></RequireRole>} />
