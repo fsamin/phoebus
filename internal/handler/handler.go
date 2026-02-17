@@ -31,6 +31,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 	// Public
 	r.Get("/api/health", h.Health)
 	r.Post("/api/auth/login", h.Login)
+	r.Post("/api/auth/register", h.Register)
 	r.Post("/api/auth/ldap/login", h.LDAPLogin)
 	r.Get("/api/auth/oidc/redirect", h.OIDCRedirect)
 	r.Get("/api/auth/oidc/callback", h.OIDCCallback)
@@ -72,6 +73,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			r.Use(h.RequireRole(model.RoleAdmin))
 			r.Get("/api/admin/users", h.ListUsers)
+			r.Post("/api/admin/users", h.CreateUser)
 			r.Patch("/api/admin/users/{userId}", h.UpdateUser)
 			r.Get("/api/admin/repos", h.ListRepos)
 			r.Get("/api/admin/repos/{repoId}", h.GetRepo)
@@ -146,6 +148,82 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	})
 
 	writeJSON(w, http.StatusOK, map[string]any{
+		"user": map[string]any{
+			"id":           user.ID,
+			"username":     user.Username,
+			"display_name": user.DisplayName,
+			"role":         user.Role,
+		},
+	})
+}
+
+func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
+	if !h.cfg.Auth.LocalEnabled {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "local auth is disabled"})
+		return
+	}
+
+	var req struct {
+		Username    string `json:"username"`
+		DisplayName string `json:"display_name"`
+		Email       string `json:"email"`
+		Password    string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	// Validate
+	if len(req.Username) < 4 || len(req.Username) > 32 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "username must be 4-32 characters"})
+		return
+	}
+	if len(req.Password) < 8 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "password must be at least 8 characters"})
+		return
+	}
+	if req.DisplayName == "" {
+		req.DisplayName = req.Username
+	}
+
+	hash, err := auth.HashPassword(req.Password)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to hash password"})
+		return
+	}
+
+	var user model.User
+	err = h.db.QueryRowxContext(r.Context(), `
+		INSERT INTO users (id, username, display_name, email, password_hash, role, auth_provider, active)
+		VALUES (gen_random_uuid(), $1, $2, NULLIF($3, ''), $4, 'learner', 'local', true)
+		RETURNING id, username, display_name, role, auth_provider, active, created_at, updated_at
+	`, req.Username, req.DisplayName, req.Email, hash).StructScan(&user)
+	if err != nil {
+		if isDuplicateKey(err) {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "username already taken"})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create user"})
+		return
+	}
+
+	token, err := auth.GenerateToken(&user, h.cfg.JWT.Secret)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to generate token"})
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "phoebus_session",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   8 * 60 * 60,
+	})
+
+	writeJSON(w, http.StatusCreated, map[string]any{
 		"user": map[string]any{
 			"id":           user.ID,
 			"username":     user.Username,

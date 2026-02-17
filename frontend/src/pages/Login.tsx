@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Form, Input, Button, Typography, Alert, Divider, Tabs } from 'antd';
-import { FireOutlined, LoginOutlined, SafetyOutlined } from '@ant-design/icons';
+import { FireOutlined, LoginOutlined, SafetyOutlined, UserAddOutlined } from '@ant-design/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
+import { api } from '../api/client';
 
 interface AuthProviders {
   local: boolean;
@@ -18,6 +19,7 @@ const Login: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [providers, setProviders] = useState<AuthProviders | null>(null);
   const [authMode, setAuthMode] = useState<string>('local');
+  const [showRegister, setShowRegister] = useState(false);
 
   useEffect(() => {
     fetch('/api/auth/providers')
@@ -25,7 +27,6 @@ const Login: React.FC = () => {
       .then((p: AuthProviders) => {
         setProviders(p);
         if (p.oidc && !p.local && !p.ldap) {
-          // Auto-redirect to OIDC if it's the only provider
           window.location.href = '/api/auth/oidc/redirect';
         } else if (p.local) {
           setAuthMode('local');
@@ -38,6 +39,8 @@ const Login: React.FC = () => {
   if (user) {
     return <Navigate to={searchParams.get('redirect') || '/'} replace />;
   }
+
+  const redirect = searchParams.get('redirect') || '/';
 
   const onFinish = async (values: { username: string; password: string }) => {
     setLoading(true);
@@ -54,13 +57,35 @@ const Login: React.FC = () => {
           const data = await resp.json();
           throw new Error(data.error || 'Login failed');
         }
-        window.location.href = searchParams.get('redirect') || '/';
+        window.location.href = redirect;
       } else {
         await login(values.username, values.password);
-        navigate(searchParams.get('redirect') || '/');
+        navigate(redirect);
       }
     } catch (e) {
       setError((e as Error).message || 'Login failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onRegister = async (values: { username: string; display_name: string; email?: string; password: string; confirm: string }) => {
+    if (values.password !== values.confirm) {
+      setError('Passwords do not match');
+      return;
+    }
+    setLoading(true);
+    setError('');
+    try {
+      await api.register({
+        username: values.username,
+        display_name: values.display_name,
+        email: values.email,
+        password: values.password,
+      });
+      window.location.href = redirect;
+    } catch (e) {
+      setError((e as Error).message || 'Registration failed');
     } finally {
       setLoading(false);
     }
@@ -79,12 +104,54 @@ const Login: React.FC = () => {
           Sign in
         </Button>
       </Form.Item>
+      {providers?.local && (
+        <div style={{ textAlign: 'center' }}>
+          <Typography.Text type="secondary">
+            Don't have an account?{' '}
+            <Typography.Link onClick={() => { setShowRegister(true); setError(''); }}>Create one</Typography.Link>
+          </Typography.Text>
+        </div>
+      )}
+    </Form>
+  );
+
+  const registerForm = (
+    <Form layout="vertical" onFinish={onRegister}>
+      <Typography.Title level={4} style={{ textAlign: 'center', marginBottom: 16 }}>
+        <UserAddOutlined /> Create your account
+      </Typography.Title>
+      <Form.Item name="username" label="Username" rules={[{ required: true, min: 4, max: 32 }]}>
+        <Input autoFocus />
+      </Form.Item>
+      <Form.Item name="display_name" label="Display Name" rules={[{ required: true }]}>
+        <Input />
+      </Form.Item>
+      <Form.Item name="email" label="Email">
+        <Input type="email" />
+      </Form.Item>
+      <Form.Item name="password" label="Password" rules={[{ required: true, min: 8 }]}>
+        <Input.Password />
+      </Form.Item>
+      <Form.Item name="confirm" label="Confirm Password" rules={[{ required: true }]}>
+        <Input.Password />
+      </Form.Item>
+      <Form.Item>
+        <Button type="primary" htmlType="submit" loading={loading} block>
+          Create Account
+        </Button>
+      </Form.Item>
+      <div style={{ textAlign: 'center' }}>
+        <Typography.Text type="secondary">
+          Already have an account?{' '}
+          <Typography.Link onClick={() => { setShowRegister(false); setError(''); }}>Sign in</Typography.Link>
+        </Typography.Text>
+      </div>
     </Form>
   );
 
   const tabItems = [];
   if (providers?.local) {
-    tabItems.push({ key: 'local', label: 'Local', icon: <LoginOutlined />, children: loginForm });
+    tabItems.push({ key: 'local', label: 'Local', icon: <LoginOutlined />, children: showRegister ? registerForm : loginForm });
   }
   if (providers?.ldap) {
     tabItems.push({ key: 'ldap', label: 'LDAP', icon: <SafetyOutlined />, children: loginForm });
@@ -118,12 +185,12 @@ const Login: React.FC = () => {
         {tabItems.length > 1 ? (
           <Tabs
             activeKey={authMode}
-            onChange={setAuthMode}
+            onChange={(key) => { setAuthMode(key); setShowRegister(false); setError(''); }}
             items={tabItems}
             centered
           />
         ) : tabItems.length === 1 ? (
-          loginForm
+          showRegister ? registerForm : loginForm
         ) : null}
       </Card>
     </div>

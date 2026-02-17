@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Tag, Typography, Select, Switch, message, Input } from 'antd';
-import { SearchOutlined } from '@ant-design/icons';
+import { Table, Tag, Typography, Select, Switch, message, Input, Button, Modal, Form } from 'antd';
+import { SearchOutlined, PlusOutlined } from '@ant-design/icons';
 import { api } from '../../api/client';
 import type { User } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
@@ -13,6 +13,9 @@ const Users: React.FC = () => {
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
+  const [createModalOpen, setCreateModalOpen] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [createForm] = Form.useForm();
 
   // Debounce search 300ms
   useEffect(() => {
@@ -53,18 +56,38 @@ const Users: React.FC = () => {
         (u.email || '').toLowerCase().includes(search.toLowerCase()))
     : users;
 
+  const handleCreateUser = async (values: { username: string; display_name: string; email?: string; role: string; password: string }) => {
+    setCreateLoading(true);
+    try {
+      await api.createUser(values);
+      message.success('User created');
+      setCreateModalOpen(false);
+      createForm.resetFields();
+      loadUsers();
+    } catch (e) {
+      message.error((e as Error).message);
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <Typography.Title level={3} style={{ margin: 0 }}>Users</Typography.Title>
-        <Input
-          prefix={<SearchOutlined />}
-          placeholder="Search users..."
-          value={searchInput}
-          onChange={(e) => setSearchInput(e.target.value)}
-          allowClear
-          style={{ width: 300 }}
-        />
+        <div style={{ display: 'flex', gap: 12 }}>
+          <Input
+            prefix={<SearchOutlined />}
+            placeholder="Search users..."
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
+            allowClear
+            style={{ width: 300 }}
+          />
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setCreateModalOpen(true)}>
+            Add User
+          </Button>
+        </div>
       </div>
       <Table
         dataSource={filteredUsers}
@@ -122,6 +145,40 @@ const Users: React.FC = () => {
           },
         ]}
       />
+
+      <Modal
+        title="Create Local User"
+        open={createModalOpen}
+        onCancel={() => { setCreateModalOpen(false); createForm.resetFields(); }}
+        footer={null}
+      >
+        <Form form={createForm} layout="vertical" onFinish={handleCreateUser} initialValues={{ role: 'learner' }}>
+          <Form.Item name="username" label="Username" rules={[{ required: true, min: 4, max: 32 }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="display_name" label="Display Name" rules={[{ required: true }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="email" label="Email">
+            <Input type="email" />
+          </Form.Item>
+          <Form.Item name="role" label="Role">
+            <Select options={[
+              { value: 'learner', label: 'Learner' },
+              { value: 'instructor', label: 'Instructor' },
+              { value: 'admin', label: 'Admin' },
+            ]} />
+          </Form.Item>
+          <Form.Item name="password" label="Password" rules={[{ required: true, min: 8 }]}>
+            <Input.Password />
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" htmlType="submit" loading={createLoading} block>
+              Create User
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
     </div>
   );
 };

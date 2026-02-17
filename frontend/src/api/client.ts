@@ -26,6 +26,11 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ username, password }),
     }),
+  register: (data: { username: string; display_name: string; email?: string; password: string }) =>
+    request<{ user: User }>('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
   logout: () => request<{ status: string }>('/auth/logout', { method: 'POST' }),
   me: () => request<User>('/me'),
 
@@ -74,6 +79,11 @@ export const api = {
     request<{ status: string }>(`/admin/repos/${id}/sync`, { method: 'POST' }),
   listUsers: (page = 1, perPage = 20) =>
     request<{ users: User[]; total: number; page: number; per_page: number }>(`/admin/users?page=${page}&per_page=${perPage}`),
+  createUser: (data: { username: string; display_name: string; email?: string; role: string; password: string }) =>
+    request<User>('/admin/users', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
 };
 
 // --- Types ---

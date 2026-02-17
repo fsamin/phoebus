@@ -3,10 +3,79 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 
+	"github.com/fsamin/phoebus/internal/auth"
 	"github.com/fsamin/phoebus/internal/model"
 	"github.com/go-chi/chi/v5"
 )
+
+func isDuplicateKey(err error) bool {
+	return strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique constraint")
+}
+
+// CreateUser allows admins to create a local user.
+func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
+	if !h.cfg.Auth.LocalEnabled {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": "local auth is disabled"})
+		return
+	}
+
+	var req struct {
+		Username    string     `json:"username"`
+		DisplayName string     `json:"display_name"`
+		Email       string     `json:"email"`
+		Role        model.Role `json:"role"`
+		Password    string     `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request body"})
+		return
+	}
+
+	if len(req.Username) < 4 || len(req.Username) > 32 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "username must be 4-32 characters"})
+		return
+	}
+	if len(req.Password) < 8 {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "password must be at least 8 characters"})
+		return
+	}
+	switch req.Role {
+	case model.RoleLearner, model.RoleInstructor, model.RoleAdmin:
+	default:
+		req.Role = model.RoleLearner
+	}
+	if req.DisplayName == "" {
+		req.DisplayName = req.Username
+	}
+
+	hash, err := auth.HashPassword(req.Password)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to hash password"})
+		return
+	}
+
+	var user model.User
+	err = h.db.QueryRowxContext(r.Context(), `
+		INSERT INTO users (id, username, display_name, email, password_hash, role, auth_provider, active)
+		VALUES (gen_random_uuid(), $1, $2, NULLIF($3, ''), $4, $5, 'local', true)
+		RETURNING id, username, display_name, email, role, auth_provider, active, created_at, updated_at
+	`, req.Username, req.DisplayName, req.Email, hash, req.Role).StructScan(&user)
+	if err != nil {
+		if isDuplicateKey(err) {
+			writeJSON(w, http.StatusConflict, map[string]string{"error": "username already taken"})
+			return
+		}
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create user"})
+		return
+	}
+
+	claims := ClaimsFromContext(r.Context())
+	h.auditLog(r.Context(), claims, "create", "user", user.ID.String(), map[string]any{"username": user.Username, "role": user.Role})
+
+	writeJSON(w, http.StatusCreated, user)
+}
 
 // UpdateUser allows admins to change a user's role or active status.
 func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
