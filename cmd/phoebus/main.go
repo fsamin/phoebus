@@ -14,6 +14,7 @@ import (
 	"github.com/fsamin/phoebus/internal/database"
 	"github.com/fsamin/phoebus/internal/handler"
 	"github.com/fsamin/phoebus/internal/syncer"
+	"github.com/fsamin/phoebus/internal/ui"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -59,6 +60,9 @@ func main() {
 
 	h := handler.New(db, cfg, syncWorker)
 	h.RegisterRoutes(r)
+
+	// Serve embedded SPA for all non-API routes
+	r.NotFound(ui.Handler().ServeHTTP)
 
 	addr := fmt.Sprintf(":%d", cfg.HTTP.Port)
 	srv := &http.Server{
