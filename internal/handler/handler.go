@@ -36,11 +36,19 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Group(func(r chi.Router) {
 		r.Use(h.AuthMiddleware)
 		r.Get("/api/me", h.Me)
+		r.Post("/api/auth/logout", h.Logout)
 
 		// Learning paths (all authenticated users)
 		r.Get("/api/learning-paths", h.ListLearningPaths)
 		r.Get("/api/learning-paths/{pathId}", h.GetLearningPath)
 		r.Get("/api/learning-paths/{pathId}/steps/{stepId}", h.GetStep)
+
+		// Progress & exercises (all authenticated users)
+		r.Get("/api/progress", h.GetProgress)
+		r.Post("/api/progress", h.UpdateProgress)
+		r.Post("/api/exercises/{stepId}/attempt", h.SubmitAttempt)
+		r.Post("/api/exercises/{stepId}/reset", h.ResetExercise)
+		r.Get("/api/exercises/{stepId}/attempts", h.GetStepAttempts)
 
 		// Admin only
 		r.Group(func(r chi.Router) {
