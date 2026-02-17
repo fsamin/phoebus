@@ -13,6 +13,7 @@ import (
 	"github.com/fsamin/phoebus/internal/config"
 	"github.com/fsamin/phoebus/internal/database"
 	"github.com/fsamin/phoebus/internal/handler"
+	"github.com/fsamin/phoebus/internal/syncer"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
@@ -50,7 +51,13 @@ func main() {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(30 * time.Second))
 
-	h := handler.New(db, cfg)
+	// Create and start the sync worker
+	syncWorker := syncer.New(db)
+	workerCtx, workerCancel := context.WithCancel(context.Background())
+	defer workerCancel()
+	go syncWorker.Start(workerCtx)
+
+	h := handler.New(db, cfg, syncWorker)
 	h.RegisterRoutes(r)
 
 	addr := fmt.Sprintf(":%d", cfg.HTTP.Port)
@@ -75,6 +82,7 @@ func main() {
 	<-quit
 
 	slog.Info("shutting down server")
+	workerCancel() // Stop the sync worker
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {

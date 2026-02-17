@@ -9,14 +9,16 @@ import (
 )
 
 type LearningPath struct {
-	ID          uuid.UUID      `json:"id" db:"id"`
-	RepoID      uuid.UUID      `json:"repo_id" db:"repo_id"`
-	Title       string         `json:"title" db:"title"`
-	Description string         `json:"description" db:"description"`
-	Icon        *string        `json:"icon,omitempty" db:"icon"`
-	Tags        pq.StringArray `json:"tags" db:"tags"`
-	CreatedAt   time.Time      `json:"created_at" db:"created_at"`
-	UpdatedAt   time.Time      `json:"updated_at" db:"updated_at"`
+	ID                uuid.UUID      `json:"id" db:"id"`
+	RepoID            uuid.UUID      `json:"repo_id" db:"repo_id"`
+	Title             string         `json:"title" db:"title"`
+	Description       string         `json:"description" db:"description"`
+	Icon              *string        `json:"icon,omitempty" db:"icon"`
+	Tags              pq.StringArray `json:"tags" db:"tags"`
+	EstimatedDuration *string        `json:"estimated_duration,omitempty" db:"estimated_duration"`
+	Prerequisites     pq.StringArray `json:"prerequisites,omitempty" db:"prerequisites"`
+	CreatedAt         time.Time      `json:"created_at" db:"created_at"`
+	UpdatedAt         time.Time      `json:"updated_at" db:"updated_at"`
 }
 
 type Module struct {
@@ -60,4 +62,6 @@ type CodebaseFile struct {
 	StepID   uuid.UUID `json:"step_id" db:"step_id"`
 	FilePath string    `json:"file_path" db:"file_path"`
 	Content  string    `json:"content" db:"content"`
+	Language string    `json:"language" db:"language"`
+	Position int       `json:"position" db:"position"`
 }

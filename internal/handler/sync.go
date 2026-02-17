@@ -16,11 +16,6 @@ func (h *Handler) enqueueSync(ctx context.Context, repoID uuid.UUID) {
 		return
 	}
 
-	// Update repo status
-	h.db.ExecContext(ctx, `
-		UPDATE git_repositories SET sync_status = 'syncing', updated_at = now() WHERE id = $1
-	`, repoID)
-
-	// Trigger sync in background
-	go h.syncer.ProcessRepo(context.Background(), repoID)
+	// Notify the sync worker that a new job is available
+	h.syncer.Notify()
 }

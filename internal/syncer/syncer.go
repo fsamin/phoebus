@@ -2,6 +2,7 @@ package syncer
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -17,16 +19,107 @@ import (
 )
 
 type Syncer struct {
-	db *sqlx.DB
+	db     *sqlx.DB
+	notify chan struct{} // signals the worker that a new job is available
 }
 
 func New(db *sqlx.DB) *Syncer {
-	return &Syncer{db: db}
+	return &Syncer{
+		db:     db,
+		notify: make(chan struct{}, 1),
+	}
 }
 
-// ProcessRepo clones the repo, parses content, and updates the database.
-func (s *Syncer) ProcessRepo(ctx context.Context, repoID uuid.UUID) {
-	logger := slog.With("repo_id", repoID)
+// Start launches the background worker that picks up sync jobs.
+// It runs until ctx is cancelled.
+func (s *Syncer) Start(ctx context.Context) {
+	slog.Info("sync worker started")
+	for {
+		select {
+		case <-ctx.Done():
+			slog.Info("sync worker stopped")
+			return
+		case <-s.notify:
+			s.processAllPending(ctx)
+		case <-time.After(30 * time.Second):
+			// Poll periodically as a safety net
+			s.processAllPending(ctx)
+		}
+	}
+}
+
+// Notify wakes the worker to pick up new jobs.
+func (s *Syncer) Notify() {
+	select {
+	case s.notify <- struct{}{}:
+	default:
+		// Already notified, skip
+	}
+}
+
+// processAllPending processes all pending jobs one by one using SELECT FOR UPDATE SKIP LOCKED.
+func (s *Syncer) processAllPending(ctx context.Context) {
+	for {
+		if ctx.Err() != nil {
+			return
+		}
+		processed := s.pickAndProcess(ctx)
+		if !processed {
+			return
+		}
+	}
+}
+
+// pickAndProcess atomically picks one pending job and processes it.
+// Returns true if a job was processed, false if no job was available.
+func (s *Syncer) pickAndProcess(ctx context.Context) bool {
+	// Pick a pending job with SELECT FOR UPDATE SKIP LOCKED
+	tx, err := s.db.BeginTxx(ctx, nil)
+	if err != nil {
+		slog.Error("failed to begin job tx", "error", err)
+		return false
+	}
+
+	var job struct {
+		ID     uuid.UUID `db:"id"`
+		RepoID uuid.UUID `db:"repo_id"`
+	}
+	err = tx.GetContext(ctx, &job, `
+		SELECT id, repo_id FROM sync_jobs
+		WHERE status = 'pending'
+		ORDER BY created_at ASC
+		LIMIT 1
+		FOR UPDATE SKIP LOCKED
+	`)
+	if err != nil {
+		tx.Rollback()
+		if err == sql.ErrNoRows {
+			return false
+		}
+		slog.Error("failed to pick sync job", "error", err)
+		return false
+	}
+
+	// Mark as processing
+	tx.ExecContext(ctx, `
+		UPDATE sync_jobs SET status = 'processing', attempts = attempts + 1, started_at = now(), updated_at = now() WHERE id = $1
+	`, job.ID)
+	tx.ExecContext(ctx, `
+		UPDATE git_repositories SET sync_status = 'syncing', updated_at = now() WHERE id = $1
+	`, job.RepoID)
+	if err := tx.Commit(); err != nil {
+		slog.Error("failed to commit job pickup", "error", err)
+		return false
+	}
+
+	// Process the job (outside the lock transaction)
+	s.processJob(ctx, job.ID, job.RepoID)
+	return true
+}
+
+// processJob clones the repo, parses content, and updates the database.
+func (s *Syncer) processJob(ctx context.Context, jobID, repoID uuid.UUID) {
+	logger := slog.With("repo_id", repoID, "job_id", jobID)
 
 	// Fetch repo details
 	var repo struct {
@@ -40,7 +133,7 @@ func (s *Syncer) ProcessRepo(ctx context.Context, repoID uuid.UUID) {
 		SELECT id, clone_url, branch, auth_type, credentials FROM git_repositories WHERE id = $1
 	`, repoID); err != nil {
 		logger.Error("failed to fetch repo", "error", err)
-		s.failSync(ctx, repoID, err)
+		s.failJob(ctx, jobID, repoID, err)
 		return
 	}
 
@@ -48,21 +141,21 @@ func (s *Syncer) ProcessRepo(ctx context.Context, repoID uuid.UUID) {
 	tmpDir, err := os.MkdirTemp("", "phoebus-sync-*")
 	if err != nil {
 		logger.Error("failed to create temp dir", "error", err)
-		s.failSync(ctx, repoID, err)
+		s.failJob(ctx, jobID, repoID, err)
 		return
 	}
 	defer os.RemoveAll(tmpDir)
 
 	if err := gitClone(repo.CloneURL, repo.Branch, tmpDir); err != nil {
 		logger.Error("git clone failed", "error", err)
-		s.failSync(ctx, repoID, fmt.Errorf("git clone failed: %w", err))
+		s.failJob(ctx, jobID, repoID, fmt.Errorf("git clone failed: %w", err))
 		return
 	}
 
 	// Parse and sync content
 	if err := s.syncContent(ctx, repoID, tmpDir); err != nil {
 		logger.Error("content sync failed", "error", err)
-		s.failSync(ctx, repoID, err)
+		s.failJob(ctx, jobID, repoID, err)
 		return
 	}
 
@@ -71,20 +164,20 @@ func (s *Syncer) ProcessRepo(ctx context.Context, repoID uuid.UUID) {
 		UPDATE git_repositories SET sync_status = 'synced', sync_error = NULL, last_synced_at = now(), updated_at = now() WHERE id = $1
 	`, repoID)
 	s.db.ExecContext(ctx, `
-		UPDATE sync_jobs SET status = 'done', updated_at = now() WHERE repo_id = $1 AND status = 'pending'
-	`, repoID)
+		UPDATE sync_jobs SET status = 'done', completed_at = now(), updated_at = now() WHERE id = $1
+	`, jobID)
 
 	logger.Info("sync completed successfully")
 }
 
-func (s *Syncer) failSync(ctx context.Context, repoID uuid.UUID, syncErr error) {
+func (s *Syncer) failJob(ctx context.Context, jobID, repoID uuid.UUID, syncErr error) {
 	errMsg := syncErr.Error()
 	s.db.ExecContext(ctx, `
 		UPDATE git_repositories SET sync_status = 'error', sync_error = $1, updated_at = now() WHERE id = $2
 	`, errMsg, repoID)
 	s.db.ExecContext(ctx, `
-		UPDATE sync_jobs SET status = 'failed', error = $1, updated_at = now() WHERE repo_id = $2 AND status = 'pending'
-	`, errMsg, repoID)
+		UPDATE sync_jobs SET status = 'failed', error = $1, completed_at = now(), updated_at = now() WHERE id = $2
+	`, errMsg, jobID)
 }
 
 func gitClone(cloneURL, branch, destDir string) error {
@@ -111,16 +204,18 @@ func (s *Syncer) syncContent(ctx context.Context, repoID uuid.UUID, repoDir stri
 	// Upsert learning path
 	var lpID uuid.UUID
 	err = tx.GetContext(ctx, &lpID, `
-		INSERT INTO learning_paths (repo_id, title, description, icon, tags)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO learning_paths (repo_id, title, description, icon, tags, estimated_duration, prerequisites)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT (repo_id) DO UPDATE SET
 			title = EXCLUDED.title,
 			description = EXCLUDED.description,
 			icon = EXCLUDED.icon,
 			tags = EXCLUDED.tags,
+			estimated_duration = EXCLUDED.estimated_duration,
+			prerequisites = EXCLUDED.prerequisites,
 			updated_at = now()
 		RETURNING id
-	`, repoID, lpMeta.Title, lpMeta.Description, lpMeta.Icon, pq.Array(lpMeta.Tags))
+	`, repoID, lpMeta.Title, lpMeta.Description, lpMeta.Icon, pq.Array(lpMeta.Tags), lpMeta.EstimatedDuration, pq.Array(lpMeta.Prerequisites))
 	if err != nil {
 		return fmt.Errorf("upsert learning path: %w", err)
 	}
@@ -237,6 +332,7 @@ func (s *Syncer) syncCodebaseFiles(ctx context.Context, tx *sqlx.Tx, stepID uuid
 		return nil
 	}
 
+	position := 0
 	return filepath.Walk(codebaseDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil || info.IsDir() {
 			return err
@@ -251,9 +347,11 @@ func (s *Syncer) syncCodebaseFiles(ctx context.Context, tx *sqlx.Tx, stepID uuid
 		}
 
 		relPath, _ := filepath.Rel(codebaseDir, path)
+		lang := inferLanguage(filepath.Ext(relPath))
 		_, err = tx.ExecContext(ctx, `
-			INSERT INTO codebase_files (step_id, file_path, content) VALUES ($1, $2, $3)
-		`, stepID, relPath, string(content))
+			INSERT INTO codebase_files (step_id, file_path, content, language, position) VALUES ($1, $2, $3, $4, $5)
+		`, stepID, relPath, string(content), lang, position)
+		position++
 		return err
 	})
 }
@@ -339,4 +437,61 @@ func keys(m map[string]bool) []string {
 		result = append(result, k)
 	}
 	return result
+}
+
+// inferLanguage maps file extensions to language identifiers for syntax highlighting.
+func inferLanguage(ext string) string {
+	ext = strings.ToLower(ext)
+	switch ext {
+	case ".go":
+		return "go"
+	case ".py":
+		return "python"
+	case ".js":
+		return "javascript"
+	case ".ts":
+		return "typescript"
+	case ".jsx":
+		return "jsx"
+	case ".tsx":
+		return "tsx"
+	case ".java":
+		return "java"
+	case ".rs":
+		return "rust"
+	case ".rb":
+		return "ruby"
+	case ".sh", ".bash":
+		return "shell"
+	case ".yaml", ".yml":
+		return "yaml"
+	case ".json":
+		return "json"
+	case ".toml":
+		return "toml"
+	case ".xml":
+		return "xml"
+	case ".html", ".htm":
+		return "html"
+	case ".css":
+		return "css"
+	case ".sql":
+		return "sql"
+	case ".md":
+		return "markdown"
+	case ".dockerfile":
+		return "dockerfile"
+	case ".tf", ".hcl":
+		return "hcl"
+	case ".c":
+		return "c"
+	case ".cpp", ".cc", ".cxx":
+		return "cpp"
+	case ".h", ".hpp":
+		return "cpp"
+	case ".cs":
+		return "csharp"
+	default:
+		return ""
+	}
 }

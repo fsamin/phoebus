@@ -18,11 +18,11 @@ type Handler struct {
 	syncer *syncer.Syncer
 }
 
-func New(db *sqlx.DB, cfg *config.Config) *Handler {
+func New(db *sqlx.DB, cfg *config.Config, s *syncer.Syncer) *Handler {
 	return &Handler{
 		db:     db,
 		cfg:    cfg,
-		syncer: syncer.New(db),
+		syncer: s,
 	}
 }
 

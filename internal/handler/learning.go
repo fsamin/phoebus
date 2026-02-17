@@ -19,7 +19,8 @@ type learningPathResponse struct {
 func (h *Handler) ListLearningPaths(w http.ResponseWriter, r *http.Request) {
 	var paths []learningPathResponse
 	err := h.db.SelectContext(r.Context(), &paths, `
-		SELECT lp.id, lp.repo_id, lp.title, lp.description, lp.icon, lp.tags, lp.created_at, lp.updated_at,
+		SELECT lp.id, lp.repo_id, lp.title, lp.description, lp.icon, lp.tags,
+		       lp.estimated_duration, lp.prerequisites, lp.created_at, lp.updated_at,
 		       COUNT(DISTINCT m.id) AS module_count,
 		       COUNT(DISTINCT s.id) AS step_count
 		FROM learning_paths lp
@@ -61,7 +62,7 @@ func (h *Handler) GetLearningPath(w http.ResponseWriter, r *http.Request) {
 
 	var lp model.LearningPath
 	err := h.db.GetContext(r.Context(), &lp, `
-		SELECT id, repo_id, title, description, icon, tags, created_at, updated_at
+		SELECT id, repo_id, title, description, icon, tags, estimated_duration, prerequisites, created_at, updated_at
 		FROM learning_paths WHERE id = $1
 	`, pathID)
 	if err != nil {

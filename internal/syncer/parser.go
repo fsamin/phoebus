@@ -14,10 +14,12 @@ import (
 // --- phoebus.yaml ---
 
 type phoebusMeta struct {
-	Title       string   `yaml:"title"`
-	Description string   `yaml:"description"`
-	Icon        string   `yaml:"icon"`
-	Tags        []string `yaml:"tags"`
+	Title             string   `yaml:"title"`
+	Description       string   `yaml:"description"`
+	Icon              string   `yaml:"icon"`
+	Tags              []string `yaml:"tags"`
+	EstimatedDuration string   `yaml:"estimated_duration"`
+	Prerequisites     []string `yaml:"prerequisites"`
 }
 
 func parsePhoebus(repoDir string) (*phoebusMeta, error) {
@@ -181,7 +183,12 @@ func parseQuizQuestion(tag, title, body string) (map[string]any, error) {
 		lines := strings.Split(body, "\n")
 		for _, line := range lines {
 			if strings.HasPrefix(line, "    ") || strings.HasPrefix(line, "\t") {
-				q["pattern"] = strings.TrimSpace(line)
+				pattern := strings.TrimSpace(line)
+				// Validate regex at parse-time (E6)
+				if _, err := regexp.Compile(pattern); err != nil {
+					return nil, fmt.Errorf("invalid regex pattern %q for question %q: %w", pattern, title, err)
+				}
+				q["pattern"] = pattern
 				break
 			}
 		}
