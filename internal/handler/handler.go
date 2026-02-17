@@ -35,6 +35,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Get("/api/auth/oidc/callback", h.OIDCCallback)
 	r.Get("/api/auth/providers", h.AuthProviders)
 	r.Post("/api/webhooks/{uuid}", h.Webhook)
+	r.Handle("/metrics", h.Metrics())
 
 	// Authenticated
 	r.Group(func(r chi.Router) {
@@ -69,6 +70,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 		r.Group(func(r chi.Router) {
 			r.Use(h.RequireRole(model.RoleAdmin))
 			r.Get("/api/admin/users", h.ListUsers)
+			r.Patch("/api/admin/users/{userId}", h.UpdateUser)
 			r.Get("/api/admin/repos", h.ListRepos)
 			r.Get("/api/admin/repos/{repoId}", h.GetRepo)
 			r.Post("/api/admin/repos", h.CreateRepo)

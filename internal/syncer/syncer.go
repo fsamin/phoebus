@@ -3,6 +3,7 @@ package syncer
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"fmt"
 	"log/slog"
 	"os"
@@ -13,20 +14,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/fsamin/phoebus/internal/crypto"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
 )
 
 type Syncer struct {
-	db     *sqlx.DB
-	notify chan struct{} // signals the worker that a new job is available
+	db            *sqlx.DB
+	encryptionKey string
+	notify        chan struct{} // signals the worker that a new job is available
 }
 
-func New(db *sqlx.DB) *Syncer {
+func New(db *sqlx.DB, encryptionKey string) *Syncer {
 	return &Syncer{
-		db:     db,
-		notify: make(chan struct{}, 1),
+		db:            db,
+		encryptionKey: encryptionKey,
+		notify:        make(chan struct{}, 1),
 	}
 }
 
@@ -146,7 +150,21 @@ func (s *Syncer) processJob(ctx context.Context, jobID, repoID uuid.UUID) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	if err := gitClone(repo.CloneURL, repo.Branch, tmpDir); err != nil {
+	// Decrypt credentials if needed
+	var creds []byte
+	if len(repo.Credentials) > 0 && s.encryptionKey != "" {
+		decrypted, err := crypto.Decrypt(repo.Credentials, []byte(s.encryptionKey))
+		if err != nil {
+			// Fallback: might be plaintext (pre-encryption migration)
+			creds = repo.Credentials
+		} else {
+			creds = decrypted
+		}
+	} else {
+		creds = repo.Credentials
+	}
+
+	if err := gitClone(repo.CloneURL, repo.Branch, tmpDir, repo.AuthType, creds); err != nil {
 		logger.Error("git clone failed", "error", err)
 		s.failJob(ctx, jobID, repoID, fmt.Errorf("git clone failed: %w", err))
 		return
@@ -180,11 +198,73 @@ func (s *Syncer) failJob(ctx context.Context, jobID, repoID uuid.UUID, syncErr e
 	`, errMsg, jobID)
 }
 
-func gitClone(cloneURL, branch, destDir string) error {
-	cmd := exec.Command("git", "clone", "--branch", branch, "--depth", "1", "--single-branch", cloneURL, destDir)
+func gitClone(cloneURL, branch, destDir, authType string, credentials []byte) error {
+	args := []string{"clone", "--branch", branch, "--depth", "1", "--single-branch"}
+
+	// For HTTP token auth, inject token into the URL via GIT_ASKPASS
+	if authType == "http-token" && len(credentials) > 0 {
+		// Use clone URL with token via header
+		args = append(args, cloneURL, destDir)
+		cmd := exec.Command("git", args...)
+		cmd.Env = append(os.Environ(),
+			fmt.Sprintf("GIT_CONFIG_COUNT=1"),
+			fmt.Sprintf("GIT_CONFIG_KEY_0=http.extraHeader"),
+			fmt.Sprintf("GIT_CONFIG_VALUE_0=Authorization: Bearer %s", string(credentials)),
+		)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	}
+
+	if authType == "http-basic" && len(credentials) > 0 {
+		// credentials expected as "username:password"
+		args = append(args, cloneURL, destDir)
+		cmd := exec.Command("git", args...)
+		cmd.Env = append(os.Environ(),
+			fmt.Sprintf("GIT_CONFIG_COUNT=1"),
+			fmt.Sprintf("GIT_CONFIG_KEY_0=http.extraHeader"),
+			fmt.Sprintf("GIT_CONFIG_VALUE_0=Authorization: Basic %s",
+				base64Encode(credentials)),
+		)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	}
+
+	if authType == "ssh-key" && len(credentials) > 0 {
+		// Write SSH key to temp file
+		tmpKey, err := os.CreateTemp("", "phoebus-ssh-*")
+		if err != nil {
+			return fmt.Errorf("create ssh key file: %w", err)
+		}
+		defer os.Remove(tmpKey.Name())
+
+		if _, err := tmpKey.Write(credentials); err != nil {
+			return fmt.Errorf("write ssh key: %w", err)
+		}
+		tmpKey.Close()
+		os.Chmod(tmpKey.Name(), 0600)
+
+		args = append(args, cloneURL, destDir)
+		cmd := exec.Command("git", args...)
+		cmd.Env = append(os.Environ(),
+			fmt.Sprintf("GIT_SSH_COMMAND=ssh -i %s -o StrictHostKeyChecking=no", tmpKey.Name()),
+		)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	}
+
+	// No auth
+	args = append(args, cloneURL, destDir)
+	cmd := exec.Command("git", args...)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
+}
+
+func base64Encode(data []byte) string {
+	return base64.StdEncoding.EncodeToString(data)
 }
 
 func (s *Syncer) syncContent(ctx context.Context, repoID uuid.UUID, repoDir string) error {

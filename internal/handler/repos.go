@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/fsamin/phoebus/internal/crypto"
 	"github.com/fsamin/phoebus/internal/model"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -67,12 +68,28 @@ func (h *Handler) CreateRepo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	webhookUUID := uuid.New()
+
+	// Encrypt credentials if provided and encryption key is configured
+	var credBytes []byte
+	if req.Credentials != "" {
+		if h.cfg.EncryptionKey != "" {
+			encrypted, err := crypto.Encrypt([]byte(req.Credentials), []byte(h.cfg.EncryptionKey))
+			if err != nil {
+				writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to encrypt credentials"})
+				return
+			}
+			credBytes = encrypted
+		} else {
+			credBytes = []byte(req.Credentials)
+		}
+	}
+
 	var repo model.GitRepository
 	err := h.db.GetContext(r.Context(), &repo, `
 		INSERT INTO git_repositories (clone_url, branch, auth_type, credentials, webhook_uuid)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, clone_url, branch, auth_type, webhook_uuid, sync_status, sync_error, last_synced_at, created_at, updated_at
-	`, req.CloneURL, req.Branch, req.AuthType, []byte(req.Credentials), webhookUUID)
+	`, req.CloneURL, req.Branch, req.AuthType, credBytes, webhookUUID)
 	if err != nil {
 		slog.Error("failed to create repository", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create repository"})
@@ -94,6 +111,17 @@ func (h *Handler) UpdateRepo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Encrypt credentials if provided
+	credValue := req.Credentials
+	if credValue != "" && h.cfg.EncryptionKey != "" {
+		encrypted, err := crypto.Encrypt([]byte(credValue), []byte(h.cfg.EncryptionKey))
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to encrypt credentials"})
+			return
+		}
+		credValue = string(encrypted)
+	}
+
 	var repo model.GitRepository
 	err := h.db.GetContext(r.Context(), &repo, `
 		UPDATE git_repositories
@@ -104,7 +132,7 @@ func (h *Handler) UpdateRepo(w http.ResponseWriter, r *http.Request) {
 		    updated_at = now()
 		WHERE id = $5
 		RETURNING id, clone_url, branch, auth_type, webhook_uuid, sync_status, sync_error, last_synced_at, created_at, updated_at
-	`, req.CloneURL, req.Branch, req.AuthType, req.Credentials, id)
+	`, req.CloneURL, req.Branch, req.AuthType, credValue, id)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "repository not found"})
 		return

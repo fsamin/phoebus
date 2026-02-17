@@ -8,11 +8,12 @@ import (
 )
 
 type Config struct {
-	HTTP     HTTPConfig     `yaml:"http"`
-	Database DatabaseConfig `yaml:"database"`
-	JWT      JWTConfig      `yaml:"jwt"`
-	Admin    AdminConfig    `yaml:"admin"`
-	Auth     AuthConfig     `yaml:"auth"`
+	HTTP          HTTPConfig     `yaml:"http"`
+	Database      DatabaseConfig `yaml:"database"`
+	JWT           JWTConfig      `yaml:"jwt"`
+	Admin         AdminConfig    `yaml:"admin"`
+	Auth          AuthConfig     `yaml:"auth"`
+	EncryptionKey string         `yaml:"encryption_key"`
 }
 
 type HTTPConfig struct {
@@ -122,6 +123,13 @@ func Load() (*Config, error) {
 
 	if err := unmarshalItem("auth", &cfg.Auth); err != nil {
 		// optional, keep defaults
+	}
+
+	var encCfg struct {
+		Key string `yaml:"key"`
+	}
+	if err := unmarshalItem("encryption", &encCfg); err == nil {
+		cfg.EncryptionKey = encCfg.Key
 	}
 
 	return cfg, nil

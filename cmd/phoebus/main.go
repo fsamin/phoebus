@@ -20,6 +20,12 @@ import (
 )
 
 func main() {
+	// Handle subcommands
+	if len(os.Args) > 1 && os.Args[1] == "validate" {
+		runValidate()
+		return
+	}
+
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
 	slog.SetDefault(logger)
 
@@ -53,7 +59,7 @@ func main() {
 	r.Use(middleware.Timeout(30 * time.Second))
 
 	// Create and start the sync worker
-	syncWorker := syncer.New(db)
+	syncWorker := syncer.New(db, cfg.EncryptionKey)
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
 	go syncWorker.Start(workerCtx)
