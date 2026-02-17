@@ -72,7 +72,8 @@ export const api = {
     request<void>(`/admin/repos/${id}`, { method: 'DELETE' }),
   syncRepo: (id: string) =>
     request<{ status: string }>(`/admin/repos/${id}/sync`, { method: 'POST' }),
-  listUsers: () => request<User[]>('/admin/users'),
+  listUsers: (page = 1, perPage = 20) =>
+    request<{ users: User[]; total: number; page: number; per_page: number }>(`/admin/users?page=${page}&per_page=${perPage}`),
 };
 
 // --- Types ---

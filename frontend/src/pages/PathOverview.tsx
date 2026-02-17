@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Typography, Spin, Card, Collapse, List, Tag, Progress as AntProgress, Button,
+  Typography, Spin, Card, Collapse, List, Tag, Progress as AntProgress, Button, Breadcrumb,
 } from 'antd';
 import {
-  BookOutlined, CheckCircleOutlined, PlayCircleOutlined,
+  CheckCircleOutlined, PlayCircleOutlined,
   FileTextOutlined, QuestionCircleOutlined, CodeOutlined, DesktopOutlined,
+  WarningOutlined,
 } from '@ant-design/icons';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api/client';
 import type { LearningPathDetail, Progress, StepSummary } from '../api/client';
 
@@ -48,9 +49,14 @@ const PathOverview: React.FC = () => {
 
   // Find first incomplete step for "Continue Learning" button
   const nextStep = allSteps.find((s) => stepStatus(s.id, progress) !== 'completed');
+  const isPathCompleted = allSteps.length > 0 && !nextStep;
 
   return (
     <div>
+      <Breadcrumb items={[
+        { title: <Link to="/catalog">Catalog</Link> },
+        { title: path.title },
+      ]} style={{ marginBottom: 16 }} />
       <Typography.Title level={2}>
         {path.icon && <span style={{ marginRight: 8 }}>{path.icon}</span>}
         {path.title}
@@ -63,20 +69,28 @@ const PathOverview: React.FC = () => {
             <AntProgress percent={pct} />
             <Typography.Text type="secondary">
               {completedSteps}/{allSteps.length} steps completed
+              {' · '}{path.modules.length} modules
+              {path.estimated_duration ? ` · ⏱ ${path.estimated_duration}` : ''}
             </Typography.Text>
           </div>
-          {nextStep && (
+          {!isPathCompleted && nextStep && (
             <Button type="primary" onClick={() => navigate(`/paths/${pathId}/steps/${nextStep.id}`)}>
               {completedSteps > 0 ? 'Continue Learning' : 'Start Learning'}
             </Button>
           )}
+          {isPathCompleted && <Tag color="green" icon={<CheckCircleOutlined />}>Path Completed</Tag>}
         </div>
         <div style={{ marginTop: 12 }}>
           {path.tags?.map((tag) => <Tag key={tag}>{tag}</Tag>)}
-          {path.estimated_duration && (
-            <Tag icon={<BookOutlined />}>{path.estimated_duration}</Tag>
-          )}
         </div>
+        {path.prerequisites && path.prerequisites.length > 0 && (
+          <div style={{ marginTop: 12 }}>
+            <Typography.Text type="secondary">Prerequisites: </Typography.Text>
+            {path.prerequisites.map((p) => (
+              <Tag key={p} icon={<WarningOutlined />} color="orange">{p}</Tag>
+            ))}
+          </div>
+        )}
       </Card>
 
       <Collapse
@@ -108,11 +122,13 @@ const PathOverview: React.FC = () => {
                       style={{ cursor: 'pointer' }}
                       onClick={() => navigate(`/paths/${pathId}/steps/${step.id}`)}
                       extra={
-                        status === 'completed' ? (
-                          <CheckCircleOutlined style={{ color: '#52c41a' }} />
-                        ) : status === 'in_progress' ? (
-                          <PlayCircleOutlined style={{ color: '#faad14' }} />
-                        ) : null
+                        <>
+                          {status === 'completed' ? (
+                            <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                          ) : status === 'in_progress' ? (
+                            <span><PlayCircleOutlined style={{ color: '#faad14' }} /> <Typography.Text type="secondary" style={{ fontSize: 12 }}>← current</Typography.Text></span>
+                          ) : null}
+                        </>
                       }
                     >
                       <List.Item.Meta

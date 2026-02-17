@@ -1,10 +1,10 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Layout, Menu, Spin, Button, Typography, Popconfirm, message } from 'antd';
 import {
   ArrowLeftOutlined, ArrowRightOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
   FileTextOutlined, QuestionCircleOutlined, DesktopOutlined, CodeOutlined,
-  CheckCircleOutlined, PlayCircleOutlined,
+  CheckCircleOutlined, PlayCircleOutlined, CloseOutlined,
 } from '@ant-design/icons';
 import { api } from '../api/client';
 import type { StepDetail, LearningPathDetail, Progress } from '../api/client';
@@ -33,6 +33,7 @@ const StepView: React.FC = () => {
   const [progress, setProgress] = useState<Progress[]>([]);
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
+  const sidebarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!pathId || !stepId) return;
@@ -97,6 +98,12 @@ const StepView: React.FC = () => {
 
   if (loading || !path || !step) return <Spin size="large" style={{ display: 'block', marginTop: 100 }} />;
 
+  // Auto-scroll sidebar to current step
+  setTimeout(() => {
+    const el = sidebarRef.current?.querySelector('.ant-menu-item-selected');
+    el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  }, 100);
+
   // Build sidebar menu items grouped by module
   const sidebarItems = path.modules.map((m) => ({
     key: m.id,
@@ -110,7 +117,7 @@ const StepView: React.FC = () => {
           : status === 'in_progress'
           ? <PlayCircleOutlined style={{ color: '#faad14' }} />
           : stepIcon(s.type),
-        label: s.title,
+        label: <span style={s.id === stepId ? { fontWeight: 'bold' } : undefined}>{s.title}</span>,
       };
     }),
   }));
@@ -129,16 +136,20 @@ const StepView: React.FC = () => {
         theme="light"
         style={{ borderRight: '1px solid #f0f0f0', overflow: 'auto' }}
       >
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
+        <div ref={sidebarRef} style={{ height: '100%', overflow: 'auto' }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', gap: 8 }}>
           <Button
             type="text"
             icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
             onClick={() => setCollapsed(!collapsed)}
           />
           {!collapsed && (
-            <Button type="link" onClick={() => navigate(`/paths/${pathId}`)}>
-              ← Back to overview
-            </Button>
+            <>
+              <Button type="link" onClick={() => navigate(`/paths/${pathId}`)} style={{ flex: 1, textAlign: 'left', padding: 0 }}>
+                ← {path.title}
+              </Button>
+              <Button type="text" icon={<CloseOutlined />} size="small" onClick={() => navigate(`/paths/${pathId}`)} />
+            </>
           )}
         </div>
         <Menu
@@ -148,6 +159,7 @@ const StepView: React.FC = () => {
           items={sidebarItems}
           onClick={({ key }) => navigate(`/paths/${pathId}/steps/${key}`)}
         />
+        </div>
       </Sider>
       <Content style={{ padding: 24, overflow: 'auto' }}>
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
@@ -157,13 +169,17 @@ const StepView: React.FC = () => {
           {step.type === 'lesson' && (
             <>
               <MarkdownRenderer content={step.content_md} />
-              {!isCompleted && (
-                <div style={{ marginTop: 24, textAlign: 'center' }}>
+              <div style={{ marginTop: 24, textAlign: 'center' }}>
+                {isCompleted ? (
+                  <Button type="primary" size="large" disabled icon={<CheckCircleOutlined />}>
+                    ✅ Completed
+                  </Button>
+                ) : (
                   <Button type="primary" size="large" onClick={handleLessonComplete}>
                     Mark as Completed
                   </Button>
-                </div>
-              )}
+                )}
+              </div>
             </>
           )}
 
@@ -194,7 +210,7 @@ const StepView: React.FC = () => {
           )}
 
           {/* Reset button for exercises */}
-          {step.type !== 'lesson' && isCompleted && (
+          {step.type !== 'lesson' && (
             <div style={{ marginTop: 24, textAlign: 'center' }}>
               <Popconfirm title="Reset this exercise? Your previous attempts will be preserved." onConfirm={handleReset}>
                 <Button danger>Reset Exercise</Button>

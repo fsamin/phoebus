@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/fsamin/phoebus/internal/auth"
 	"github.com/fsamin/phoebus/internal/config"
@@ -41,6 +42,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Group(func(r chi.Router) {
 		r.Use(h.AuthMiddleware)
 		r.Get("/api/me", h.Me)
+		r.Get("/api/me/dashboard", h.Dashboard)
 		r.Post("/api/auth/logout", h.Logout)
 		r.Post("/api/auth/refresh", h.RefreshToken)
 
@@ -77,6 +79,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 			r.Put("/api/admin/repos/{repoId}", h.UpdateRepo)
 			r.Delete("/api/admin/repos/{repoId}", h.DeleteRepo)
 			r.Post("/api/admin/repos/{repoId}/sync", h.SyncRepo)
+			r.Get("/api/admin/health", h.AdminHealth)
 		})
 	})
 }
@@ -173,11 +176,29 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
+	page := 1
+	perPage := 20
+	if v := r.URL.Query().Get("page"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			page = n
+		}
+	}
+	if v := r.URL.Query().Get("per_page"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 100 {
+			perPage = n
+		}
+	}
+	offset := (page - 1) * perPage
+
+	var total int
+	h.db.GetContext(r.Context(), &total, "SELECT COUNT(*) FROM users")
+
 	var users []model.User
 	err := h.db.SelectContext(r.Context(), &users, `
 		SELECT id, username, email, display_name, role, auth_provider, active, last_login_at, created_at, updated_at
 		FROM users ORDER BY created_at DESC
-	`)
+		LIMIT $1 OFFSET $2
+	`, perPage, offset)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list users"})
 		return
@@ -185,7 +206,12 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	if users == nil {
 		users = []model.User{}
 	}
-	writeJSON(w, http.StatusOK, users)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"users": users,
+		"total": total,
+		"page":  page,
+		"per_page": perPage,
+	})
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {

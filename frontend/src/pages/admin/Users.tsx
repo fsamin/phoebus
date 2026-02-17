@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Tag, Typography, Select, Switch, message } from 'antd';
+import { Table, Tag, Typography, Select, Switch, message, Input } from 'antd';
+import { SearchOutlined } from '@ant-design/icons';
 import { api } from '../../api/client';
 import type { User } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
@@ -8,13 +9,26 @@ const Users: React.FC = () => {
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState('');
+  const [search, setSearch] = useState('');
 
-  const loadUsers = () => {
+  // Debounce search 300ms
+  useEffect(() => {
+    const t = setTimeout(() => setSearch(searchInput), 300);
+    return () => clearTimeout(t);
+  }, [searchInput]);
+
+  const loadUsers = (p = page) => {
     setLoading(true);
-    api.listUsers().then(setUsers).finally(() => setLoading(false));
+    api.listUsers(p).then((data) => {
+      setUsers(data.users);
+      setTotal(data.total);
+    }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { loadUsers(); }, []);
+  useEffect(() => { loadUsers(); }, [page]);
 
   const updateUser = async (userId: string, patch: { role?: string; active?: boolean }) => {
     const resp = await fetch(`/api/admin/users/${userId}`, {
@@ -32,13 +46,39 @@ const Users: React.FC = () => {
     loadUsers();
   };
 
+  const filteredUsers = search
+    ? users.filter((u) =>
+        u.username.toLowerCase().includes(search.toLowerCase()) ||
+        (u.display_name || '').toLowerCase().includes(search.toLowerCase()) ||
+        (u.email || '').toLowerCase().includes(search.toLowerCase()))
+    : users;
+
   return (
     <div>
-      <Typography.Title level={3}>Users</Typography.Title>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <Typography.Title level={3} style={{ margin: 0 }}>Users</Typography.Title>
+        <Input
+          prefix={<SearchOutlined />}
+          placeholder="Search users..."
+          value={searchInput}
+          onChange={(e) => setSearchInput(e.target.value)}
+          allowClear
+          style={{ width: 300 }}
+        />
+      </div>
       <Table
-        dataSource={users}
+        dataSource={filteredUsers}
         rowKey="id"
         loading={loading}
+        rowClassName={(record: User) => record.active ? '' : 'deactivated-row'}
+        pagination={{
+          current: page,
+          pageSize: 20,
+          total,
+          onChange: (p) => setPage(p),
+          showSizeChanger: false,
+          showTotal: (t) => `${t} users`,
+        }}
         columns={[
           { title: 'Username', dataIndex: 'username' },
           { title: 'Display Name', dataIndex: 'display_name' },

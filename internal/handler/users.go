@@ -84,5 +84,7 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.auditLog(r.Context(), claims, "update", "user", userID, map[string]any{"role": user.Role, "active": user.Active})
+
 	writeJSON(w, http.StatusOK, user)
 }

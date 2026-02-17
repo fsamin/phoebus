@@ -66,3 +66,9 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* Deactivated user rows */
+.deactivated-row {
+  opacity: 0.5;
+  background-color: #fafafa;
+}

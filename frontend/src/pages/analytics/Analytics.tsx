@@ -44,6 +44,17 @@ const Analytics: React.FC = () => {
 
   if (loading || !overview) return <Spin size="large" style={{ display: 'block', marginTop: 100 }} />;
 
+  const relativeTime = (iso: string) => {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60_000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    return `${days}d ago`;
+  };
+
   return (
     <div>
       <Typography.Title level={2}>Analytics</Typography.Title>
@@ -96,7 +107,7 @@ const Analytics: React.FC = () => {
                 <Typography.Text>{e.step_title}</Typography.Text>
                 <br />
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                  {e.path_title} · {new Date(e.created_at).toLocaleString()}
+                  {e.path_title} · {relativeTime(e.created_at)}
                 </Typography.Text>
               </div>
             ))}

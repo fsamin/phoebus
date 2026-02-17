@@ -99,6 +99,8 @@ func (h *Handler) CreateRepo(w http.ResponseWriter, r *http.Request) {
 	// Enqueue initial sync
 	h.enqueueSync(r.Context(), repo.ID)
 
+	h.auditLog(r.Context(), ClaimsFromContext(r.Context()), "create", "git_repository", repo.ID.String(), map[string]any{"clone_url": req.CloneURL})
+
 	writeJSON(w, http.StatusCreated, repo)
 }
 
@@ -138,6 +140,8 @@ func (h *Handler) UpdateRepo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.auditLog(r.Context(), ClaimsFromContext(r.Context()), "update", "git_repository", id, nil)
+
 	writeJSON(w, http.StatusOK, repo)
 }
 
@@ -153,6 +157,7 @@ func (h *Handler) DeleteRepo(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "repository not found"})
 		return
 	}
+	h.auditLog(r.Context(), ClaimsFromContext(r.Context()), "delete", "git_repository", id, nil)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "deleted"})
 }
 
@@ -165,6 +170,7 @@ func (h *Handler) SyncRepo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.enqueueSync(r.Context(), repoUUID)
+	h.auditLog(r.Context(), ClaimsFromContext(r.Context()), "sync", "git_repository", id, nil)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "sync enqueued"})
 }
 

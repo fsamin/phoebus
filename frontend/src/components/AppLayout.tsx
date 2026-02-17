@@ -8,6 +8,8 @@ import {
   UserOutlined,
   LogoutOutlined,
   FireOutlined,
+  TeamOutlined,
+  HeartOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -31,7 +33,7 @@ const AppLayout: React.FC = () => {
     return <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname)}`} replace />;
   }
 
-  const menuItems = [
+  const menuItems: Array<{ key: string; icon: React.ReactNode; label: string; children?: Array<{ key: string; icon: React.ReactNode; label: string }> }> = [
     { key: '/', icon: <DashboardOutlined />, label: 'Dashboard' },
     { key: '/catalog', icon: <BookOutlined />, label: 'Catalog' },
   ];
@@ -41,11 +43,19 @@ const AppLayout: React.FC = () => {
   }
 
   if (user.role === 'admin') {
-    menuItems.push({ key: '/admin/repositories', icon: <SettingOutlined />, label: 'Admin' });
+    menuItems.push({
+      key: '/admin',
+      icon: <SettingOutlined />,
+      label: 'Admin',
+      children: [
+        { key: '/admin/repositories', icon: <SettingOutlined />, label: 'Repositories' },
+        { key: '/admin/users', icon: <TeamOutlined />, label: 'Users' },
+        { key: '/admin/health', icon: <HeartOutlined />, label: 'Health' },
+      ],
+    });
   }
 
-  const currentKey = menuItems
-    .map((i) => i.key)
+  const currentKey = ['/admin/repositories', '/admin/users', '/admin/health', '/analytics', '/catalog', '/']
     .filter((k) => location.pathname.startsWith(k))
     .sort((a, b) => b.length - a.length)[0] || '/';
 

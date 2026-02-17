@@ -47,6 +47,23 @@ const LearnerDetail: React.FC = () => {
 
   if (loading || !data) return <Spin size="large" style={{ display: 'block', marginTop: 100 }} />;
 
+  const formatDay = (iso: string) => {
+    const d = new Date(iso);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    if (d.toDateString() === today.toDateString()) return 'Today';
+    if (d.toDateString() === yesterday.toDateString()) return 'Yesterday';
+    return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
+  };
+
+  // Group activity by day
+  const groupedActivity: Record<string, typeof data.activity> = {};
+  for (const a of data.activity) {
+    const day = formatDay(a.timestamp);
+    (groupedActivity[day] ??= []).push(a);
+  }
+
   return (
     <div>
       <Breadcrumb items={[
@@ -94,21 +111,26 @@ const LearnerDetail: React.FC = () => {
       <Row gutter={[16, 16]}>
         <Col xs={24} lg={12}>
           <Card title="Activity Timeline" style={{ maxHeight: 500, overflow: 'auto' }}>
-            <Timeline
-              items={data.activity.map((a) => ({
-                color: a.event === 'completed' ? 'green' : 'blue',
-                dot: a.event === 'completed' ? <CheckCircleOutlined /> : <PlayCircleOutlined />,
-                children: (
-                  <div>
-                    <Typography.Text>{a.event === 'completed' ? 'Completed' : 'Started'}: {a.step_title}</Typography.Text>
-                    <br />
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      {a.path_title} · {new Date(a.timestamp).toLocaleString()}
-                    </Typography.Text>
-                  </div>
-                ),
-              }))}
-            />
+            {Object.entries(groupedActivity).map(([day, items]) => (
+              <div key={day}>
+                <Typography.Text strong style={{ display: 'block', marginBottom: 8, marginTop: 8 }}>{day}</Typography.Text>
+                <Timeline
+                  items={items.map((a) => ({
+                    color: a.event === 'completed' ? 'green' : 'blue',
+                    dot: a.event === 'completed' ? <CheckCircleOutlined /> : <PlayCircleOutlined />,
+                    children: (
+                      <div>
+                        <Typography.Text>{a.event === 'completed' ? 'Completed' : 'Started'}: {a.step_title}</Typography.Text>
+                        <br />
+                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                          {a.path_title} · {new Date(a.timestamp).toLocaleTimeString()}
+                        </Typography.Text>
+                      </div>
+                    ),
+                  }))}
+                />
+              </div>
+            ))}
           </Card>
         </Col>
         <Col xs={24} lg={12}>

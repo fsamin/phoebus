@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Form, Input, Select, Button, Card, Typography, message } from 'antd';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Form, Input, Select, Button, Card, Typography, message, Breadcrumb } from 'antd';
+import { useNavigate, useParams, Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { RepoInput } from '../../api/client';
 
@@ -45,6 +45,10 @@ const RepoForm: React.FC = () => {
 
   return (
     <div style={{ maxWidth: 600, margin: '0 auto' }}>
+      <Breadcrumb items={[
+        { title: <Link to="/admin/repositories">Repositories</Link> },
+        { title: isEdit ? 'Edit' : 'Add' },
+      ]} style={{ marginBottom: 16 }} />
       <Typography.Title level={3}>{isEdit ? 'Edit' : 'Add'} Repository</Typography.Title>
       <Card>
         <Form form={form} layout="vertical" onFinish={onFinish} initialValues={{ branch: 'main', auth_type: 'none' }}>

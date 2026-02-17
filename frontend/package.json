@@ -12,12 +12,15 @@
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
     "antd": "^6.3.0",
+    "mermaid": "^11.12.3",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^7.13.0",
     "rehype-highlight": "^7.0.2",
     "rehype-raw": "^7.0.0",
+    "remark-directive": "^4.0.0",
+    "remark-directive-rehype": "^1.0.0",
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
