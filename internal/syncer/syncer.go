@@ -150,28 +150,40 @@ func (s *Syncer) processJob(ctx context.Context, jobID, repoID uuid.UUID) {
 	}
 	defer os.RemoveAll(tmpDir)
 
-	// Decrypt credentials if needed
-	var creds []byte
-	if len(repo.Credentials) > 0 && s.encryptionKey != "" {
-		decrypted, err := crypto.Decrypt(repo.Credentials, []byte(s.encryptionKey))
-		if err != nil {
-			// Fallback: might be plaintext (pre-encryption migration)
-			creds = repo.Credentials
-		} else {
-			creds = decrypted
+	// For file:// URLs, use local path directly instead of git clone
+	repoDir := tmpDir
+	if strings.HasPrefix(repo.CloneURL, "file://") {
+		localPath := strings.TrimPrefix(repo.CloneURL, "file://")
+		if _, err := os.Stat(localPath); err != nil {
+			logger.Error("local path not accessible", "path", localPath, "error", err)
+			s.failJob(ctx, jobID, repoID, fmt.Errorf("local path not accessible: %w", err))
+			return
 		}
+		repoDir = localPath
 	} else {
-		creds = repo.Credentials
-	}
+		// Decrypt credentials if needed
+		var creds []byte
+		if len(repo.Credentials) > 0 && s.encryptionKey != "" {
+			decrypted, err := crypto.Decrypt(repo.Credentials, []byte(s.encryptionKey))
+			if err != nil {
+				// Fallback: might be plaintext (pre-encryption migration)
+				creds = repo.Credentials
+			} else {
+				creds = decrypted
+			}
+		} else {
+			creds = repo.Credentials
+		}
 
-	if err := gitClone(repo.CloneURL, repo.Branch, tmpDir, repo.AuthType, creds); err != nil {
-		logger.Error("git clone failed", "error", err)
-		s.failJob(ctx, jobID, repoID, fmt.Errorf("git clone failed: %w", err))
-		return
+		if err := gitClone(repo.CloneURL, repo.Branch, tmpDir, repo.AuthType, creds); err != nil {
+			logger.Error("git clone failed", "error", err)
+			s.failJob(ctx, jobID, repoID, fmt.Errorf("git clone failed: %w", err))
+			return
+		}
 	}
 
 	// Parse and sync content
-	if err := s.syncContent(ctx, repoID, tmpDir); err != nil {
+	if err := s.syncContent(ctx, repoID, repoDir); err != nil {
 		logger.Error("content sync failed", "error", err)
 		s.failJob(ctx, jobID, repoID, err)
 		return
