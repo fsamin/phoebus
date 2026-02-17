@@ -87,12 +87,15 @@ The backend has no code execution, no infrastructure orchestration, and no WebSo
 |---|---|
 | `GET /api/learning-paths` | List, search, and retrieve learning paths, modules, steps |
 | `GET /api/learning-paths/{id}/steps/{id}` | Retrieve step content including exercise data (proposals, patches, codebase files) |
+| `POST /api/auth/login` | Local/LDAP authentication (sets httpOnly JWT cookie) |
+| `POST /api/auth/register` | Self-registration for local auth (creates learner, sets JWT cookie) |
 | `POST /api/webhooks/{uuid}` | Git-provider-agnostic webhook endpoint to trigger content sync |
 | `GET/POST /api/progress` | Learner progress tracking (read/write) |
 | `POST /api/exercises/{id}/attempt` | Submit exercise answers for server-side validation; returns verdict + explanations |
 | `POST /api/exercises/{id}/reset` | Reset exercise progress for a learner |
 | `GET /api/admin/repos` | Manage registered Git repositories (CRUD, sync status) |
 | `POST /api/admin/repos/{id}/sync` | Manually trigger content sync for a repository |
+| `POST /api/admin/users` | Create a local user (admin only, local auth must be enabled) |
 | `GET /api/analytics/*` | Learner and instructor analytics |
 | `GET /api/users/*` | User management (admin only) |
 

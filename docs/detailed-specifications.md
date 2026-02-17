@@ -735,10 +735,12 @@ Managers can view aggregated progress for their team members. Teams are derived 
 **Behavior:**
 
 1. Users are created automatically upon first SSO login (OIDC/LDAP)
-2. Default role for new users: `learner`
-3. Administrators can change a user's role: `learner`, `instructor`, `admin`
-4. Administrators can deactivate users (soft-delete — they cannot log in but their data is preserved)
-5. User list displays: name, email, role, last login, number of completed paths
+2. When local auth is enabled, users can self-register via a signup form on the login page (created with role `learner`)
+3. Administrators can create local users manually from the Admin > Users view (with a chosen role and temporary password)
+4. Default role for new users: `learner`
+5. Administrators can change a user's role: `learner`, `instructor`, `admin`
+6. Administrators can deactivate users (soft-delete — they cannot log in but their data is preserved)
+7. User list displays: name, email, role, last login, number of completed paths
 
 **RBAC Matrix:**
 
@@ -833,16 +835,42 @@ See section 2.1 (Git Repository Registration). The admin UI provides:
 2. Phoebus verifies the password against a bcrypt hash stored in the `users` table
 3. If valid, a session token (JWT) is issued as an httpOnly cookie (same as OIDC/LDAP)
 
+**Self-Registration (Signup):**
+
+When local auth is enabled, a "Create account" link is displayed below the login form. Clicking it reveals a registration form:
+
+1. User fills in: username, display name, email (optional), password, confirm password
+2. `POST /api/auth/register` creates the user with role `learner` and `auth_provider: local`
+3. On success, the user is automatically logged in (JWT cookie set) and redirected to `/`
+
+**Constraints:**
+- Signup is only available when local auth is enabled (`local_auth.enabled: true`)
+- Username must be unique (4–32 chars, alphanumeric + hyphens)
+- Password minimum length: 8 characters
+- If username already exists → error "Username already taken"
+
+**Admin User Creation:**
+
+Administrators can create local users from the Admin > Users view:
+
+1. Admin clicks "Add User" button
+2. Modal form: username, display name, email, role (learner/instructor/admin), password
+3. `POST /api/admin/users` creates the user with `auth_provider: local`
+4. The created user can log in immediately with the provided credentials
+
 **Scope:**
 - Bcrypt-hashed passwords
 - `/api/auth/login` endpoint
+- `/api/auth/register` endpoint (self-registration)
+- `/api/admin/users` endpoint (admin creation with `POST`)
 - No password reset functionality
-- No password complexity policy
+- No password complexity policy (beyond minimum 8 chars)
 - Essential for bootstrap (first admin account), getting started (`docker compose up` → immediate login), and development
 
 **Configuration:**
 - Enabled/disabled via `local_auth.enabled` (default: `true`)
 - Disabled in production via `local_auth.enabled: false`
+- When disabled, `/api/auth/register` returns `403 Forbidden` and signup UI is hidden
 
 ---
 
@@ -906,7 +934,7 @@ All authenticated views share a common shell layout:
 
 ### 10.3 Login (`/login`)
 
-**Purpose:** Authenticate the user via OIDC, LDAP, or local credentials.
+**Purpose:** Authenticate the user via OIDC, LDAP, or local credentials. Optionally allow self-registration.
 
 **Layout:** Centered card on a neutral background, no global header.
 
@@ -925,7 +953,31 @@ All authenticated views share a common shell layout:
 │                                     │
 │        [Sign In]                    │
 │                                     │
+│  Don't have an account? Create one  │  ← Link (if local auth enabled)
+│                                     │
 │  ⚠ Invalid credentials             │  ← Error (conditional)
+└─────────────────────────────────────┘
+```
+
+**Registration form** (toggled via "Create one" link, replaces login form):
+
+```
+┌─────────────────────────────────────┐
+│           🔥 Phoebus                │
+│                                     │
+│  Create your account                │
+│                                     │
+│  Username      [___________________]│
+│  Display Name  [___________________]│
+│  Email         [___________________]│  ← Optional
+│  Password      [___________________]│
+│  Confirm       [___________________]│
+│                                     │
+│        [Create Account]             │
+│                                     │
+│  Already have an account? Sign in   │  ← Link back to login form
+│                                     │
+│  ⚠ Username already taken           │  ← Error (conditional)
 └─────────────────────────────────────┘
 ```
 
@@ -935,10 +987,13 @@ All authenticated views share a common shell layout:
 |---|---|---|
 | SSO button | OIDC is configured | Redirects to OIDC provider (external redirect via `GET /api/auth/oidc/redirect`) |
 | Username/password form | LDAP or local auth enabled | `POST /api/auth/login` with credentials |
-| Error message | On failed login | "Invalid credentials" (no distinction between wrong user/wrong password for security) |
+| "Create account" link | Local auth enabled | Toggles to registration form |
+| Registration form | Local auth enabled + user clicked link | `POST /api/auth/register` with `{ username, display_name, email, password }` |
+| Error message | On failed login or registration | "Invalid credentials" or "Username already taken" (no distinction between wrong user/wrong password for security) |
 
 **API Calls:**
 - `POST /api/auth/login` — LDAP/local authentication (sets httpOnly cookie on success)
+- `POST /api/auth/register` — Local self-registration (creates user with role `learner`, sets httpOnly cookie on success)
 - `GET /api/auth/oidc/redirect` — returns OIDC provider URL for browser redirect
 
 **Navigation:**
@@ -1574,7 +1629,7 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 
 ### 10.13 User Management (`/admin/users`)
 
-**Purpose:** List all users, change roles, deactivate accounts.
+**Purpose:** List all users, change roles, deactivate accounts, and create local users.
 
 **Required role:** `admin`
 
@@ -1585,7 +1640,7 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 │ Header                                                               │
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  User Management                                                     │
+│  User Management                                    [+ Add User]     │
 │                                                                      │
 │  [🔍 Search users...                    ]                            │
 │                                                                      │
@@ -1600,6 +1655,26 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 │  Showing 4 of 42 users                        [← 1  2  3  4  5 →]  │
 │                                                                      │
 └──────────────────────────────────────────────────────────────────────┘
+```
+
+**"Add User" modal** (shown when clicking the [+ Add User] button, only when local auth is enabled):
+
+```
+┌─────────────────────────────────────┐
+│  Create Local User                  │
+│                                     │
+│  Username      [___________________]│
+│  Display Name  [___________________]│
+│  Email         [___________________]│  ← Optional
+│  Role          (●) learner          │
+│                ( ) instructor       │
+│                ( ) admin            │
+│  Password      [___________________]│
+│                                     │
+│        [Cancel]  [Create User]      │
+│                                     │
+│  ⚠ Username already taken           │  ← Error (conditional)
+└─────────────────────────────────────┘
 ```
 
 **Table columns:**
@@ -1617,6 +1692,7 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 
 | Action | Behavior |
 |---|---|
+| Add User | Ant Design Modal with form (username, display name, email, role, password). `POST /api/admin/users` with `{ username, display_name, email, role, password }`. Only shown when local auth is enabled. Toast confirmation "User created" |
 | Change Role | Ant Design Modal with role selector (radio: learner, instructor, admin). `PATCH /api/users/:userId` with `{ role }`. Toast confirmation |
 | Deactivate | Confirmation modal. `PATCH /api/users/:userId` with `{ active: false }`. User cannot log in. Row is greyed out |
 | Reactivate | `PATCH /api/users/:userId` with `{ active: true }`. Row returns to normal |
@@ -1626,6 +1702,7 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 
 **API Calls:**
 - `GET /api/users?page=1&per_page=20` — paginated user list
+- `POST /api/admin/users` — create a local user (admin only, local auth must be enabled)
 - `PATCH /api/users/:userId` — update role or active status
 
 ### 10.14 Platform Health (`/admin/health`)
