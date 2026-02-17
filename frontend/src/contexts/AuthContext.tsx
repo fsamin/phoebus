@@ -26,6 +26,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     api.me().then(setUser).catch(() => setUser(null)).finally(() => setLoading(false));
   }, []);
 
+  // Auto-refresh token every 7 hours (token expires in 8h)
+  useEffect(() => {
+    if (!user) return;
+    const interval = setInterval(() => {
+      fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' })
+        .catch(() => { /* silent — will 401 on next API call */ });
+    }, 7 * 60 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user]);
+
   const login = useCallback(async (username: string, password: string) => {
     const res = await api.login(username, password);
     setUser(res.user as User);

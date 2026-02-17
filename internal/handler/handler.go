@@ -30,6 +30,10 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 	// Public
 	r.Get("/api/health", h.Health)
 	r.Post("/api/auth/login", h.Login)
+	r.Post("/api/auth/ldap/login", h.LDAPLogin)
+	r.Get("/api/auth/oidc/redirect", h.OIDCRedirect)
+	r.Get("/api/auth/oidc/callback", h.OIDCCallback)
+	r.Get("/api/auth/providers", h.AuthProviders)
 	r.Post("/api/webhooks/{uuid}", h.Webhook)
 
 	// Authenticated
@@ -37,6 +41,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 		r.Use(h.AuthMiddleware)
 		r.Get("/api/me", h.Me)
 		r.Post("/api/auth/logout", h.Logout)
+		r.Post("/api/auth/refresh", h.RefreshToken)
 
 		// Learning paths (all authenticated users)
 		r.Get("/api/learning-paths", h.ListLearningPaths)
