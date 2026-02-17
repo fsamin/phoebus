@@ -1,8 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, Radio, Button, Alert, Typography, Tag, Space, Divider, Tree } from 'antd';
 import { FileOutlined, FolderOutlined } from '@ant-design/icons';
 import MarkdownRenderer from './MarkdownRenderer';
 import type { CodebaseFile } from '../api/client';
+import hljs from 'highlight.js/lib/core';
+import javascript from 'highlight.js/lib/languages/javascript';
+import typescript from 'highlight.js/lib/languages/typescript';
+import python from 'highlight.js/lib/languages/python';
+import go from 'highlight.js/lib/languages/go';
+import yaml from 'highlight.js/lib/languages/yaml';
+import json from 'highlight.js/lib/languages/json';
+import bash from 'highlight.js/lib/languages/bash';
+import dockerfile from 'highlight.js/lib/languages/dockerfile';
+import xml from 'highlight.js/lib/languages/xml';
+import css from 'highlight.js/lib/languages/css';
+import sql from 'highlight.js/lib/languages/sql';
+import markdown from 'highlight.js/lib/languages/markdown';
+import 'highlight.js/styles/github.css';
+
+hljs.registerLanguage('javascript', javascript);
+hljs.registerLanguage('typescript', typescript);
+hljs.registerLanguage('python', python);
+hljs.registerLanguage('go', go);
+hljs.registerLanguage('yaml', yaml);
+hljs.registerLanguage('json', json);
+hljs.registerLanguage('bash', bash);
+hljs.registerLanguage('dockerfile', dockerfile);
+hljs.registerLanguage('xml', xml);
+hljs.registerLanguage('html', xml);
+hljs.registerLanguage('css', css);
+hljs.registerLanguage('sql', sql);
+hljs.registerLanguage('markdown', markdown);
 
 interface Patch {
   label: string;
@@ -58,6 +86,26 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
   const currentFile = codebaseFiles.find((f) => f.file_path === selectedFile);
   const lines = currentFile?.content.split('\n') || [];
   const treeData = buildTreeData(codebaseFiles);
+
+  // Syntax highlighting
+  const highlightedLines = useMemo(() => {
+    if (!currentFile) return [];
+    const ext = selectedFile.split('.').pop()?.toLowerCase() || '';
+    const langMap: Record<string, string> = {
+      js: 'javascript', jsx: 'javascript', ts: 'typescript', tsx: 'typescript',
+      py: 'python', go: 'go', yml: 'yaml', yaml: 'yaml', json: 'json',
+      sh: 'bash', bash: 'bash', dockerfile: 'dockerfile', html: 'html',
+      htm: 'html', xml: 'xml', css: 'css', sql: 'sql', md: 'markdown',
+    };
+    const lang = langMap[ext];
+    if (!lang) return lines.map((l) => l);
+    try {
+      const result = hljs.highlight(currentFile.content, { language: lang });
+      return result.value.split('\n');
+    } catch {
+      return lines.map((l) => l);
+    }
+  }, [currentFile, selectedFile, lines]);
 
   const toggleLine = (lineNum: number) => {
     if (phase !== 'identify' || feedback) return;
@@ -131,7 +179,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
         {/* Code viewer */}
         <div style={{ flex: 1, overflow: 'auto', maxHeight: 400 }}>
           <pre style={{ margin: 0, padding: 16, background: '#f6f8fa', borderRadius: 6, fontSize: 13, lineHeight: '20px' }}>
-            {lines.map((line, i) => {
+            {lines.map((_line, i) => {
               const lineNum = i + 1;
               const isSelected = selectedLines.includes(lineNum);
               const isTarget = target?.file === selectedFile && target?.lines.includes(lineNum);
@@ -153,7 +201,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
                   <span style={{ width: 40, textAlign: 'right', paddingRight: 12, color: '#999', userSelect: 'none' }}>
                     {lineNum}
                   </span>
-                  <code>{line}</code>
+                  <code dangerouslySetInnerHTML={{ __html: highlightedLines[i] || '' }} />
                 </div>
               );
             })}
