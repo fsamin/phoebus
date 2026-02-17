@@ -1,15 +1,15 @@
 package database
 
 import (
-	"database/sql"
 	"log/slog"
 
 	"github.com/fsamin/phoebus/internal/config"
+	"github.com/jmoiron/sqlx"
 	"golang.org/x/crypto/bcrypt"
 )
 
 // SeedAdmin ensures a default admin user exists for bootstrap.
-func SeedAdmin(db *sql.DB, cfg *config.Config) error {
+func SeedAdmin(db *sqlx.DB, cfg *config.Config) error {
 	if !cfg.LocalAuth {
 		return nil
 	}

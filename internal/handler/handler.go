@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"database/sql"
 	"encoding/json"
 	"net/http"
 
@@ -9,14 +8,15 @@ import (
 	"github.com/fsamin/phoebus/internal/config"
 	"github.com/fsamin/phoebus/internal/model"
 	"github.com/go-chi/chi/v5"
+	"github.com/jmoiron/sqlx"
 )
 
 type Handler struct {
-	db  *sql.DB
+	db  *sqlx.DB
 	cfg *config.Config
 }
 
-func New(db *sql.DB, cfg *config.Config) *Handler {
+func New(db *sqlx.DB, cfg *config.Config) *Handler {
 	return &Handler{db: db, cfg: cfg}
 }
 
@@ -62,11 +62,10 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var user model.User
-	var passwordHash sql.NullString
-	err := h.db.QueryRowContext(r.Context(), `
+	err := h.db.QueryRowxContext(r.Context(), `
 		SELECT id, username, display_name, role, password_hash, active
 		FROM users WHERE username = $1 AND auth_provider = 'local'
-	`, req.Username).Scan(&user.ID, &user.Username, &user.DisplayName, &user.Role, &passwordHash, &user.Active)
+	`, req.Username).StructScan(&user)
 	if err != nil {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid credentials"})
 		return
@@ -77,7 +76,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !passwordHash.Valid || !auth.CheckPassword(passwordHash.String, req.Password) {
+	if user.PasswordHash == nil || !auth.CheckPassword(*user.PasswordHash, req.Password) {
 		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid credentials"})
 		return
 	}
@@ -118,10 +117,10 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var user model.User
-	err := h.db.QueryRowContext(r.Context(), `
-		SELECT id, username, COALESCE(email, ''), display_name, role, auth_provider, active, created_at, updated_at
+	err := h.db.GetContext(r.Context(), &user, `
+		SELECT id, username, email, display_name, role, auth_provider, active, created_at, updated_at
 		FROM users WHERE id = $1
-	`, claims.UserID).Scan(&user.ID, &user.Username, new(string), &user.DisplayName, &user.Role, &user.AuthProvider, &user.Active, &user.CreatedAt, &user.UpdatedAt)
+	`, claims.UserID)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to fetch user"})
 		return
@@ -131,23 +130,14 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
-	rows, err := h.db.QueryContext(r.Context(), `
-		SELECT id, username, COALESCE(email, ''), display_name, role, auth_provider, active, last_login_at, created_at, updated_at
+	var users []model.User
+	err := h.db.SelectContext(r.Context(), &users, `
+		SELECT id, username, email, display_name, role, auth_provider, active, last_login_at, created_at, updated_at
 		FROM users ORDER BY created_at DESC
 	`)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list users"})
 		return
-	}
-	defer rows.Close()
-
-	var users []model.User
-	for rows.Next() {
-		var u model.User
-		if err := rows.Scan(&u.ID, &u.Username, new(string), &u.DisplayName, &u.Role, &u.AuthProvider, &u.Active, &u.LastLoginAt, &u.CreatedAt, &u.UpdatedAt); err != nil {
-			continue
-		}
-		users = append(users, u)
 	}
 	if users == nil {
 		users = []model.User{}

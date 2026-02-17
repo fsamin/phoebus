@@ -475,6 +475,7 @@ All configuration — including the AES-256-GCM encryption key — is managed th
 |---|---|---|
 | **Backend** | Go | Latest stable |
 | **HTTP Router** | Chi | Latest stable |
+| **Database Access** | sqlx (struct mapping over `database/sql`) | Latest stable |
 | **Frontend** | React + Ant Design | Latest stable |
 | **Frontend Build** | Vite + React Router | Latest stable |
 | **Code Viewer** | Monaco Editor (read-only) | Latest stable |

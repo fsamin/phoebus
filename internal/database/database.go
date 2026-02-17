@@ -1,26 +1,23 @@
 package database
 
 import (
-	"database/sql"
 	"embed"
 	"fmt"
 	"log/slog"
 	"sort"
 	"strings"
 
+	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
 
 //go:embed migrations/*.sql
 var migrationsFS embed.FS
 
-func Connect(databaseURL string) (*sql.DB, error) {
-	db, err := sql.Open("postgres", databaseURL)
+func Connect(databaseURL string) (*sqlx.DB, error) {
+	db, err := sqlx.Connect("postgres", databaseURL)
 	if err != nil {
-		return nil, fmt.Errorf("open database: %w", err)
-	}
-	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("ping database: %w", err)
+		return nil, fmt.Errorf("connect database: %w", err)
 	}
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(5)
@@ -28,7 +25,7 @@ func Connect(databaseURL string) (*sql.DB, error) {
 	return db, nil
 }
 
-func Migrate(db *sql.DB) error {
+func Migrate(db *sqlx.DB) error {
 	// Create migrations tracking table
 	if _, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS schema_migrations (
