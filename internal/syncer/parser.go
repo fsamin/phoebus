@@ -71,8 +71,8 @@ type stepMeta struct {
 	Type     string `yaml:"type"`
 	Duration string `yaml:"estimated_duration"`
 	// Code exercise fields
-	Mode   string          `yaml:"mode"`
-	Target json.RawMessage `yaml:"target"`
+	Mode   string      `yaml:"mode"`
+	Target interface{} `yaml:"target"`
 }
 
 func parseStep(stepPath string) (*stepMeta, string, json.RawMessage, error) {
@@ -301,7 +301,7 @@ func parseTerminalStep(body string) (map[string]any, error) {
 
 // --- Code exercise parser ---
 
-func parseCodeExerciseBody(body, mode string, target json.RawMessage) (json.RawMessage, error) {
+func parseCodeExerciseBody(body, mode string, target interface{}) (json.RawMessage, error) {
 	// Split on ## Patches
 	patchIdx := strings.Index(body, "## Patches")
 	if patchIdx < 0 {
@@ -337,10 +337,8 @@ func parseCodeExerciseBody(body, mode string, target json.RawMessage) (json.RawM
 		"description": description,
 		"patches":     patches,
 	}
-	if len(target) > 0 {
-		var t any
-		json.Unmarshal(target, &t)
-		result["target"] = t
+	if target != nil {
+		result["target"] = convertYAMLToJSON(target)
 	}
 
 	return json.Marshal(result)
@@ -478,4 +476,24 @@ func parseProposalLine(rest string) (string, string) {
 		explanation = strings.TrimSpace(rest[idx+len(" — "):])
 	}
 	return cmd, explanation
+}
+
+// convertYAMLToJSON recursively converts map[interface{}]interface{} to map[string]interface{}
+// so it can be marshalled to JSON.
+func convertYAMLToJSON(v interface{}) interface{} {
+	switch val := v.(type) {
+	case map[interface{}]interface{}:
+		m := make(map[string]interface{})
+		for k, v := range val {
+			m[fmt.Sprintf("%v", k)] = convertYAMLToJSON(v)
+		}
+		return m
+	case []interface{}:
+		for i, item := range val {
+			val[i] = convertYAMLToJSON(item)
+		}
+		return val
+	default:
+		return v
+	}
 }

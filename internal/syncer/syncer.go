@@ -268,10 +268,11 @@ func base64Encode(data []byte) string {
 }
 
 func (s *Syncer) syncContent(ctx context.Context, repoID uuid.UUID, repoDir string) error {
-	// Parse phoebus.yaml
-	lpMeta, err := parsePhoebus(repoDir)
+	// Discover learning paths: either phoebus.yaml at root (single path)
+	// or phoebus.yaml in subdirectories (multi-path repo)
+	pathDirs, err := discoverLearningPaths(repoDir)
 	if err != nil {
-		return fmt.Errorf("parse phoebus.yaml: %w", err)
+		return err
 	}
 
 	// Begin transaction
@@ -281,12 +282,73 @@ func (s *Syncer) syncContent(ctx context.Context, repoID uuid.UUID, repoDir stri
 	}
 	defer tx.Rollback()
 
+	existingPathKeys := map[string]bool{}
+	for _, pd := range pathDirs {
+		if err := s.syncOnePath(ctx, tx, repoID, pd.dir, pd.filePath); err != nil {
+			return err
+		}
+		existingPathKeys[pd.filePath] = true
+	}
+
+	// Delete learning paths that no longer exist in this repo
+	tx.ExecContext(ctx, `
+		DELETE FROM learning_paths WHERE repo_id = $1 AND file_path != ALL($2)
+	`, repoID, pq.Array(keys(existingPathKeys)))
+
+	return tx.Commit()
+}
+
+type pathDir struct {
+	dir      string // absolute path to the learning path directory
+	filePath string // relative path used as unique key (empty for root, "subdir" for subdirs)
+}
+
+// discoverLearningPaths finds all phoebus.yaml files in the repo.
+func discoverLearningPaths(repoDir string) ([]pathDir, error) {
+	// Check root first
+	if _, err := os.Stat(filepath.Join(repoDir, "phoebus.yaml")); err == nil {
+		return []pathDir{{dir: repoDir, filePath: ""}}, nil
+	}
+
+	// Check subdirectories for multi-path repos
+	entries, err := os.ReadDir(repoDir)
+	if err != nil {
+		return nil, fmt.Errorf("read repo dir: %w", err)
+	}
+
+	var paths []pathDir
+	for _, e := range entries {
+		if !e.IsDir() || strings.HasPrefix(e.Name(), ".") {
+			continue
+		}
+		subDir := filepath.Join(repoDir, e.Name())
+		if _, err := os.Stat(filepath.Join(subDir, "phoebus.yaml")); err == nil {
+			paths = append(paths, pathDir{dir: subDir, filePath: e.Name()})
+		}
+	}
+
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("no phoebus.yaml found at root or in subdirectories")
+	}
+
+	sort.Slice(paths, func(i, j int) bool {
+		return paths[i].filePath < paths[j].filePath
+	})
+	return paths, nil
+}
+
+func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID, pathRoot, filePath string) error {
+	lpMeta, err := parsePhoebus(pathRoot)
+	if err != nil {
+		return fmt.Errorf("parse phoebus.yaml in %s: %w", filePath, err)
+	}
+
 	// Upsert learning path
 	var lpID uuid.UUID
 	err = tx.GetContext(ctx, &lpID, `
-		INSERT INTO learning_paths (repo_id, title, description, icon, tags, estimated_duration, prerequisites)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-		ON CONFLICT (repo_id) DO UPDATE SET
+		INSERT INTO learning_paths (repo_id, title, description, icon, tags, estimated_duration, prerequisites, file_path)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		ON CONFLICT (repo_id, file_path) DO UPDATE SET
 			title = EXCLUDED.title,
 			description = EXCLUDED.description,
 			icon = EXCLUDED.icon,
@@ -295,15 +357,15 @@ func (s *Syncer) syncContent(ctx context.Context, repoID uuid.UUID, repoDir stri
 			prerequisites = EXCLUDED.prerequisites,
 			updated_at = now()
 		RETURNING id
-	`, repoID, lpMeta.Title, lpMeta.Description, lpMeta.Icon, pq.Array(lpMeta.Tags), lpMeta.EstimatedDuration, pq.Array(lpMeta.Prerequisites))
+	`, repoID, lpMeta.Title, lpMeta.Description, lpMeta.Icon, pq.Array(lpMeta.Tags), lpMeta.EstimatedDuration, pq.Array(lpMeta.Prerequisites), filePath)
 	if err != nil {
-		return fmt.Errorf("upsert learning path: %w", err)
+		return fmt.Errorf("upsert learning path %s: %w", lpMeta.Title, err)
 	}
 
 	// Find module directories
-	moduleDirs, err := findOrderedDirs(repoDir)
+	moduleDirs, err := findOrderedDirs(pathRoot)
 	if err != nil {
-		return fmt.Errorf("find modules: %w", err)
+		return fmt.Errorf("find modules in %s: %w", filePath, err)
 	}
 
 	// Soft-delete all existing steps (will be restored if still present)
@@ -317,13 +379,11 @@ func (s *Syncer) syncContent(ctx context.Context, repoID uuid.UUID, repoDir stri
 	for position, moduleDir := range moduleDirs {
 		modulePath := filepath.Base(moduleDir)
 
-		// Parse module index.md
 		modMeta, err := parseModuleIndex(moduleDir)
 		if err != nil {
 			return fmt.Errorf("parse module %s: %w", modulePath, err)
 		}
 
-		// Upsert module
 		var moduleID uuid.UUID
 		err = tx.GetContext(ctx, &moduleID, `
 			INSERT INTO modules (learning_path_id, title, description, competencies, position, file_path)
@@ -342,7 +402,6 @@ func (s *Syncer) syncContent(ctx context.Context, repoID uuid.UUID, repoDir stri
 
 		existingModulePaths[modulePath] = true
 
-		// Parse steps
 		stepFiles, err := findOrderedSteps(moduleDir)
 		if err != nil {
 			return fmt.Errorf("find steps in %s: %w", modulePath, err)
@@ -355,7 +414,6 @@ func (s *Syncer) syncContent(ctx context.Context, repoID uuid.UUID, repoDir stri
 				return fmt.Errorf("parse step %s/%s: %w", modulePath, stepFilePath, err)
 			}
 
-			// Upsert step (restore if soft-deleted)
 			var stepID uuid.UUID
 			err = tx.GetContext(ctx, &stepID, `
 				INSERT INTO steps (module_id, title, type, estimated_duration, content_md, exercise_data, position, file_path)
@@ -372,7 +430,6 @@ func (s *Syncer) syncContent(ctx context.Context, repoID uuid.UUID, repoDir stri
 				RETURNING id
 			`, moduleID, stepMeta.Title, stepMeta.Type, stepMeta.Duration, contentMD, exerciseData, stepPos, stepFilePath)
 			if err != nil {
-				// Try to restore soft-deleted step
 				err = tx.GetContext(ctx, &stepID, `
 					UPDATE steps SET
 						title = $1, type = $2, estimated_duration = $3,
@@ -386,7 +443,6 @@ func (s *Syncer) syncContent(ctx context.Context, repoID uuid.UUID, repoDir stri
 				}
 			}
 
-			// Handle codebase files for code exercises
 			if stepMeta.Type == "code-exercise" {
 				codebaseDir := filepath.Join(filepath.Dir(stepPath), "codebase")
 				if err := s.syncCodebaseFiles(ctx, tx, stepID, codebaseDir); err != nil {
@@ -401,7 +457,7 @@ func (s *Syncer) syncContent(ctx context.Context, repoID uuid.UUID, repoDir stri
 		DELETE FROM modules WHERE learning_path_id = $1 AND file_path != ALL($2)
 	`, lpID, pq.Array(keys(existingModulePaths)))
 
-	return tx.Commit()
+	return nil
 }
 
 func (s *Syncer) syncCodebaseFiles(ctx context.Context, tx *sqlx.Tx, stepID uuid.UUID, codebaseDir string) error {
