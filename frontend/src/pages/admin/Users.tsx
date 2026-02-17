@@ -7,7 +7,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 const Users: React.FC = () => {
   const { user: currentUser } = useAuth();
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<Array<User & { completed_paths: number }>>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
@@ -137,6 +137,13 @@ const Users: React.FC = () => {
                 onChange={(active) => updateUser(record.id, { active })}
               />
             ),
+          },
+          {
+            title: 'Completed Paths',
+            dataIndex: 'completed_paths',
+            width: 130,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            sorter: (a: any, b: any) => (a.completed_paths ?? 0) - (b.completed_paths ?? 0),
           },
           {
             title: 'Last Login',

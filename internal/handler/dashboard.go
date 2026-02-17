@@ -61,13 +61,14 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		enrolledPaths = []pathProgress{}
 	}
 
-	// Competencies (from completed modules)
+	// Competencies: acquired (all steps in module completed) + pending (enrolled but not all done)
 	type competency struct {
 		Name      string `json:"name"`
 		Acquired  bool   `json:"acquired"`
 		PathTitle string `json:"path_title" db:"path_title"`
 	}
 	var competencies []competency
+	// Acquired: modules where all steps are completed
 	h.db.SelectContext(r.Context(), &competencies, `
 		SELECT UNNEST(m.competencies) AS name, true AS acquired, lp.title AS path_title
 		FROM modules m
@@ -82,6 +83,28 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		)
 		AND EXISTS (SELECT 1 FROM steps s WHERE s.module_id = m.id AND s.deleted_at IS NULL)
 	`, claims.UserID)
+	// Pending: modules where user has some progress but not all steps completed
+	var pendingCompetencies []competency
+	h.db.SelectContext(r.Context(), &pendingCompetencies, `
+		SELECT UNNEST(m.competencies) AS name, false AS acquired, lp.title AS path_title
+		FROM modules m
+		JOIN learning_paths lp ON lp.id = m.learning_path_id
+		WHERE EXISTS (
+			SELECT 1 FROM progress p
+			JOIN steps s ON s.id = p.step_id
+			WHERE s.module_id = m.id AND p.user_id = $1 AND s.deleted_at IS NULL
+		)
+		AND EXISTS (
+			SELECT 1 FROM steps s
+			WHERE s.module_id = m.id AND s.deleted_at IS NULL
+			AND NOT EXISTS (
+				SELECT 1 FROM progress p
+				WHERE p.step_id = s.id AND p.user_id = $1 AND p.status = 'completed'
+			)
+		)
+		AND array_length(m.competencies, 1) > 0
+	`, claims.UserID)
+	competencies = append(competencies, pendingCompetencies...)
 	if competencies == nil {
 		competencies = []competency{}
 	}

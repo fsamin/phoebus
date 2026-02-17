@@ -223,6 +223,8 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		MaxAge:   8 * 60 * 60,
 	})
 
+	h.auditLog(r.Context(), &auth.Claims{UserID: user.ID.String(), Username: user.Username, Role: user.Role}, "register", "user", user.ID.String(), map[string]any{"username": user.Username})
+
 	writeJSON(w, http.StatusCreated, map[string]any{
 		"user": map[string]any{
 			"id":           user.ID,
@@ -284,10 +286,44 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	if users == nil {
 		users = []model.User{}
 	}
+
+	// Enrich with completed paths count per user
+	type pathCount struct {
+		UserID         string `db:"user_id"`
+		CompletedPaths int    `db:"completed_paths"`
+	}
+	var counts []pathCount
+	h.db.SelectContext(r.Context(), &counts, `
+		SELECT user_id, COUNT(*) AS completed_paths
+		FROM (
+			SELECT p.user_id, lp.id AS path_id
+			FROM learning_paths lp
+			JOIN modules m ON m.learning_path_id = lp.id AND m.deleted_at IS NULL
+			JOIN steps s ON s.module_id = m.id AND s.deleted_at IS NULL
+			LEFT JOIN progress p ON p.step_id = s.id AND p.status = 'completed'
+			GROUP BY p.user_id, lp.id
+			HAVING COUNT(DISTINCT s.id) = COUNT(DISTINCT p.step_id) AND p.user_id IS NOT NULL
+		) completed
+		GROUP BY user_id
+	`)
+	countMap := map[string]int{}
+	for _, c := range counts {
+		countMap[c.UserID] = c.CompletedPaths
+	}
+
+	type userResponse struct {
+		model.User
+		CompletedPaths int `json:"completed_paths"`
+	}
+	out := make([]userResponse, len(users))
+	for i, u := range users {
+		out[i] = userResponse{User: u, CompletedPaths: countMap[u.ID.String()]}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
-		"users": users,
-		"total": total,
-		"page":  page,
+		"users":    out,
+		"total":    total,
+		"page":     page,
 		"per_page": perPage,
 	})
 }

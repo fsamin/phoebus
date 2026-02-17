@@ -23,6 +23,7 @@ interface PathAnalytics {
     completed: number;
     total: number;
     percentage: number;
+    last_activity?: string;
   }>;
 }
 
@@ -171,6 +172,21 @@ const PathAnalyticsView: React.FC = () => {
                   render: (v: number) => <AntProgress percent={Math.round(v)} size="small" />,
                 },
                 { title: 'Completed', width: 120, render: (_: unknown, r) => `${r.completed}/${r.total}` },
+                {
+                  title: 'Last Activity',
+                  dataIndex: 'last_activity',
+                  width: 160,
+                  render: (v?: string) => {
+                    if (!v) return '—';
+                    const d = new Date(v);
+                    const diff = Date.now() - d.getTime();
+                    const hours = Math.floor(diff / 3600000);
+                    if (hours < 1) return 'Just now';
+                    if (hours < 24) return `${hours}h ago`;
+                    const days = Math.floor(hours / 24);
+                    return days === 1 ? 'Yesterday' : `${days}d ago`;
+                  },
+                },
               ]}
             />
           ),

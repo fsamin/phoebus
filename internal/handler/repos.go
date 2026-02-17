@@ -26,7 +26,33 @@ func (h *Handler) ListRepos(w http.ResponseWriter, r *http.Request) {
 	if repos == nil {
 		repos = []model.GitRepository{}
 	}
-	writeJSON(w, http.StatusOK, repos)
+
+	// Enrich with learning path titles
+	type result struct {
+		RepoID string `db:"repo_id"`
+		Title  string `db:"title"`
+	}
+	var pathTitles []result
+	h.db.SelectContext(r.Context(), &pathTitles, `SELECT repo_id, title FROM learning_paths`)
+
+	titleMap := map[string][]string{}
+	for _, pt := range pathTitles {
+		titleMap[pt.RepoID] = append(titleMap[pt.RepoID], pt.Title)
+	}
+
+	type repoResponse struct {
+		model.GitRepository
+		PathTitles []string `json:"path_titles"`
+	}
+	out := make([]repoResponse, len(repos))
+	for i, repo := range repos {
+		titles := titleMap[repo.ID.String()]
+		if titles == nil {
+			titles = []string{}
+		}
+		out[i] = repoResponse{GitRepository: repo, PathTitles: titles}
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (h *Handler) GetRepo(w http.ResponseWriter, r *http.Request) {

@@ -61,7 +61,7 @@ export const api = {
     request<ExerciseAttempt[]>(`/exercises/${stepId}/attempts`),
 
   // Admin
-  listRepos: () => request<GitRepository[]>('/admin/repos'),
+  listRepos: () => request<Array<GitRepository & { path_titles: string[] }>>('/admin/repos'),
   getRepo: (id: string) => request<GitRepository>(`/admin/repos/${id}`),
   createRepo: (data: RepoInput) =>
     request<GitRepository>('/admin/repos', {
@@ -78,7 +78,7 @@ export const api = {
   syncRepo: (id: string) =>
     request<{ status: string }>(`/admin/repos/${id}/sync`, { method: 'POST' }),
   listUsers: (page = 1, perPage = 20) =>
-    request<{ users: User[]; total: number; page: number; per_page: number }>(`/admin/users?page=${page}&per_page=${perPage}`),
+    request<{ users: Array<User & { completed_paths: number }>; total: number; page: number; per_page: number }>(`/admin/users?page=${page}&per_page=${perPage}`),
   createUser: (data: { username: string; display_name: string; email?: string; role: string; password: string }) =>
     request<User>('/admin/users', {
       method: 'POST',

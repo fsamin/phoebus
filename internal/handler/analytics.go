@@ -146,12 +146,13 @@ type stepAnalytics struct {
 }
 
 type learnerProgress struct {
-	UserID      string  `json:"user_id" db:"user_id"`
-	Username    string  `json:"username" db:"username"`
-	DisplayName string  `json:"display_name" db:"display_name"`
-	Completed   int     `json:"completed" db:"completed"`
-	Total       int     `json:"total" db:"total"`
-	Percentage  float64 `json:"percentage"`
+	UserID       string  `json:"user_id" db:"user_id"`
+	Username     string  `json:"username" db:"username"`
+	DisplayName  string  `json:"display_name" db:"display_name"`
+	Completed    int     `json:"completed" db:"completed"`
+	Total        int     `json:"total" db:"total"`
+	Percentage   float64 `json:"percentage"`
+	LastActivity *string `json:"last_activity" db:"last_activity"`
 }
 
 func (h *Handler) AnalyticsPath(w http.ResponseWriter, r *http.Request) {
@@ -245,7 +246,8 @@ func (h *Handler) AnalyticsPath(w http.ResponseWriter, r *http.Request) {
 	h.db.SelectContext(ctx, &detail.Learners, `
 		SELECT p.user_id, u.username, u.display_name,
 		       COUNT(CASE WHEN p.status = 'completed' THEN 1 END) AS completed,
-		       COUNT(*) AS total
+		       COUNT(*) AS total,
+		       MAX(p.updated_at)::text AS last_activity
 		FROM progress p
 		JOIN users u ON u.id = p.user_id
 		JOIN steps s ON s.id = p.step_id AND s.deleted_at IS NULL

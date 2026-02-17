@@ -7,7 +7,7 @@ import type { GitRepository } from '../../api/client';
 
 const Repositories: React.FC = () => {
   const navigate = useNavigate();
-  const [repos, setRepos] = useState<GitRepository[]>([]);
+  const [repos, setRepos] = useState<Array<GitRepository & { path_titles: string[] }>>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchRepos = () => {
@@ -57,6 +57,11 @@ const Repositories: React.FC = () => {
         rowKey="id"
         loading={loading}
         columns={[
+          {
+            title: 'Name',
+            dataIndex: 'path_titles',
+            render: (v: string[]) => v.length > 0 ? v.join(', ') : '—',
+          },
           {
             title: 'Clone URL',
             dataIndex: 'clone_url',
