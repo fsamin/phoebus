@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/fsamin/phoebus/internal/auth"
 	"github.com/fsamin/phoebus/internal/config"
@@ -28,6 +29,15 @@ func New(db *sqlx.DB, cfg *config.Config, s *syncer.Syncer) *Handler {
 }
 
 func (h *Handler) RegisterRoutes(r chi.Router) {
+	// Latency tracking middleware
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			start := time.Now()
+			next.ServeHTTP(w, req)
+			latencyTracker.Record(time.Since(start))
+		})
+	})
+
 	// Public
 	r.Get("/api/health", h.Health)
 	r.Post("/api/auth/login", h.Login)

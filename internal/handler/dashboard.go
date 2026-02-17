@@ -198,11 +198,19 @@ func (h *Handler) AdminHealth(w http.ResponseWriter, r *http.Request) {
 	// Uptime
 	uptime := time.Since(serverStartTime).Round(time.Second).String()
 
+	// Latency percentiles
+	p50, p95, p99 := latencyTracker.Percentiles()
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"api":            map[string]any{"status": "ok", "uptime": uptime},
 		"database":       map[string]any{"connected": dbOK},
 		"repositories":   map[string]any{"total": len(repos), "synced": syncedCount, "details": repos},
 		"active_users_24h": activeUsers24h,
 		"total_users":    totalUsers,
+		"latency": map[string]any{
+			"p50_ms": p50,
+			"p95_ms": p95,
+			"p99_ms": p99,
+		},
 	})
 }

@@ -1,9 +1,19 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Tag, Space, Typography, Popconfirm, message, Tooltip } from 'antd';
+import { Table, Button, Tag, Space, Typography, Popconfirm, Popover, message, Tooltip } from 'antd';
 import { PlusOutlined, SyncOutlined, CopyOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { GitRepository } from '../../api/client';
+
+function relativeTime(iso?: string): string {
+  if (!iso) return '—';
+  const diff = Date.now() - new Date(iso).getTime();
+  const hours = Math.floor(diff / 3600000);
+  if (hours < 1) return 'Just now';
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return days === 1 ? 'Yesterday' : `${days}d ago`;
+}
 
 const Repositories: React.FC = () => {
   const navigate = useNavigate();
@@ -82,19 +92,28 @@ const Repositories: React.FC = () => {
             title: 'Status',
             dataIndex: 'sync_status',
             width: 120,
-            render: (v: string, r: GitRepository) => (
-              <Tooltip title={r.sync_error}>
+            render: (v: string, r: GitRepository) => {
+              const tag = (
                 <Tag color={statusColor(v)} icon={v === 'syncing' ? <SyncOutlined spin /> : undefined}>
                   {v}
                 </Tag>
-              </Tooltip>
-            ),
+              );
+              return v === 'error' && r.sync_error ? (
+                <Popover content={<Typography.Text type="danger">{r.sync_error}</Typography.Text>} title="Sync Error" trigger="click">
+                  <span style={{ cursor: 'pointer' }}>{tag}</span>
+                </Popover>
+              ) : tag;
+            },
           },
           {
             title: 'Last Synced',
             dataIndex: 'last_synced_at',
             width: 180,
-            render: (v?: string) => v ? new Date(v).toLocaleString() : '—',
+            render: (v?: string) => (
+              <Tooltip title={v ? new Date(v).toLocaleString() : undefined}>
+                {relativeTime(v)}
+              </Tooltip>
+            ),
           },
           {
             title: 'Actions',

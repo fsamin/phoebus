@@ -8,6 +8,7 @@ interface HealthData {
   repositories: { total: number; synced: number; details: Array<{ id: string; clone_url: string; sync_status: string; sync_error?: string; last_synced_at?: string }> };
   active_users_24h: number;
   total_users: number;
+  latency?: { p50_ms: number; p95_ms: number; p99_ms: number };
 }
 
 const Health: React.FC = () => {
@@ -73,6 +74,19 @@ const Health: React.FC = () => {
         <Col xs={12} sm={6}>
           <Card><Statistic title="Total Users" value={data.total_users} /></Card>
         </Col>
+        {data.latency && (
+          <>
+            <Col xs={12} sm={4}>
+              <Card><Statistic title="API p50" value={data.latency.p50_ms} suffix="ms" precision={0} /></Card>
+            </Col>
+            <Col xs={12} sm={4}>
+              <Card><Statistic title="API p95" value={data.latency.p95_ms} suffix="ms" precision={0} /></Card>
+            </Col>
+            <Col xs={12} sm={4}>
+              <Card><Statistic title="API p99" value={data.latency.p99_ms} suffix="ms" precision={0} /></Card>
+            </Col>
+          </>
+        )}
       </Row>
 
       {data.repositories.details.length > 0 && (
@@ -95,7 +109,15 @@ const Health: React.FC = () => {
               {
                 title: 'Last Synced',
                 dataIndex: 'last_synced_at',
-                render: (v?: string) => v ? new Date(v).toLocaleString() : '—',
+                render: (v?: string) => {
+                  if (!v) return '—';
+                  const diff = Date.now() - new Date(v).getTime();
+                  const hours = Math.floor(diff / 3600000);
+                  if (hours < 1) return 'Just now';
+                  if (hours < 24) return `${hours}h ago`;
+                  const days = Math.floor(hours / 24);
+                  return days === 1 ? 'Yesterday' : `${days}d ago`;
+                },
               },
               {
                 title: 'Error',

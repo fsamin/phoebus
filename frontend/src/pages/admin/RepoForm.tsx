@@ -30,10 +30,10 @@ const RepoForm: React.FC = () => {
     try {
       if (isEdit) {
         await api.updateRepo(repoId!, values);
-        message.success('Repository updated');
+        message.success('Repository updated, sync in progress');
       } else {
         await api.createRepo(values);
-        message.success('Repository created');
+        message.success('Repository added, sync in progress');
       }
       navigate('/admin/repositories');
     } catch (e) {
@@ -71,17 +71,18 @@ const RepoForm: React.FC = () => {
               name="credentials"
               label={authType === 'ssh-key' ? 'SSH Private Key' : authType === 'http-token' ? 'Token' : 'username:password'}
               rules={[{ required: !isEdit }]}
+              extra={isEdit ? 'Leave empty to keep existing credentials' : undefined}
             >
               {authType === 'ssh-key' ? (
-                <Input.TextArea rows={4} placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" />
+                <Input.TextArea rows={4} placeholder={isEdit ? '••••••••' : '-----BEGIN OPENSSH PRIVATE KEY-----'} />
               ) : (
-                <Input.Password placeholder={authType === 'http-token' ? 'ghp_...' : 'user:password'} />
+                <Input.Password placeholder={isEdit ? '••••••••' : authType === 'http-token' ? 'ghp_...' : 'user:password'} />
               )}
             </Form.Item>
           )}
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={loading}>
-              {isEdit ? 'Save' : 'Save & Sync'}
+              Save & Sync
             </Button>
             <Button style={{ marginLeft: 8 }} onClick={() => navigate('/admin/repositories')}>
               Cancel

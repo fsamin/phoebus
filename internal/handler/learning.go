@@ -36,7 +36,50 @@ func (h *Handler) ListLearningPaths(w http.ResponseWriter, r *http.Request) {
 	if paths == nil {
 		paths = []learningPathResponse{}
 	}
-	writeJSON(w, http.StatusOK, paths)
+
+	// Enrich with user progress if authenticated
+	claims := ClaimsFromContext(r.Context())
+	type pathProg struct {
+		PathID    string `db:"path_id"`
+		Total     int    `db:"total"`
+		Completed int    `db:"completed"`
+	}
+	var userProgress []pathProg
+	if claims != nil {
+		h.db.SelectContext(r.Context(), &userProgress, `
+			SELECT m.learning_path_id AS path_id,
+			       COUNT(DISTINCT s.id) AS total,
+			       COUNT(DISTINCT CASE WHEN p.status = 'completed' THEN s.id END) AS completed
+			FROM steps s
+			JOIN modules m ON m.id = s.module_id
+			LEFT JOIN progress p ON p.step_id = s.id AND p.user_id = $1
+			WHERE s.deleted_at IS NULL AND EXISTS (
+				SELECT 1 FROM progress p2 JOIN steps s2 ON s2.id = p2.step_id
+				JOIN modules m2 ON m2.id = s2.module_id
+				WHERE p2.user_id = $1 AND m2.learning_path_id = m.learning_path_id
+			)
+			GROUP BY m.learning_path_id
+		`, claims.UserID)
+	}
+	progMap := map[string]pathProg{}
+	for _, pp := range userProgress {
+		progMap[pp.PathID] = pp
+	}
+
+	type enrichedPath struct {
+		learningPathResponse
+		ProgressTotal     *int `json:"progress_total,omitempty"`
+		ProgressCompleted *int `json:"progress_completed,omitempty"`
+	}
+	out := make([]enrichedPath, len(paths))
+	for i, p := range paths {
+		out[i] = enrichedPath{learningPathResponse: p}
+		if pp, ok := progMap[p.ID.String()]; ok {
+			out[i].ProgressTotal = &pp.Total
+			out[i].ProgressCompleted = &pp.Completed
+		}
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 type learningPathDetailResponse struct {

@@ -1,14 +1,26 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Card, Row, Col, Typography, Tag, Input, Empty, Spin, Select } from 'antd';
+import { Card, Row, Col, Typography, Tag, Input, Empty, Spin, Select, Progress as AntProgress } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
-import type { LearningPathSummary, Progress } from '../api/client';
+
+interface CatalogPath {
+  id: string;
+  title: string;
+  description: string;
+  icon?: string;
+  tags: string[];
+  estimated_duration?: string;
+  prerequisites?: string[];
+  module_count: number;
+  step_count: number;
+  progress_total?: number;
+  progress_completed?: number;
+}
 
 const Catalog: React.FC = () => {
   const navigate = useNavigate();
-  const [paths, setPaths] = useState<LearningPathSummary[]>([]);
-  const [progress, setProgress] = useState<Progress[]>([]);
+  const [paths, setPaths] = useState<CatalogPath[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
@@ -23,16 +35,19 @@ const Catalog: React.FC = () => {
   }, [searchInput]);
 
   useEffect(() => {
-    Promise.all([api.listPaths(), api.getProgress()])
-      .then(([p, pr]) => { setPaths(p); setProgress(pr); })
+    api.listPaths()
+      .then((p) => setPaths(p as unknown as CatalogPath[]))
       .finally(() => setLoading(false));
   }, []);
 
   const allTags = [...new Set(paths.flatMap((p) => p.tags || []))].sort();
 
-  // We don't have path_id in progress entries, so status filter is approximate
-  void statusFilter; // status filter UI present; full implementation requires backend path-progress mapping
-  void progress;
+  const getPathStatus = (p: CatalogPath): string => {
+    if (!p.progress_total) return 'not_started';
+    if (p.progress_completed === p.progress_total) return 'completed';
+    return 'in_progress';
+  };
+
   const filtered = useMemo(() => {
     let result = paths.filter((p) => {
       const matchesSearch =
@@ -41,13 +56,19 @@ const Catalog: React.FC = () => {
         p.description.toLowerCase().includes(search.toLowerCase());
       const matchesTags =
         tagFilter.length === 0 || tagFilter.every((t) => p.tags?.includes(t));
-      return matchesSearch && matchesTags;
+      const matchesStatus =
+        statusFilter === 'all' || getPathStatus(p) === statusFilter;
+      return matchesSearch && matchesTags && matchesStatus;
     });
-    // Sort
     if (sortBy === 'az') result = [...result].sort((a, b) => a.title.localeCompare(b.title));
     else if (sortBy === 'za') result = [...result].sort((a, b) => b.title.localeCompare(a.title));
+    else if (sortBy === 'progress') result = [...result].sort((a, b) => {
+      const pa = a.progress_total ? (a.progress_completed ?? 0) / a.progress_total : -1;
+      const pb = b.progress_total ? (b.progress_completed ?? 0) / b.progress_total : -1;
+      return pb - pa;
+    });
     return result;
-  }, [paths, search, tagFilter, sortBy]);
+  }, [paths, search, tagFilter, sortBy, statusFilter]);
 
   if (loading) return <Spin size="large" style={{ display: 'block', marginTop: 100 }} />;
 
@@ -96,6 +117,7 @@ const Catalog: React.FC = () => {
             options={[
               { label: 'A → Z', value: 'az' },
               { label: 'Z → A', value: 'za' },
+              { label: 'Progress ↓', value: 'progress' },
             ]}
           />
         </Col>
@@ -105,43 +127,56 @@ const Catalog: React.FC = () => {
         <Empty description="No learning paths match your search" />
       ) : (
         <Row gutter={[16, 16]}>
-          {filtered.map((path) => (
-            <Col xs={24} sm={12} lg={8} key={path.id}>
-              <Card
-                hoverable
-                onClick={() => navigate(`/paths/${path.id}`)}
-                style={{ height: '100%' }}
-              >
-                <Card.Meta
-                  title={
-                    <span>
-                      {path.icon && <span style={{ marginRight: 8 }}>{path.icon}</span>}
-                      {path.title}
-                    </span>
-                  }
-                  description={path.description}
-                />
-                <div style={{ marginTop: 12 }}>
-                  {path.tags?.map((tag) => <Tag key={tag}>{tag}</Tag>)}
-                </div>
-                <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography.Text type="secondary">
-                    {path.module_count} modules · {path.step_count} steps
-                  </Typography.Text>
-                  {path.estimated_duration && (
-                    <Typography.Text type="secondary">⏱ {path.estimated_duration}</Typography.Text>
-                  )}
-                </div>
-                {path.prerequisites && path.prerequisites.length > 0 && (
-                  <div style={{ marginTop: 8 }}>
-                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                      Prerequisites: {path.prerequisites.join(', ')}
-                    </Typography.Text>
+          {filtered.map((path) => {
+            const pct = path.progress_total
+              ? Math.round(((path.progress_completed ?? 0) / path.progress_total) * 100)
+              : 0;
+            const status = getPathStatus(path);
+            return (
+              <Col xs={24} sm={12} lg={8} key={path.id}>
+                <Card
+                  hoverable
+                  onClick={() => navigate(`/paths/${path.id}`)}
+                  style={{ height: '100%' }}
+                >
+                  <Card.Meta
+                    title={
+                      <span>
+                        {path.icon && <span style={{ marginRight: 8 }}>{path.icon}</span>}
+                        {path.title}
+                      </span>
+                    }
+                    description={path.description}
+                  />
+                  <div style={{ marginTop: 12 }}>
+                    {path.tags?.map((tag) => <Tag key={tag}>{tag}</Tag>)}
                   </div>
-                )}
-              </Card>
-            </Col>
-          ))}
+                  <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between' }}>
+                    <Typography.Text type="secondary">
+                      {path.module_count} modules · {path.step_count} steps
+                    </Typography.Text>
+                    {path.estimated_duration && (
+                      <Typography.Text type="secondary">⏱ {path.estimated_duration}</Typography.Text>
+                    )}
+                  </div>
+                  {status !== 'not_started' ? (
+                    <AntProgress percent={pct} size="small" style={{ marginTop: 8 }} />
+                  ) : (
+                    <Typography.Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
+                      Not started
+                    </Typography.Text>
+                  )}
+                  {path.prerequisites && path.prerequisites.length > 0 && (
+                    <div style={{ marginTop: 8 }}>
+                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        Prerequisites: {path.prerequisites.join(', ')}
+                      </Typography.Text>
+                    </div>
+                  )}
+                </Card>
+              </Col>
+            );
+          })}
         </Row>
       )}
     </div>
