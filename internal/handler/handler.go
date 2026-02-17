@@ -7,33 +7,51 @@ import (
 	"github.com/fsamin/phoebus/internal/auth"
 	"github.com/fsamin/phoebus/internal/config"
 	"github.com/fsamin/phoebus/internal/model"
+	"github.com/fsamin/phoebus/internal/syncer"
 	"github.com/go-chi/chi/v5"
 	"github.com/jmoiron/sqlx"
 )
 
 type Handler struct {
-	db  *sqlx.DB
-	cfg *config.Config
+	db     *sqlx.DB
+	cfg    *config.Config
+	syncer *syncer.Syncer
 }
 
 func New(db *sqlx.DB, cfg *config.Config) *Handler {
-	return &Handler{db: db, cfg: cfg}
+	return &Handler{
+		db:     db,
+		cfg:    cfg,
+		syncer: syncer.New(db),
+	}
 }
 
 func (h *Handler) RegisterRoutes(r chi.Router) {
 	// Public
 	r.Get("/api/health", h.Health)
 	r.Post("/api/auth/login", h.Login)
+	r.Post("/api/webhooks/{uuid}", h.Webhook)
 
 	// Authenticated
 	r.Group(func(r chi.Router) {
 		r.Use(h.AuthMiddleware)
 		r.Get("/api/me", h.Me)
 
+		// Learning paths (all authenticated users)
+		r.Get("/api/learning-paths", h.ListLearningPaths)
+		r.Get("/api/learning-paths/{pathId}", h.GetLearningPath)
+		r.Get("/api/learning-paths/{pathId}/steps/{stepId}", h.GetStep)
+
 		// Admin only
 		r.Group(func(r chi.Router) {
 			r.Use(h.RequireRole(model.RoleAdmin))
 			r.Get("/api/admin/users", h.ListUsers)
+			r.Get("/api/admin/repos", h.ListRepos)
+			r.Get("/api/admin/repos/{repoId}", h.GetRepo)
+			r.Post("/api/admin/repos", h.CreateRepo)
+			r.Put("/api/admin/repos/{repoId}", h.UpdateRepo)
+			r.Delete("/api/admin/repos/{repoId}", h.DeleteRepo)
+			r.Post("/api/admin/repos/{repoId}/sync", h.SyncRepo)
 		})
 	})
 }
