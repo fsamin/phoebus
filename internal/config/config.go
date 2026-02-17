@@ -4,52 +4,80 @@ import (
 	"fmt"
 
 	"github.com/ovh/configstore"
+	"gopkg.in/yaml.v2"
 )
 
 type Config struct {
-	Port          int
-	DatabaseURL   string
-	JWTSecret     string
-	AdminUsername  string
-	AdminPassword string
-	LocalAuth     bool
+	HTTP     HTTPConfig     `yaml:"http"`
+	Database DatabaseConfig `yaml:"database"`
+	JWT      JWTConfig      `yaml:"jwt"`
+	Admin    AdminConfig    `yaml:"admin"`
+	Auth     AuthConfig     `yaml:"auth"`
+}
+
+type HTTPConfig struct {
+	Port int `yaml:"port"`
+}
+
+type DatabaseConfig struct {
+	URL string `yaml:"url"`
+}
+
+type JWTConfig struct {
+	Secret string `yaml:"secret"`
+}
+
+type AdminConfig struct {
+	Username string `yaml:"username"`
+	Password string `yaml:"password"`
+}
+
+type AuthConfig struct {
+	LocalEnabled bool `yaml:"local_enabled"`
 }
 
 func Load() (*Config, error) {
 	configstore.InitFromEnvironment()
 
 	cfg := &Config{
-		Port:          8080,
-		LocalAuth:     true,
-		AdminUsername:  "admin",
-		AdminPassword: "admin",
+		HTTP:     HTTPConfig{Port: 8080},
+		Admin:    AdminConfig{Username: "admin", Password: "admin"},
+		Auth:     AuthConfig{LocalEnabled: true},
 	}
 
-	if v, err := configstore.GetItemValue("port"); err == nil {
-		fmt.Sscanf(v, "%d", &cfg.Port)
+	if err := unmarshalItem("http", &cfg.HTTP); err != nil {
+		// optional, keep defaults
 	}
 
-	v, err := configstore.GetItemValue("database-url")
-	if err != nil {
-		return nil, fmt.Errorf("missing required config: database_url: %w", err)
+	if err := unmarshalItem("database", &cfg.Database); err != nil {
+		return nil, fmt.Errorf("missing required config item 'database': %w", err)
 	}
-	cfg.DatabaseURL = v
+	if cfg.Database.URL == "" {
+		return nil, fmt.Errorf("database.url is required")
+	}
 
-	v, err = configstore.GetItemValue("jwt-secret")
-	if err != nil {
-		return nil, fmt.Errorf("missing required config: jwt_secret: %w", err)
+	if err := unmarshalItem("jwt", &cfg.JWT); err != nil {
+		return nil, fmt.Errorf("missing required config item 'jwt': %w", err)
 	}
-	cfg.JWTSecret = v
+	if cfg.JWT.Secret == "" {
+		return nil, fmt.Errorf("jwt.secret is required")
+	}
 
-	if v, err := configstore.GetItemValue("admin-username"); err == nil {
-		cfg.AdminUsername = v
+	if err := unmarshalItem("admin", &cfg.Admin); err != nil {
+		// optional, keep defaults
 	}
-	if v, err := configstore.GetItemValue("admin-password"); err == nil {
-		cfg.AdminPassword = v
-	}
-	if v, err := configstore.GetItemValue("local-auth-enabled"); err == nil {
-		cfg.LocalAuth = v != "false"
+
+	if err := unmarshalItem("auth", &cfg.Auth); err != nil {
+		// optional, keep defaults
 	}
 
 	return cfg, nil
+}
+
+func unmarshalItem(key string, dest interface{}) error {
+	v, err := configstore.GetItemValue(key)
+	if err != nil {
+		return err
+	}
+	return yaml.Unmarshal([]byte(v), dest)
 }

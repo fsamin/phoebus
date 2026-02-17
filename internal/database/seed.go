@@ -10,12 +10,12 @@ import (
 
 // SeedAdmin ensures a default admin user exists for bootstrap.
 func SeedAdmin(db *sqlx.DB, cfg *config.Config) error {
-	if !cfg.LocalAuth {
+	if !cfg.Auth.LocalEnabled {
 		return nil
 	}
 
 	var exists bool
-	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)", cfg.AdminUsername).Scan(&exists)
+	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE username = $1)", cfg.Admin.Username).Scan(&exists)
 	if err != nil {
 		return err
 	}
@@ -23,7 +23,7 @@ func SeedAdmin(db *sqlx.DB, cfg *config.Config) error {
 		return nil
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(cfg.AdminPassword), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(cfg.Admin.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
@@ -31,11 +31,11 @@ func SeedAdmin(db *sqlx.DB, cfg *config.Config) error {
 	_, err = db.Exec(`
 		INSERT INTO users (username, display_name, role, password_hash, auth_provider)
 		VALUES ($1, $2, 'admin', $3, 'local')
-	`, cfg.AdminUsername, cfg.AdminUsername, string(hash))
+	`, cfg.Admin.Username, cfg.Admin.Username, string(hash))
 	if err != nil {
 		return err
 	}
 
-	slog.Info("seeded admin user", "username", cfg.AdminUsername)
+	slog.Info("seeded admin user", "username", cfg.Admin.Username)
 	return nil
 }

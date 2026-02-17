@@ -47,7 +47,7 @@ func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
-	if !h.cfg.LocalAuth {
+	if !h.cfg.Auth.LocalEnabled {
 		writeJSON(w, http.StatusForbidden, map[string]string{"error": "local auth is disabled"})
 		return
 	}
@@ -81,7 +81,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := auth.GenerateToken(&user, h.cfg.JWTSecret)
+	token, err := auth.GenerateToken(&user, h.cfg.JWT.Secret)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to generate token"})
 		return

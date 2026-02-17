@@ -20,7 +20,7 @@ func (h *Handler) AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		claims, err := auth.ValidateToken(cookie.Value, h.cfg.JWTSecret)
+		claims, err := auth.ValidateToken(cookie.Value, h.cfg.JWT.Secret)
 		if err != nil {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "invalid or expired session"})
 			return

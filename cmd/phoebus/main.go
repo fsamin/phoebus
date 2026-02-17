@@ -27,7 +27,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	db, err := database.Connect(cfg.DatabaseURL)
+	db, err := database.Connect(cfg.Database.URL)
 	if err != nil {
 		slog.Error("failed to connect to database", "error", err)
 		os.Exit(1)
@@ -53,7 +53,7 @@ func main() {
 	h := handler.New(db, cfg)
 	h.RegisterRoutes(r)
 
-	addr := fmt.Sprintf(":%d", cfg.Port)
+	addr := fmt.Sprintf(":%d", cfg.HTTP.Port)
 	srv := &http.Server{
 		Addr:         addr,
 		Handler:      r,

@@ -4,11 +4,9 @@ services:
     ports:
       - "8080:8080"
     environment:
-      CONFIGURATION_FROM: "env:PHOEBUS"
-      PHOEBUS_DATABASE_URL: "postgres://phoebus:phoebus@db:5432/phoebus?sslmode=disable"
-      PHOEBUS_JWT_SECRET: "change-me-in-production"
-      PHOEBUS_ADMIN_USERNAME: "admin"
-      PHOEBUS_ADMIN_PASSWORD: "admin"
+      CONFIGURATION_FROM: "filetree:/etc/phoebus/conf.d"
+    volumes:
+      - ./config:/etc/phoebus/conf.d:ro
     depends_on:
       db:
         condition: service_healthy
