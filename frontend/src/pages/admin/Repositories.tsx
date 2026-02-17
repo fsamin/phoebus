@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Table, Button, Tag, Space, Typography, Popconfirm, Popover, message, Tooltip } from 'antd';
-import { PlusOutlined, SyncOutlined, CopyOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons';
+import { PlusOutlined, SyncOutlined, CopyOutlined, DeleteOutlined, EditOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { GitRepository } from '../../api/client';
@@ -122,6 +122,9 @@ const Repositories: React.FC = () => {
               <Space>
                 <Button size="small" icon={<EditOutlined />} onClick={() => navigate(`/admin/repositories/${r.id}/edit`)} />
                 <Button size="small" icon={<SyncOutlined />} onClick={() => handleSync(r.id)} />
+                <Tooltip title="Sync Logs">
+                  <Button size="small" icon={<UnorderedListOutlined />} onClick={() => navigate(`/admin/repositories/${r.id}/sync-logs`)} />
+                </Tooltip>
                 <Button size="small" icon={<CopyOutlined />} onClick={() => handleCopyWebhook(r.webhook_uuid)} />
                 <Popconfirm title="Delete this repository?" onConfirm={() => handleDelete(r.id)}>
                   <Button size="small" danger icon={<DeleteOutlined />} />

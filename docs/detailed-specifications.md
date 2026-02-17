@@ -922,8 +922,9 @@ All authenticated views share a common shell layout:
 | `/admin/repositories` | Repository Management | `admin` | Global shell | 10.11 |
 | `/admin/repositories/new` | Add Repository | `admin` | Global shell | 10.12 |
 | `/admin/repositories/:repoId/edit` | Edit Repository | `admin` | Global shell | 10.12 |
-| `/admin/users` | User Management | `admin` | Global shell | 10.13 |
-| `/admin/health` | Platform Health | `admin` | Global shell | 10.14 |
+| `/admin/repositories/:repoId/sync-logs` | Sync Logs | `admin` | Global shell | 10.13 |
+| `/admin/users` | User Management | `admin` | Global shell | 10.14 |
+| `/admin/health` | Platform Health | `admin` | Global shell | 10.15 |
 
 **Access control:** The frontend checks the user's role (from the JWT payload decoded client-side — the httpOnly cookie contains the JWT but a non-sensitive role claim is also available via a `/api/me` call on page load) and hides inaccessible navigation links. The backend enforces RBAC on every API call — a direct URL access to an unauthorized route returns `403 Forbidden`.
 
@@ -1554,6 +1555,7 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 | Sync Now | `POST /api/admin/repos/:repoId/sync`. Status changes to `syncing`. Toast notification on completion/failure |
 | Copy Webhook URL | Copies `https://{host}/api/webhooks/{uuid}` to clipboard. Toast: "Webhook URL copied" |
 | Delete | Ant Design Modal confirmation ("This will remove all content from this repository. Learner progress will be preserved."). `DELETE /api/admin/repos/:repoId` |
+| Sync Logs | Navigates to `/admin/repositories/:repoId/sync-logs`. Shows the complete sync history for this repository |
 
 **Error display:** If status is `error`, clicking the status badge opens a popover showing the error message from `sync_error`.
 
@@ -1561,10 +1563,12 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 - `GET /api/admin/repos` — returns all repositories with sync status
 - `POST /api/admin/repos/:repoId/sync` — trigger manual sync
 - `DELETE /api/admin/repos/:repoId` — delete repository
+- `GET /api/admin/repos/:repoId/sync-logs` — returns sync job history for this repository
 
 **Navigation targets:**
 - + Add Repository → `/admin/repositories/new`
 - Edit → `/admin/repositories/:repoId/edit`
+- Sync Logs → `/admin/repositories/:repoId/sync-logs`
 
 ### 10.12 Add / Edit Repository (`/admin/repositories/new`, `/admin/repositories/:repoId/edit`)
 
@@ -1627,7 +1631,73 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 - On save → `/admin/repositories`
 - Cancel → `/admin/repositories`
 
-### 10.13 User Management (`/admin/users`)
+### 10.13 Sync Logs (`/admin/repositories/:repoId/sync-logs`)
+
+**Purpose:** View the complete synchronization history for a specific Git repository.
+
+**Required role:** `admin`
+
+**Layout:** Global shell. Header with repository info, followed by Ant Design Table listing all sync jobs.
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ Header                                                               │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ← Back to Repositories                                             │
+│                                                                      │
+│  Sync Logs: git@github.com/company/k8s-content.git (main)           │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │ #   Status     Started              Duration   Error          │  │
+│  │ 1   ✅ done    2025-01-15 14:32:05  3.2s       —              │  │
+│  │ 2   ✅ done    2025-01-15 12:10:44  2.8s       —              │  │
+│  │ 3   ❌ failed  2025-01-14 09:05:12  1.1s       git clone fa…  │  │
+│  │ 4   ✅ done    2025-01-13 16:48:30  4.5s       —              │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                                                                      │
+│  Showing 4 sync jobs                            [← 1  2  3  4  →]  │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Table columns (Ant Design Table):**
+
+| Column | Description |
+|---|---|
+| # | Row number (most recent first) |
+| Status | Badge: `done` (green), `failed` (red), `processing` (blue, spinning), `pending` (grey) |
+| Started | Absolute timestamp of `started_at` (or `created_at` if not yet started). Relative time in tooltip |
+| Duration | Computed from `started_at` → `completed_at` (e.g., "3.2s", "1m 12s"). Shows "—" if not completed |
+| Error | Error message (truncated to 80 chars). Full error shown in expandable row or tooltip |
+
+**Sorting:** Most recent jobs first (by `created_at DESC`).
+
+**Error detail:** Clicking on a truncated error message or expanding the row reveals the full error text in a code block for easy reading.
+
+**API Calls:**
+- `GET /api/admin/repos/:repoId/sync-logs` — returns array of sync jobs for this repository, ordered by `created_at DESC`
+
+**Response format:**
+```json
+[
+  {
+    "id": "uuid",
+    "repo_id": "uuid",
+    "status": "done",
+    "error": null,
+    "attempts": 1,
+    "started_at": "2025-01-15T14:32:05Z",
+    "completed_at": "2025-01-15T14:32:08Z",
+    "created_at": "2025-01-15T14:32:04Z"
+  }
+]
+```
+
+**Navigation:**
+- ← Back to Repositories → `/admin/repositories`
+
+### 10.14 User Management (`/admin/users`)
 
 **Purpose:** List all users, change roles, deactivate accounts, and create local users.
 
@@ -1705,7 +1775,7 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 - `POST /api/admin/users` — create a local user (admin only, local auth must be enabled)
 - `PATCH /api/users/:userId` — update role or active status
 
-### 10.14 Platform Health (`/admin/health`)
+### 10.15 Platform Health (`/admin/health`)
 
 **Purpose:** Monitor platform health and operational metrics.
 
@@ -1761,7 +1831,7 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 
 **Note:** Detailed Prometheus metrics are available at `/metrics` for external monitoring tools (Grafana). This page is a lightweight summary for quick admin checks.
 
-### 10.15 Navigation Graph
+### 10.16 Navigation Graph
 
 The following Mermaid diagram shows the navigation flow between all views:
 

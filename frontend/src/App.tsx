@@ -11,6 +11,7 @@ import Repositories from './pages/admin/Repositories';
 import RepoForm from './pages/admin/RepoForm';
 import Users from './pages/admin/Users';
 import Health from './pages/admin/Health';
+import SyncLogs from './pages/admin/SyncLogs';
 import Analytics from './pages/analytics/Analytics';
 import PathAnalyticsView from './pages/analytics/PathAnalytics';
 import LearnerDetail from './pages/analytics/LearnerDetail';
@@ -43,6 +44,7 @@ function App() {
               <Route path="/admin/repositories" element={<RequireRole role="admin"><Repositories /></RequireRole>} />
               <Route path="/admin/repositories/new" element={<RequireRole role="admin"><RepoForm /></RequireRole>} />
               <Route path="/admin/repositories/:repoId/edit" element={<RequireRole role="admin"><RepoForm /></RequireRole>} />
+              <Route path="/admin/repositories/:repoId/sync-logs" element={<RequireRole role="admin"><SyncLogs /></RequireRole>} />
               <Route path="/admin/users" element={<RequireRole role="admin"><Users /></RequireRole>} />
               <Route path="/admin/health" element={<RequireRole role="admin"><Health /></RequireRole>} />
             </Route>

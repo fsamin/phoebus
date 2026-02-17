@@ -200,6 +200,52 @@ func (h *Handler) SyncRepo(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "sync enqueued"})
 }
 
+func (h *Handler) SyncLogs(w http.ResponseWriter, r *http.Request) {
+	id := chi.URLParam(r, "repoId")
+	if _, err := uuid.Parse(id); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid repository id"})
+		return
+	}
+
+	var logs []struct {
+		ID          string  `json:"id" db:"id"`
+		RepoID      string  `json:"repo_id" db:"repo_id"`
+		Status      string  `json:"status" db:"status"`
+		Error       *string `json:"error" db:"error"`
+		Attempts    int     `json:"attempts" db:"attempts"`
+		StartedAt   *string `json:"started_at" db:"started_at"`
+		CompletedAt *string `json:"completed_at" db:"completed_at"`
+		CreatedAt   string  `json:"created_at" db:"created_at"`
+	}
+	if err := h.db.SelectContext(r.Context(), &logs, `
+		SELECT id, repo_id, status, error, attempts,
+			   to_char(started_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS started_at,
+			   to_char(completed_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS completed_at,
+			   to_char(created_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS created_at
+		FROM sync_jobs WHERE repo_id = $1
+		ORDER BY created_at DESC
+		LIMIT 100
+	`, id); err != nil {
+		slog.Error("failed to fetch sync logs", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
+		return
+	}
+
+	if logs == nil {
+		logs = []struct {
+			ID          string  `json:"id" db:"id"`
+			RepoID      string  `json:"repo_id" db:"repo_id"`
+			Status      string  `json:"status" db:"status"`
+			Error       *string `json:"error" db:"error"`
+			Attempts    int     `json:"attempts" db:"attempts"`
+			StartedAt   *string `json:"started_at" db:"started_at"`
+			CompletedAt *string `json:"completed_at" db:"completed_at"`
+			CreatedAt   string  `json:"created_at" db:"created_at"`
+		}{}
+	}
+	writeJSON(w, http.StatusOK, logs)
+}
+
 // --- Webhook ---
 
 func (h *Handler) Webhook(w http.ResponseWriter, r *http.Request) {

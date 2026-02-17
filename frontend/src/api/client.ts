@@ -77,6 +77,8 @@ export const api = {
     request<void>(`/admin/repos/${id}`, { method: 'DELETE' }),
   syncRepo: (id: string) =>
     request<{ status: string }>(`/admin/repos/${id}/sync`, { method: 'POST' }),
+  syncLogs: (id: string) =>
+    request<SyncLog[]>(`/admin/repos/${id}/sync-logs`),
   listUsers: (page = 1, perPage = 20) =>
     request<{ users: Array<User & { completed_paths: number }>; total: number; page: number; per_page: number }>(`/admin/users?page=${page}&per_page=${perPage}`),
   createUser: (data: { username: string; display_name: string; email?: string; role: string; password: string }) =>
@@ -191,4 +193,15 @@ export interface RepoInput {
   branch: string;
   auth_type: string;
   credentials?: string;
+}
+
+export interface SyncLog {
+  id: string;
+  repo_id: string;
+  status: string;
+  error: string | null;
+  attempts: number;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
 }

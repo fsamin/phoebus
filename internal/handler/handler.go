@@ -91,6 +91,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 			r.Put("/api/admin/repos/{repoId}", h.UpdateRepo)
 			r.Delete("/api/admin/repos/{repoId}", h.DeleteRepo)
 			r.Post("/api/admin/repos/{repoId}/sync", h.SyncRepo)
+			r.Get("/api/admin/repos/{repoId}/sync-logs", h.SyncLogs)
 			r.Get("/api/admin/health", h.AdminHealth)
 		})
 	})
