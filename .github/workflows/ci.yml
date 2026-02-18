@@ -60,7 +60,9 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Build frontend (needed for go:embed)
-        run: cd frontend && npm ci && npm run build
+        run: |
+          cd frontend && npm ci && npm run build
+          rm -rf internal/ui/dist && cp -r frontend/dist internal/ui/dist
 
       - name: Build
         run: go build ./...

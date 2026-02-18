@@ -15,15 +15,22 @@ import (
 	"github.com/fsamin/phoebus/internal/handler"
 	"github.com/fsamin/phoebus/internal/syncer"
 	"github.com/fsamin/phoebus/internal/ui"
+	"github.com/fsamin/phoebus/internal/version"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 )
 
 func main() {
 	// Handle subcommands
-	if len(os.Args) > 1 && os.Args[1] == "validate" {
-		runValidate()
-		return
+	if len(os.Args) > 1 {
+		switch os.Args[1] {
+		case "validate":
+			runValidate()
+			return
+		case "version":
+			fmt.Printf("phoebus %s (commit: %s, built: %s)\n", version.Version, version.Commit, version.Date)
+			return
+		}
 	}
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo}))
@@ -80,7 +87,7 @@ func main() {
 	}
 
 	go func() {
-		slog.Info("starting server", "addr", addr)
+		slog.Info("starting server", "addr", addr, "version", version.Version)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			slog.Error("server failed", "error", err)
 			os.Exit(1)
