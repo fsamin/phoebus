@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
+import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import remarkDirective from 'remark-directive';
 import remarkDirectiveRehype from 'remark-directive-rehype';
@@ -13,6 +14,42 @@ mermaid.initialize({ startOnLoad: false, theme: 'default' });
 interface MarkdownRendererProps {
   content: string;
 }
+
+const admonitionStyles: Record<string, { color: string; icon: string }> = {
+  tip:     { color: '#52c41a', icon: '💡' },
+  warning: { color: '#faad14', icon: '⚠️' },
+  danger:  { color: '#ff4d4f', icon: '🚨' },
+  info:    { color: '#1890ff', icon: 'ℹ️' },
+  note:    { color: '#722ed1', icon: '📝' },
+  caution: { color: '#faad14', icon: '⚠️' },
+};
+
+function Admonition({ type, children }: { type: string; children?: React.ReactNode }) {
+  const style = admonitionStyles[type] || admonitionStyles.info;
+  return (
+    <div style={{
+      borderLeft: `4px solid ${style.color}`,
+      padding: '12px 16px',
+      margin: '16px 0',
+      background: `${style.color}10`,
+      borderRadius: 4,
+    }}>
+      <strong>{style.icon} {type.charAt(0).toUpperCase() + type.slice(1)}</strong>
+      <div style={{ marginTop: 8 }}>{children}</div>
+    </div>
+  );
+}
+
+const admonitionNames = Object.keys(admonitionStyles);
+
+const components: Components = Object.fromEntries(
+  admonitionNames.map((name) => [
+    name,
+    ({ children, ...props }: React.HTMLAttributes<HTMLDivElement> & { children?: React.ReactNode }) => (
+      <Admonition type={name} {...props}>{children}</Admonition>
+    ),
+  ])
+);
 
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -33,27 +70,14 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
     });
   }, [content]);
 
-  // Transform :::tip, :::warning, :::danger, :::info, :::note directives
-  const processedContent = content.replace(
-    /^:::(tip|warning|danger|info|note)\s*\n([\s\S]*?)^:::/gm,
-    (_match, type: string, body: string) => {
-      const colors: Record<string, string> = {
-        tip: '#52c41a', warning: '#faad14', danger: '#ff4d4f', info: '#1890ff', note: '#722ed1',
-      };
-      const icons: Record<string, string> = {
-        tip: '💡', warning: '⚠️', danger: '🚨', info: 'ℹ️', note: '📝',
-      };
-      return `<div style="border-left: 4px solid ${colors[type] || '#1890ff'}; padding: 12px 16px; margin: 16px 0; background: ${colors[type] || '#1890ff'}10; border-radius: 4px;"><strong>${icons[type] || ''} ${type.charAt(0).toUpperCase() + type.slice(1)}</strong>\n\n${body.trim()}</div>`;
-    }
-  );
-
   return (
     <div className="markdown-body" ref={containerRef}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkDirective, remarkDirectiveRehype]}
         rehypePlugins={[rehypeHighlight, rehypeRaw]}
+        components={components}
       >
-        {processedContent}
+        {content}
       </ReactMarkdown>
     </div>
   );
