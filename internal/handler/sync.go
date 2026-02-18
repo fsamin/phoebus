@@ -17,5 +17,7 @@ func (h *Handler) enqueueSync(ctx context.Context, repoID uuid.UUID) {
 	}
 
 	// Notify the sync worker that a new job is available
-	h.syncer.Notify()
+	if h.syncer != nil {
+		h.syncer.Notify()
+	}
 }
