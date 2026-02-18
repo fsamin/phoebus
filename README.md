@@ -36,6 +36,12 @@ docker compose up -d
 
 Open [http://localhost:8080](http://localhost:8080) and login with `admin` / `admin`.
 
+To load sample DevOps content, add the [phoebus-content-samples](https://github.com/fsamin/phoebus-content-samples) repository via the admin UI (*Repositories → Add*) with the clone URL:
+
+```
+https://github.com/fsamin/phoebus-content-samples.git
+```
+
 ## Architecture
 
 ```
