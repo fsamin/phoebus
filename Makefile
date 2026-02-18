@@ -7,7 +7,7 @@ LDFLAGS  := -s -w \
 	-X github.com/fsamin/phoebus/internal/version.Commit=$(COMMIT) \
 	-X github.com/fsamin/phoebus/internal/version.Date=$(DATE)
 
-.PHONY: all build frontend backend clean test lint docker
+.PHONY: all build frontend backend clean test lint docker e2e e2e-down
 
 all: build
 
@@ -41,3 +41,12 @@ clean:
 ## Build Docker image
 docker:
 	docker build -t phoebus:$(VERSION) .
+
+## Run E2E tests (Playwright in Docker)
+e2e:
+	docker compose -p phoebus-e2e -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from playwright
+	@docker compose -p phoebus-e2e -f docker-compose.e2e.yml down -v 2>/dev/null || true
+
+## Stop E2E environment
+e2e-down:
+	docker compose -p phoebus-e2e -f docker-compose.e2e.yml down -v

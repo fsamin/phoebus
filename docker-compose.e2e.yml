@@ -1,0 +1,41 @@
+services:
+  db-e2e:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: phoebus
+      POSTGRES_PASSWORD: phoebus
+      POSTGRES_DB: phoebus
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U phoebus"]
+      interval: 2s
+      timeout: 5s
+      retries: 10
+
+  phoebus-e2e:
+    build: .
+    ports:
+      - "9080:8080"
+    environment:
+      CONFIGURATION_FROM: "filetree:/etc/phoebus/conf.d"
+    volumes:
+      - ./e2e/config:/etc/phoebus/conf.d:ro
+    depends_on:
+      db-e2e:
+        condition: service_healthy
+
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.50.0-noble
+    working_dir: /app
+    volumes:
+      - ./e2e:/app
+    environment:
+      BASE_URL: http://phoebus-e2e:8080
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    depends_on:
+      - phoebus-e2e
+    command: >
+      bash -c "
+        npm ci --silent &&
+        npx playwright install --with-deps chromium &&
+        npx playwright test ${PLAYWRIGHT_ARGS:-}
+      "
