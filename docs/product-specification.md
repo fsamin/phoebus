@@ -1,14 +1,14 @@
-# Phoebus — Product Specification
+# Phœbus — Product Specification
 
 ## 1. Vision
 
-Phoebus is an open-source e-learning platform purpose-built for **DevOps and software engineering training** in enterprise environments. It enables organizations to upskill and reskill their engineering teams through hands-on, practical learning experiences.
+Phœbus is an open-source e-learning platform purpose-built for **DevOps and software engineering training** in enterprise environments. It enables organizations to upskill and reskill their engineering teams through hands-on, practical learning experiences.
 
-Phoebus promotes **self-assessment**: learners progress at their own pace, in their own style. There is no grading, no ranking, no instructor gatekeeping. Programming exercises and terminal sessions are **practical applications** of the pedagogical content — they exist so learners can build muscle memory and validate their own understanding, not to be evaluated by others. Automated feedback (test results, validation scripts) serves the learner directly, helping them iterate until they master the skill.
+Phœbus promotes **self-assessment**: learners progress at their own pace, in their own style. There is no grading, no ranking, no instructor gatekeeping. Programming exercises and terminal sessions are **practical applications** of the pedagogical content — they exist so learners can build muscle memory and validate their own understanding, not to be evaluated by others. Automated feedback (test results, validation scripts) serves the learner directly, helping them iterate until they master the skill.
 
-What sets Phoebus apart is its **content-as-code** philosophy: all training content lives in Git repositories as Markdown files, making content creation and updates as agile as software development itself. There is no CMS, no WYSIWYG editor, no publishing pipeline — **what is in Git is what learners see**.
+What sets Phœbus apart is its **content-as-code** philosophy: all training content lives in Git repositories as Markdown files, making content creation and updates as agile as software development itself. There is no CMS, no WYSIWYG editor, no publishing pipeline — **what is in Git is what learners see**.
 
-Phoebus provides **interactive, guided exercises** — terminal command sequencing, code review challenges, and quizzes — all rendered in the browser with no infrastructure to provision. Combined with rich Markdown lessons, Phoebus bridges the gap between theoretical knowledge and real-world DevOps practice.
+Phœbus provides **interactive, guided exercises** — terminal command sequencing, code review challenges, and quizzes — all rendered in the browser with no infrastructure to provision. Combined with rich Markdown lessons, Phœbus bridges the gap between theoretical knowledge and real-world DevOps practice.
 
 ### Core Principles
 
@@ -64,10 +64,10 @@ Phoebus provides **interactive, guided exercises** — terminal command sequenci
 
 ### 2.3 Platform Administrator
 
-**Profile:** An infrastructure or platform engineer responsible for deploying, configuring, and maintaining the Phoebus instance within the enterprise.
+**Profile:** An infrastructure or platform engineer responsible for deploying, configuring, and maintaining the Phœbus instance within the enterprise.
 
 **Goals:**
-- Deploy and operate a single-tenant Phoebus instance on-premise or in the company cloud
+- Deploy and operate a single-tenant Phœbus instance on-premise or in the company cloud
 - Integrate with corporate identity providers (SSO / LDAP / OIDC)
 - Monitor platform health and resource usage
 
@@ -423,12 +423,12 @@ Never use panic for control flow — it will crash the server.
 
 ### 4.5 Content Synchronization
 
-- Administrators register Git repositories in Phoebus and configure how they are cloned (SSH or HTTPS, with authentication if needed)
+- Administrators register Git repositories in Phœbus and configure how they are cloned (SSH or HTTPS, with authentication if needed)
 - Each registered repository is assigned a **unique webhook URL** containing a UUID (e.g., `https://phoebus.example.com/webhooks/{uuid}`). This URL is Git-provider-agnostic: any POST to it triggers a sync for the associated repository
-- When the webhook is called, Phoebus pulls the latest changes from the configured branch (e.g., `main`) and updates the content live — no build or publish step required
+- When the webhook is called, Phœbus pulls the latest changes from the configured branch (e.g., `main`) and updates the content live — no build or publish step required
 - Content versioning is inherently handled by Git history
 - Instructors can use branches and pull requests for content review before merging to `main`
-- Phoebus supports **any Git hosting platform** (GitHub, GitLab, Gitea, Bitbucket, self-hosted, etc.) since it only relies on standard Git clone (SSH/HTTPS) and a generic webhook endpoint
+- Phœbus supports **any Git hosting platform** (GitHub, GitLab, Gitea, Bitbucket, self-hosted, etc.) since it only relies on standard Git clone (SSH/HTTPS) and a generic webhook endpoint
 
 ---
 
@@ -448,9 +448,9 @@ Never use panic for control flow — it will crash the server.
 
 ### UC-2: Instructor Creates a Learning Path
 
-1. Instructor creates a new Git repository following the Phoebus content structure
+1. Instructor creates a new Git repository following the Phœbus content structure
 2. Instructor writes `phoebus.yaml`, module `index.md` files, and step Markdown files using the structured authoring conventions
-3. Instructor registers the repository in Phoebus
+3. Instructor registers the repository in Phœbus
 4. Content becomes immediately available to learners
 5. Instructor iterates on content by committing to the repository
 
@@ -458,7 +458,7 @@ Never use panic for control flow — it will crash the server.
 
 1. Instructor edits Markdown files in the Git repository
 2. Changes are pushed to `main` (directly or via PR after review)
-3. Phoebus detects the changes and updates the content live
+3. Phœbus detects the changes and updates the content live
 4. Learners see the updated content on their next page load
 5. Learners who already completed the step are unaffected in their progress
 
@@ -483,10 +483,10 @@ Never use panic for control flow — it will crash the server.
 5. Feedback is shown with explanations for correct and incorrect choices
 6. Step is marked as completed
 
-### UC-6: Administrator Deploys Phoebus
+### UC-6: Administrator Deploys Phœbus
 
 1. Administrator provisions infrastructure (servers, network)
-2. Administrator deploys Phoebus using provided Docker Compose configuration or standalone binary
+2. Administrator deploys Phœbus using provided Docker Compose configuration or standalone binary
 3. Administrator configures SSO integration (OIDC / LDAP)
 4. Administrator registers Git repositories containing learning paths (SSH or HTTPS clone URL, credentials if needed)
 5. Administrator configures the webhook URL (with UUID) on the Git hosting platform for each repository
@@ -589,7 +589,7 @@ Never use panic for control flow — it will crash the server.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    Phoebus Platform                      │
+│                    Phœbus Platform                      │
 │                                                         │
 │  ┌──────────┐  ┌──────────────┐  ┌───────────────────┐  │
 │  │ Frontend  │  │   Backend    │  │  Content Syncer   │  │

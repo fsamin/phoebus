@@ -1,6 +1,6 @@
-# Phoebus — Documentation
+# Phœbus — Documentation
 
-Welcome to the Phoebus specification documents.
+Welcome to the Phœbus specification documents.
 
 ## Documents
 

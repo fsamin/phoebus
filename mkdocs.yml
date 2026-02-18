@@ -1,5 +1,5 @@
-site_name: Phoebus — Specifications
-site_description: Product specification, technical architecture, and detailed specifications for Phoebus
+site_name: Phœbus — Specifications
+site_description: Product specification, technical architecture, and detailed specifications for Phœbus
 theme:
   name: material
   palette:

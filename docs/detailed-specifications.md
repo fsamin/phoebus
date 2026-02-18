@@ -1,8 +1,8 @@
-# Phoebus — Detailed Specifications
+# Phœbus — Detailed Specifications
 
 ## 1. Overview
 
-This document provides detailed functional specifications for each feature area of Phoebus. It expands on the use cases and feature breakdown defined in the [Product Specification](./product-specification.md) and references the [Technical Architecture](./technical-architecture.md) for implementation context.
+This document provides detailed functional specifications for each feature area of Phœbus. It expands on the use cases and feature breakdown defined in the [Product Specification](./product-specification.md) and references the [Technical Architecture](./technical-architecture.md) for implementation context.
 
 Each section describes the detailed behavior, rules, edge cases, and UI expectations for a feature area.
 
@@ -22,7 +22,7 @@ Each section describes the detailed behavior, rules, edge cases, and UI expectat
    - Credentials (private key, username/password, or token) — stored encrypted
    - Branch to track (default: `main`)
 
-2. Upon registration, Phoebus:
+2. Upon registration, Phœbus:
    - Generates a unique webhook UUID
    - Returns the full webhook URL: `https://{phoebus-host}/api/webhooks/{uuid}`
    - Performs an initial clone and sync of the repository
@@ -722,7 +722,7 @@ For short-answer:
 
 ### 7.3 Manager View (Optional, Could Have)
 
-Managers can view aggregated progress for their team members. Teams are derived from OIDC group claims (mapped via a configurable `group_claim` setting). No manual team management in Phoebus — the enterprise directory (AD/LDAP → OIDC) is the source of truth. Groups are refreshed on each login.
+Managers can view aggregated progress for their team members. Teams are derived from OIDC group claims (mapped via a configurable `group_claim` setting). No manual team management in Phœbus — the enterprise directory (AD/LDAP → OIDC) is the source of truth. Groups are refreshed on each login.
 
 ---
 
@@ -786,11 +786,11 @@ See section 2.1 (Git Repository Registration). The admin UI provides:
 
 **Flow:**
 
-1. User accesses Phoebus → redirected to OIDC provider login page
+1. User accesses Phœbus → redirected to OIDC provider login page
 2. User authenticates with their corporate credentials
-3. OIDC provider redirects back to Phoebus with an authorization code
-4. Phoebus exchanges the code for an ID token and access token
-5. Phoebus creates or updates the user record (matched by `external_id` or email)
+3. OIDC provider redirects back to Phœbus with an authorization code
+4. Phœbus exchanges the code for an ID token and access token
+5. Phœbus creates or updates the user record (matched by `external_id` or email)
 6. A session token (JWT) is issued as an httpOnly cookie (see section 9.3)
 7. Subsequent API requests carry the JWT automatically via the cookie — no `Authorization` header needed
 
@@ -804,9 +804,9 @@ See section 2.1 (Git Repository Registration). The admin UI provides:
 
 **Flow:**
 
-1. User submits username/password on the Phoebus login page
-2. Phoebus performs an LDAP bind with the provided credentials
-3. If bind succeeds, Phoebus fetches user attributes (name, email, groups). LDAP group membership is synced on every login (no caching). Login happens once per session (~8h), so one extra LDAP query is negligible. Consistent with OIDC behavior (claims refreshed on auth)
+1. User submits username/password on the Phœbus login page
+2. Phœbus performs an LDAP bind with the provided credentials
+3. If bind succeeds, Phœbus fetches user attributes (name, email, groups). LDAP group membership is synced on every login (no caching). Login happens once per session (~8h), so one extra LDAP query is negligible. Consistent with OIDC behavior (claims refreshed on auth)
 4. User record is created or updated
 5. A session token (JWT) is issued
 
@@ -831,8 +831,8 @@ See section 2.1 (Git Repository Registration). The admin UI provides:
 
 **Flow:**
 
-1. User submits username/password on the Phoebus login page (same form as LDAP)
-2. Phoebus verifies the password against a bcrypt hash stored in the `users` table
+1. User submits username/password on the Phœbus login page (same form as LDAP)
+2. Phœbus verifies the password against a bcrypt hash stored in the `users` table
 3. If valid, a session token (JWT) is issued as an httpOnly cookie (same as OIDC/LDAP)
 
 **Self-Registration (Signup):**
@@ -876,7 +876,7 @@ Administrators can create local users from the Admin > Users view:
 
 ## 10. SPA Views
 
-This section inventories every view (page) of the Phoebus single-page application. For each view it defines the route, required role, layout, data loaded, API calls, navigation targets, and detailed interactions.
+This section inventories every view (page) of the Phœbus single-page application. For each view it defines the route, required role, layout, data loaded, API calls, navigation targets, and detailed interactions.
 
 ### 10.1 Global Layout
 
@@ -884,7 +884,7 @@ All authenticated views share a common shell layout:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  🔥 Phoebus           Catalog   Dashboard        [User ▾] [Logout] │
+│  🔥 Phœbus           Catalog   Dashboard        [User ▾] [Logout] │
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │                        <Page Content>                               │
@@ -941,7 +941,7 @@ All authenticated views share a common shell layout:
 
 ```
 ┌─────────────────────────────────────┐
-│           🔥 Phoebus                │
+│           🔥 Phœbus                │
 │                                     │
 │  ┌─────────────────────────────┐    │
 │  │  Sign in with SSO           │    │  ← OIDC button (if configured)
@@ -964,7 +964,7 @@ All authenticated views share a common shell layout:
 
 ```
 ┌─────────────────────────────────────┐
-│           🔥 Phoebus                │
+│           🔥 Phœbus                │
 │                                     │
 │  Create your account                │
 │                                     │

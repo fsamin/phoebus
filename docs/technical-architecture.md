@@ -1,10 +1,10 @@
-# Phoebus — Technical Architecture
+# Phœbus — Technical Architecture
 
 ## 1. Overview
 
-This document describes the technical architecture of Phoebus, an open-source e-learning platform for DevOps training in enterprise environments. It covers the system components, their interactions, data flows, and technology choices.
+This document describes the technical architecture of Phœbus, an open-source e-learning platform for DevOps training in enterprise environments. It covers the system components, their interactions, data flows, and technology choices.
 
-Phoebus is designed as a **single-tenant**, **self-hosted** application composed of a Go backend, a React frontend, and a PostgreSQL database. All exercises (quizzes, terminal simulations, code challenges) are **interactive browser-based experiences** — there is no server-side code execution, no VM provisioning, and no infrastructure management.
+Phœbus is designed as a **single-tenant**, **self-hosted** application composed of a Go backend, a React frontend, and a PostgreSQL database. All exercises (quizzes, terminal simulations, code challenges) are **interactive browser-based experiences** — there is no server-side code execution, no VM provisioning, and no infrastructure management.
 
 ---
 
@@ -18,7 +18,7 @@ Phoebus is designed as a **single-tenant**, **self-hosted** application composed
                            │ HTTPS
                            ▼
 ┌──────────────────────────────────────────────────────────┐
-│                     Phoebus Platform                      │
+│                     Phœbus Platform                      │
 │                                                          │
 │  ┌─────────────────┐      ┌─────────────────┐           │
 │  │    Frontend      │      │    Backend       │           │

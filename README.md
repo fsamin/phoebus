@@ -1,8 +1,12 @@
-# 🔥 Phoebus
+# 🔥 Phœbus
+
+> **Phœbus** `/ˈfiːbəs/` — from Greek *Φοῖβος* (Phoîbos), meaning "bright, radiant". An epithet of Apollo, god of light, knowledge, music, and arts. A fitting name for a platform that illuminates the path to learning.
+>
+> Spelled with the **œ** ligature: **Phœbus**, not ~~Phoebus~~.
 
 **Open-source e-learning platform for DevOps training.**
 
-Phoebus follows a **content-as-code** philosophy: learning paths are authored in Markdown, stored in Git repositories, and synced automatically. The platform handles content parsing, progress tracking, exercise validation, and analytics — all from a single self-hosted binary.
+Phœbus follows a **content-as-code** philosophy: learning paths are authored in Markdown, stored in Git repositories, and synced automatically. The platform handles content parsing, progress tracking, exercise validation, and analytics — all from a single self-hosted binary.
 
 ![Go](https://img.shields.io/badge/Go-1.24-00ADD8?logo=go&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
@@ -90,7 +94,7 @@ See the [Detailed Specifications](docs/detailed-specifications.md) for the full 
 
 ## Configuration
 
-Phoebus uses [configstore](https://github.com/ovh/configstore) for configuration. Each config key is a file in the config directory:
+Phœbus uses [configstore](https://github.com/ovh/configstore) for configuration. Each config key is a file in the config directory:
 
 | File | Description | Default |
 |------|-------------|---------|
