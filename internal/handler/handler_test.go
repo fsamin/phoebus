@@ -28,27 +28,34 @@ var (
 )
 
 func TestMain(m *testing.M) {
-	// We can't use t.TempDir() in TestMain, but we manage cleanup via docker rm.
-	containerName := fmt.Sprintf("phoebus-test-pg-%d", os.Getpid())
-	port := 15432 + (os.Getpid() % 1000)
+	var err error
+	var containerID string
 
-	cmd := exec.Command("docker", "run", "-d",
-		"--name", containerName,
-		"-e", "POSTGRES_USER=test",
-		"-e", "POSTGRES_PASSWORD=test",
-		"-e", "POSTGRES_DB=phoebus_test",
-		"-p", fmt.Sprintf("%d:5432", port),
-		"postgres:16-alpine",
-	)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "failed to start postgres: %v\n%s\n", err, out)
-		os.Exit(1)
+	dsn := os.Getenv("PHOEBUS_TEST_DB")
+	if dsn == "" {
+		// No external DB provided — start an ephemeral PostgreSQL container.
+		containerName := fmt.Sprintf("phoebus-test-pg-%d", os.Getpid())
+		port := 15432 + (os.Getpid() % 1000)
+
+		cmd := exec.Command("docker", "run", "-d",
+			"--name", containerName,
+			"-e", "POSTGRES_USER=test",
+			"-e", "POSTGRES_PASSWORD=test",
+			"-e", "POSTGRES_DB=phoebus_test",
+			"-p", fmt.Sprintf("%d:5432", port),
+			"postgres:16-alpine",
+		)
+		out, cErr := cmd.CombinedOutput()
+		if cErr != nil {
+			fmt.Fprintf(os.Stderr, "failed to start postgres: %v\n%s\n", cErr, out)
+			os.Exit(1)
+		}
+		containerID = strings.TrimSpace(string(out))
+		dsn = fmt.Sprintf("postgres://test:test@localhost:%d/phoebus_test?sslmode=disable", port)
 	}
-	containerID := strings.TrimSpace(string(out))
-	defer exec.Command("docker", "rm", "-f", containerID).Run()
-
-	dsn := fmt.Sprintf("postgres://test:test@localhost:%d/phoebus_test?sslmode=disable", port)
+	if containerID != "" {
+		defer exec.Command("docker", "rm", "-f", containerID).Run()
+	}
 
 	// Wait for PostgreSQL
 	for i := 0; i < 30; i++ {
