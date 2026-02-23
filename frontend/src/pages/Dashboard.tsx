@@ -38,7 +38,7 @@ const Dashboard: React.FC = () => {
 
       {/* Continue Learning */}
       {data.continue_learning && (
-        <Card style={{ marginBottom: 24, borderLeft: '4px solid #ff7a45' }}>
+        <Card style={{ marginBottom: 24, borderLeft: '4px solid var(--color-primary)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <Typography.Text type="secondary">Continue Learning</Typography.Text>

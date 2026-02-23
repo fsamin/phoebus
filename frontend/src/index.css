@@ -2,73 +2,129 @@
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
   font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* ── Light theme (default) ── */
+  --color-bg-page: #ffffff;
+  --color-bg-container: #ffffff;
+  --color-bg-elevated: #fafafa;
+  --color-bg-header: #001529;
+  --color-bg-sidebar: #ffffff;
+  --color-bg-ide: #ffffff;
+  --color-bg-ide-secondary: #f3f3f3;
+  --color-bg-ide-panel: #f8f8f8;
+  --color-bg-terminal: #1a1a2e;
+  --color-bg-login: #f0f2f5;
+
+  --color-text-primary: #213547;
+  --color-text-secondary: #666666;
+  --color-text-ide: #333333;
+  --color-text-ide-secondary: #666666;
+  --color-text-ide-explorer: #333333;
+  --color-text-terminal: #e0e0e0;
+  --color-text-terminal-cmd: #00ff41;
+  --color-text-terminal-output: #ccc;
+  --color-text-header: #ffffff;
+
+  --color-border: #f0f0f0;
+  --color-border-ide: #e0e0e0;
+  --color-border-input: #d9d9d9;
+  --color-border-resize: #d9d9d9;
+
+  --color-primary: #ff7a45;
+  --color-link: #1890ff;
+  --color-success: #52c41a;
+  --color-warning: #faad14;
+  --color-danger: #ff4d4f;
+  --color-info: #1890ff;
+  --color-note: #722ed1;
+
+  --color-choice-selected-bg: #e6f7ff;
+  --color-choice-selected-border: #1890ff;
+  --color-choice-correct-bg: #f6ffed;
+  --color-choice-correct-border: #52c41a;
+  --color-choice-wrong-bg: #fff2f0;
+  --color-choice-wrong-border: #ff4d4f;
+
+  --color-ide-line-selected: rgba(30, 136, 229, 0.15);
+  --color-ide-glyph-selected: #1890ff;
+  --color-ide-line-target: rgba(82, 196, 26, 0.12);
+  --color-ide-glyph-target: #52c41a;
+
+  --color-ide-tree-hover: #e8e8e8;
+  --color-ide-tree-selected: #d0d0d0;
+
+  --color-ide-disabled-bg: #e8e8e8;
+  --color-ide-disabled-text: #999;
+  --color-ide-disabled-border: #d9d9d9;
+
+  --color-resize-handle-hover: #1890ff;
+
+  --monaco-theme: vs;
+  --highlight-css: github;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
+/* ── Dark theme ── */
+[data-theme="dark"] {
+  --color-bg-page: #141414;
+  --color-bg-container: #1f1f1f;
+  --color-bg-elevated: #252525;
+  --color-bg-header: #1f1f1f;
+  --color-bg-sidebar: #1f1f1f;
+  --color-bg-ide: #1e1e1e;
+  --color-bg-ide-secondary: #252526;
+  --color-bg-ide-panel: #1e1e1e;
+  --color-bg-terminal: #1a1a2e;
+  --color-bg-login: #141414;
+
+  --color-text-primary: rgba(255, 255, 255, 0.87);
+  --color-text-secondary: rgba(255, 255, 255, 0.45);
+  --color-text-ide: #cccccc;
+  --color-text-ide-secondary: #bbbbbb;
+  --color-text-ide-explorer: #cccccc;
+  --color-text-terminal: #e0e0e0;
+  --color-text-terminal-cmd: #00ff41;
+  --color-text-terminal-output: #ccc;
+  --color-text-header: #ffffff;
+
+  --color-border: #303030;
+  --color-border-ide: #3c3c3c;
+  --color-border-input: #434343;
+  --color-border-resize: #3c3c3c;
+
+  --color-choice-selected-bg: #111d2c;
+  --color-choice-selected-border: #1890ff;
+  --color-choice-correct-bg: #162312;
+  --color-choice-correct-border: #52c41a;
+  --color-choice-wrong-bg: #2a1215;
+  --color-choice-wrong-border: #ff4d4f;
+
+  --color-ide-tree-hover: #2a2d2e;
+  --color-ide-tree-selected: #37373d;
+
+  --color-ide-disabled-bg: #3c3c3c;
+  --color-ide-disabled-text: #666;
+  --color-ide-disabled-border: #555;
+
+  --monaco-theme: vs-dark;
 }
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
-}
-
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
-}
-
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
-  cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+  background-color: var(--color-bg-page);
+  color: var(--color-text-primary);
 }
 
 /* Deactivated user rows */
 .deactivated-row {
   opacity: 0.5;
-  background-color: #fafafa;
 }
+[data-theme="dark"] .deactivated-row {
+  background-color: #1a1a1a;
+}
+

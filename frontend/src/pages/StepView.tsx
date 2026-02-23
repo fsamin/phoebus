@@ -115,9 +115,9 @@ const StepView: React.FC = () => {
       return {
         key: s.id,
         icon: status === 'completed'
-          ? <CheckCircleOutlined style={{ color: '#52c41a' }} />
+          ? <CheckCircleOutlined style={{ color: 'var(--color-success)' }} />
           : status === 'in_progress'
-          ? <PlayCircleOutlined style={{ color: '#faad14' }} />
+          ? <PlayCircleOutlined style={{ color: 'var(--color-warning)' }} />
           : stepIcon(s.type),
         label: <span style={s.id === stepId ? { fontWeight: 'bold' } : undefined}>{s.title}</span>,
       };
@@ -131,12 +131,12 @@ const StepView: React.FC = () => {
     <Layout style={{ minHeight: 'calc(100vh - 64px)', margin: '-24px -48px', flexDirection: 'row' }}>
       <div style={{
         width: collapsed ? 48 : sidebarWidth, flexShrink: 0, display: 'flex',
-        background: '#fff', borderRight: '1px solid #f0f0f0', position: 'relative',
+        background: 'var(--color-bg-sidebar)', borderRight: '1px solid var(--color-border)', position: 'relative',
         transition: collapsed ? 'width 0.2s' : undefined,
       }}>
         <div style={{ flex: 1, overflow: 'auto' }}>
         <div ref={sidebarRef} style={{ height: '100%', overflow: 'auto' }}>
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <Button
             type="text"
             icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
@@ -186,7 +186,7 @@ const StepView: React.FC = () => {
               width: 4, cursor: 'col-resize', background: 'transparent',
               position: 'absolute', right: 0, top: 0, bottom: 0, zIndex: 10,
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = '#1890ff')}
+            onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-resize-handle-hover)')}
             onMouseLeave={(e) => { if (!resizingRef.current) e.currentTarget.style.background = 'transparent'; }}
           />
         )}

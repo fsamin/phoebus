@@ -10,14 +10,18 @@ import {
   FireOutlined,
   TeamOutlined,
   HeartOutlined,
+  MoonOutlined,
+  SunOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 
 const { Header, Content } = Layout;
 
 const AppLayout: React.FC = () => {
   const { user, loading, logout } = useAuth();
+  const { isDark, toggle } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -61,13 +65,13 @@ const AppLayout: React.FC = () => {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ display: 'flex', alignItems: 'center', padding: '0 24px', background: '#001529' }}>
+      <Header style={{ display: 'flex', alignItems: 'center', padding: '0 24px', background: 'var(--color-bg-header)' }}>
         <div
           style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginRight: 32 }}
           onClick={() => navigate('/')}
         >
-          <FireOutlined style={{ fontSize: 24, color: '#ff7a45', marginRight: 8 }} />
-          <Typography.Title level={4} style={{ margin: 0, color: '#fff' }}>
+          <FireOutlined style={{ fontSize: 24, color: 'var(--color-primary)', marginRight: 8 }} />
+          <Typography.Title level={4} style={{ margin: 0, color: 'var(--color-text-header)' }}>
             Phoebus
           </Typography.Title>
         </div>
@@ -78,6 +82,12 @@ const AppLayout: React.FC = () => {
           items={menuItems}
           onClick={({ key }) => navigate(key)}
           style={{ flex: 1 }}
+        />
+        <Button
+          type="text"
+          icon={isDark ? <SunOutlined /> : <MoonOutlined />}
+          onClick={toggle}
+          style={{ color: 'var(--color-text-header)', marginRight: 8 }}
         />
         <Dropdown
           menu={{
@@ -98,7 +108,7 @@ const AppLayout: React.FC = () => {
             onClick: ({ key }) => { if (key === 'logout') logout(); },
           }}
         >
-          <Button type="text" icon={<UserOutlined />} style={{ color: '#fff' }}>
+          <Button type="text" icon={<UserOutlined />} style={{ color: 'var(--color-text-header)' }}>
             {user.display_name || user.username}
           </Button>
         </Dropdown>

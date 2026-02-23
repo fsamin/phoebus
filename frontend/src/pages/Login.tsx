@@ -158,10 +158,10 @@ const Login: React.FC = () => {
   }
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: '#f0f2f5' }}>
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'var(--color-bg-login)' }}>
       <Card style={{ width: 420 }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
-          <FireOutlined style={{ fontSize: 48, color: '#ff7a45' }} />
+          <FireOutlined style={{ fontSize: 48, color: 'var(--color-primary)' }} />
           <Typography.Title level={2} style={{ marginTop: 8 }}>Phoebus</Typography.Title>
         </div>
         {error && <Alert message={error} type="error" showIcon style={{ marginBottom: 16 }} />}

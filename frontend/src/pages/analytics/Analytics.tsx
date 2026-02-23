@@ -95,10 +95,10 @@ const Analytics: React.FC = () => {
         <Col xs={24} lg={8}>
           <Card title="Recent Activity">
             {activity.map((e, i) => (
-              <div key={i} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid #f0f0f0' }}>
+              <div key={i} style={{ marginBottom: 12, paddingBottom: 12, borderBottom: '1px solid var(--color-border)' }}>
                 <Typography.Text
                   strong
-                  style={{ cursor: 'pointer', color: '#1890ff' }}
+                  style={{ cursor: 'pointer', color: 'var(--color-link)' }}
                   onClick={() => navigate(`/analytics/learners/${e.user_id}`)}
                 >
                   {e.display_name || e.username}

@@ -88,7 +88,7 @@ const PathAnalyticsView: React.FC = () => {
                       <Typography.Text type="secondary">{s.completion_rate.toFixed(0)}%</Typography.Text>
                     </div>
                     <AntProgress percent={Math.round(s.completion_rate)} size="small" showInfo={false}
-                      strokeColor={s.completion_rate < 60 ? '#faad14' : '#52c41a'} />
+                      strokeColor={s.completion_rate < 60 ? 'var(--color-warning)' : 'var(--color-success)'} />
                   </div>
                 ))}
               </Card>
@@ -137,7 +137,7 @@ const PathAnalyticsView: React.FC = () => {
                   width: 150,
                   render: (v: number) => (
                     <span>
-                      {v < 60 && <WarningOutlined style={{ color: '#faad14', marginRight: 4 }} />}
+                      {v < 60 && <WarningOutlined style={{ color: 'var(--color-warning)', marginRight: 4 }} />}
                       {v.toFixed(0)}%
                     </span>
                   ),

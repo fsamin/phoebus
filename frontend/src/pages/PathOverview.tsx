@@ -124,9 +124,9 @@ const PathOverview: React.FC = () => {
                       extra={
                         <>
                           {status === 'completed' ? (
-                            <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                            <CheckCircleOutlined style={{ color: 'var(--color-success)' }} />
                           ) : status === 'in_progress' ? (
-                            <span><PlayCircleOutlined style={{ color: '#faad14' }} /> <Typography.Text type="secondary" style={{ fontSize: 12 }}>← current</Typography.Text></span>
+                            <span><PlayCircleOutlined style={{ color: 'var(--color-warning)' }} /> <Typography.Text type="secondary" style={{ fontSize: 12 }}>← current</Typography.Text></span>
                           ) : null}
                         </>
                       }

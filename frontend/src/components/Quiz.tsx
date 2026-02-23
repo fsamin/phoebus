@@ -100,9 +100,9 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit }) => {
               let style: React.CSSProperties = {};
               if (choiceFb) {
                 style = choiceFb.correct
-                  ? { background: '#f6ffed', borderColor: '#52c41a' }
+                  ? { background: 'var(--color-choice-correct-bg)', borderColor: 'var(--color-choice-correct-border)' }
                   : choiceFb.selected
-                  ? { background: '#fff2f0', borderColor: '#ff4d4f' }
+                  ? { background: 'var(--color-choice-wrong-bg)', borderColor: 'var(--color-choice-wrong-border)' }
                   : {};
               }
               return (
@@ -110,11 +110,11 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit }) => {
                   key={c.text}
                   style={{
                     padding: '8px 12px',
-                    border: '1px solid #d9d9d9',
+                    border: '1px solid var(--color-border-input)',
                     borderRadius: 6,
                     cursor: feedback ? 'default' : 'pointer',
                     ...style,
-                    ...(isSelected && !feedback ? { borderColor: '#1890ff', background: '#e6f7ff' } : {}),
+                    ...(isSelected && !feedback ? { borderColor: 'var(--color-choice-selected-border)', background: 'var(--color-choice-selected-bg)' } : {}),
                   }}
                   onClick={() => {
                     if (feedback) return;
@@ -142,16 +142,16 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit }) => {
                 let style: React.CSSProperties = {};
                 if (choiceFb) {
                   style = choiceFb.correct
-                    ? { background: '#f6ffed', borderColor: '#52c41a' }
+                    ? { background: 'var(--color-choice-correct-bg)', borderColor: 'var(--color-choice-correct-border)' }
                     : choiceFb.selected
-                    ? { background: '#fff2f0', borderColor: '#ff4d4f' }
+                    ? { background: 'var(--color-choice-wrong-bg)', borderColor: 'var(--color-choice-wrong-border)' }
                     : {};
                 }
                 return (
                   <Radio
                     key={c.text}
                     value={c.text}
-                    style={{ display: 'block', padding: '8px 12px', border: '1px solid #d9d9d9', borderRadius: 6, ...style }}
+                    style={{ display: 'block', padding: '8px 12px', border: '1px solid var(--color-border-input)', borderRadius: 6, ...style }}
                   >
                     {c.text}
                   </Radio>
@@ -178,7 +178,7 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit }) => {
             showIcon
           />
           {(feedback.explanation as string) && (
-            <Card size="small" style={{ marginTop: 8, background: '#fafafa' }}>
+            <Card size="small" style={{ marginTop: 8, background: 'var(--color-bg-elevated)' }}>
               <MarkdownRenderer content={feedback.explanation as string} />
             </Card>
           )}

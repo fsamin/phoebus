@@ -31,8 +31,8 @@ const Health: React.FC = () => {
   if (loading || !data) return <Spin size="large" style={{ display: 'block', marginTop: 100 }} />;
 
   const statusIcon = (ok: boolean) => ok
-    ? <CheckCircleOutlined style={{ fontSize: 32, color: '#52c41a' }} />
-    : <CloseCircleOutlined style={{ fontSize: 32, color: '#ff4d4f' }} />;
+    ? <CheckCircleOutlined style={{ fontSize: 32, color: 'var(--color-success)' }} />
+    : <CloseCircleOutlined style={{ fontSize: 32, color: 'var(--color-danger)' }} />;
 
   return (
     <div>
@@ -59,7 +59,7 @@ const Health: React.FC = () => {
         <Col xs={24} sm={8}>
           <Card>
             <Card.Meta
-              avatar={<SyncOutlined style={{ fontSize: 32, color: '#1890ff' }} />}
+              avatar={<SyncOutlined style={{ fontSize: 32, color: 'var(--color-info)' }} />}
               title="Repositories"
               description={<>{data.repositories.synced}/{data.repositories.total} synced</>}
             />

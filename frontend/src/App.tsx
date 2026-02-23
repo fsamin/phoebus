@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ConfigProvider } from 'antd';
+import { ConfigProvider, theme as antTheme } from 'antd';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ThemeProvider, useTheme } from './contexts/ThemeContext';
 import AppLayout from './components/AppLayout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -26,9 +27,13 @@ function RequireRole({ role, children }: { role: string; children: React.ReactNo
   return <>{children}</>;
 }
 
-function App() {
+function ThemedApp() {
+  const { isDark } = useTheme();
   return (
-    <ConfigProvider theme={{ token: { colorPrimary: '#ff7a45' } }}>
+    <ConfigProvider theme={{
+      token: { colorPrimary: '#ff7a45' },
+      algorithm: isDark ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
+    }}>
       <AuthProvider>
         <BrowserRouter>
           <Routes>
@@ -52,6 +57,14 @@ function App() {
         </BrowserRouter>
       </AuthProvider>
     </ConfigProvider>
+  );
+}
+
+function App() {
+  return (
+    <ThemeProvider>
+      <ThemedApp />
+    </ThemeProvider>
   );
 }
 

@@ -3,6 +3,7 @@ import { Radio, Button, Alert, Typography, Tag, Space, Tree, Tooltip } from 'ant
 import { FileOutlined, FolderOutlined, CheckCircleFilled, BugFilled } from '@ant-design/icons';
 import Editor from '@monaco-editor/react';
 import MarkdownRenderer from './MarkdownRenderer';
+import { useTheme } from '../contexts/ThemeContext';
 import type { CodebaseFile } from '../api/client';
 
 interface Patch {
@@ -61,6 +62,7 @@ function buildTreeData(files: CodebaseFile[]) {
 }
 
 const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, patches, codebaseFiles, onSubmit }) => {
+  const { isDark } = useTheme();
   const [selectedFile, setSelectedFile] = useState(target?.file || codebaseFiles[0]?.file_path || '');
   const [selectedLines, setSelectedLines] = useState<number[]>([]);
   const [phase, setPhase] = useState<'identify' | 'fix'>(mode === 'B' ? 'fix' : 'identify');
@@ -87,7 +89,6 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
         glyphMarginClassName: 'line-glyph-selected',
       },
     }));
-    // Add target line decorations in fix phase
     if (phase === 'fix' && target?.file === selectedFile) {
       target.lines.forEach((lineNum) => {
         newDecorations.push({
@@ -106,24 +107,19 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
   const handleEditorMount = (editor: any) => {
     editorRef.current = editor;
     editor.updateOptions({ readOnly: true, glyphMargin: phase === 'identify' });
-
-    // Click on gutter to toggle line selection (identify phase)
     editor.onMouseDown((e: any) => {
       if (phase !== 'identify' || feedback) return;
       const lineNum = e.target?.position?.lineNumber;
       if (!lineNum) return;
-      // Allow click on line number or glyph margin
       if (e.target.type === 2 || e.target.type === 3 || e.target.type === 4) {
         setSelectedLines((prev) =>
           prev.includes(lineNum) ? prev.filter((l) => l !== lineNum) : [...prev, lineNum]
         );
       }
     });
-
     updateDecorations(editor);
   };
 
-  // Update decorations when selectedLines change
   useMemo(() => {
     if (editorRef.current) updateDecorations(editorRef.current);
   }, [selectedLines, updateDecorations]);
@@ -134,14 +130,9 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
       const result = await onSubmit({ phase: 'identify', selected_lines: selectedLines });
       setFeedback(result);
       if (result.is_correct) {
-        setTimeout(() => {
-          setPhase('fix');
-          setFeedback(null);
-        }, 1500);
+        setTimeout(() => { setPhase('fix'); setFeedback(null); }, 1500);
       }
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   };
 
   const handleSubmitFix = async () => {
@@ -150,12 +141,9 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
       const result = await onSubmit({ phase: 'fix', selected_patch: selectedPatch });
       setFeedback(result);
       if (result.is_correct) setCompleted(true);
-    } finally {
-      setSubmitting(false);
-    }
+    } finally { setSubmitting(false); }
   };
 
-  // Resize handle for bottom panel
   const handleResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
     resizingRef.current = true;
@@ -163,8 +151,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
     const startHeight = bottomPanelHeight;
     const onMove = (ev: MouseEvent) => {
       if (!resizingRef.current) return;
-      const newH = Math.max(100, Math.min(500, startHeight + (startY - ev.clientY)));
-      setBottomPanelHeight(newH);
+      setBottomPanelHeight(Math.max(100, Math.min(500, startHeight + (startY - ev.clientY))));
     };
     const onUp = () => {
       resizingRef.current = false;
@@ -176,25 +163,24 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)', background: '#1e1e1e' }}>
-      {/* Injected styles for editor decorations */}
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)', background: 'var(--color-bg-ide)' }}>
       <style>{`
-        .line-selected { background: rgba(30, 136, 229, 0.15) !important; }
-        .line-glyph-selected { background: #1890ff; border-radius: 50%; margin-left: 4px; width: 8px !important; height: 8px !important; margin-top: 6px; }
-        .line-target { background: rgba(82, 196, 26, 0.12) !important; }
-        .line-glyph-target { background: #52c41a; border-radius: 50%; margin-left: 4px; width: 8px !important; height: 8px !important; margin-top: 6px; }
-        .ide-bottom-panel .ant-btn-primary:disabled { background: #3c3c3c !important; color: #666 !important; border-color: #555 !important; }
+        .line-selected { background: var(--color-ide-line-selected) !important; }
+        .line-glyph-selected { background: var(--color-ide-glyph-selected); border-radius: 50%; margin-left: 4px; width: 8px !important; height: 8px !important; margin-top: 6px; }
+        .line-target { background: var(--color-ide-line-target) !important; }
+        .line-glyph-target { background: var(--color-ide-glyph-target); border-radius: 50%; margin-left: 4px; width: 8px !important; height: 8px !important; margin-top: 6px; }
+        .ide-bottom-panel .ant-btn-primary:disabled { background: var(--color-ide-disabled-bg) !important; color: var(--color-ide-disabled-text) !important; border-color: var(--color-ide-disabled-border) !important; }
       `}</style>
 
-      {/* Top bar: file tabs + phase indicator */}
+      {/* Top bar */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '0 12px', height: 36, background: '#252526', borderBottom: '1px solid #3c3c3c',
+        padding: '0 12px', height: 36, background: 'var(--color-bg-ide-secondary)', borderBottom: '1px solid var(--color-border-ide)',
         flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <FileOutlined style={{ color: '#cccccc', fontSize: 13 }} />
-          <Typography.Text style={{ color: '#cccccc', fontSize: 13 }}>{selectedFile}</Typography.Text>
+          <FileOutlined style={{ color: 'var(--color-text-ide)', fontSize: 13 }} />
+          <Typography.Text style={{ color: 'var(--color-text-ide)', fontSize: 13 }}>{selectedFile}</Typography.Text>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {completed && <Tag color="success" icon={<CheckCircleFilled />}>Completed</Tag>}
@@ -207,14 +193,14 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
         </div>
       </div>
 
-      {/* Main area: sidebar + editor */}
+      {/* Main area */}
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         {/* File explorer */}
         <div style={{
-          width: 200, background: '#252526', borderRight: '1px solid #3c3c3c',
+          width: 200, background: 'var(--color-bg-ide-secondary)', borderRight: '1px solid var(--color-border-ide)',
           overflow: 'auto', flexShrink: 0, padding: '8px 0',
         }}>
-          <div style={{ padding: '4px 12px 8px', color: '#bbbbbb', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>
+          <div style={{ padding: '4px 12px 8px', color: 'var(--color-text-ide-secondary)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>
             Explorer
           </div>
           <Tree
@@ -222,16 +208,16 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
             selectedKeys={[selectedFile]}
             onSelect={(keys) => keys[0] && setSelectedFile(keys[0] as string)}
             defaultExpandAll
-            style={{ background: 'transparent', color: '#cccccc' }}
+            style={{ background: 'transparent', color: 'var(--color-text-ide-explorer)' }}
             className="ide-tree"
           />
           <style>{`
             .ide-tree, .ide-tree * { background-color: transparent !important; }
-            .ide-tree .ant-tree-node-content-wrapper { color: #cccccc !important; }
-            .ide-tree .ant-tree-node-content-wrapper:hover { background-color: #2a2d2e !important; }
+            .ide-tree .ant-tree-node-content-wrapper { color: var(--color-text-ide-explorer) !important; }
+            .ide-tree .ant-tree-node-content-wrapper:hover { background-color: var(--color-ide-tree-hover) !important; }
             .ide-tree .ant-tree-node-selected .ant-tree-node-content-wrapper,
-            .ide-tree .ant-tree-node-content-wrapper.ant-tree-node-selected { background-color: #37373d !important; color: #ffffff !important; }
-            .ide-tree .ant-tree-switcher { color: #cccccc !important; }
+            .ide-tree .ant-tree-node-content-wrapper.ant-tree-node-selected { background-color: var(--color-ide-tree-selected) !important; color: var(--color-text-primary) !important; }
+            .ide-tree .ant-tree-switcher { color: var(--color-text-ide-explorer) !important; }
             .ide-tree .ant-tree-indent-unit { width: 16px; }
           `}</style>
         </div>
@@ -242,7 +228,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
             height="100%"
             language={getLanguage(selectedFile)}
             value={currentFile?.content || '// No file selected'}
-            theme="vs-dark"
+            theme={isDark ? 'vs-dark' : 'vs'}
             onMount={handleEditorMount}
             options={{
               readOnly: true,
@@ -266,23 +252,23 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
       <div
         onMouseDown={handleResizeStart}
         style={{
-          height: 4, background: '#3c3c3c', cursor: 'ns-resize', flexShrink: 0,
+          height: 4, background: 'var(--color-border-resize)', cursor: 'ns-resize', flexShrink: 0,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
-        <div style={{ width: 40, height: 2, background: '#666', borderRadius: 1 }} />
+        <div style={{ width: 40, height: 2, background: 'var(--color-text-secondary)', borderRadius: 1 }} />
       </div>
 
-      {/* Bottom panel: description + exercise controls */}
+      {/* Bottom panel */}
       <div className="ide-bottom-panel" style={{
-        height: bottomPanelHeight, background: '#1e1e1e', borderTop: '1px solid #3c3c3c',
-        overflow: 'auto', flexShrink: 0, padding: '12px 16px', color: '#cccccc',
+        height: bottomPanelHeight, background: 'var(--color-bg-ide-panel)', borderTop: '1px solid var(--color-border-ide)',
+        overflow: 'auto', flexShrink: 0, padding: '12px 16px', color: 'var(--color-text-ide)',
       }}>
         {completed ? (
           <div>
             <Alert message="Exercise complete!" type="success" showIcon style={{ marginBottom: 8 }} />
             {typeof feedback?.explanation === 'string' && (
-              <div style={{ background: '#252526', padding: 12, borderRadius: 4, color: '#cccccc' }}>
+              <div style={{ background: 'var(--color-bg-ide-secondary)', padding: 12, borderRadius: 4 }}>
                 <MarkdownRenderer content={feedback.explanation} />
               </div>
             )}
@@ -293,7 +279,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
               <MarkdownRenderer content={description} />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-              <Typography.Text style={{ color: '#cccccc' }}>
+              <Typography.Text style={{ color: 'var(--color-text-ide)' }}>
                 Click line numbers to select problematic lines.
                 Selected: <strong>{selectedLines.length > 0 ? selectedLines.sort((a, b) => a - b).join(', ') : 'none'}</strong>
               </Typography.Text>
@@ -302,11 +288,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
               </Button>
             </div>
             {feedback && !feedback.is_correct && (
-              <Alert
-                message={`${feedback.matched}/${feedback.total} lines found`}
-                description={feedback.hint as string}
-                type="warning" showIcon style={{ marginTop: 8 }}
-              />
+              <Alert message={`${feedback.matched}/${feedback.total} lines found`} description={feedback.hint as string} type="warning" showIcon style={{ marginTop: 8 }} />
             )}
             {feedback && (feedback.is_correct as boolean) && (
               <Alert message="Correct! Moving to fix phase..." type="success" showIcon style={{ marginTop: 8 }} />
@@ -315,19 +297,14 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
         ) : (
           <div>
             <div style={{ marginBottom: 8 }}>
-              <Typography.Text strong style={{ color: '#cccccc' }}>Select the correct fix:</Typography.Text>
+              <Typography.Text strong style={{ color: 'var(--color-text-ide)' }}>Select the correct fix:</Typography.Text>
             </div>
-            <Radio.Group
-              onChange={(e) => setSelectedPatch(e.target.value)}
-              value={selectedPatch}
-              style={{ width: '100%' }}
-              disabled={completed}
-            >
+            <Radio.Group onChange={(e) => setSelectedPatch(e.target.value)} value={selectedPatch} style={{ width: '100%' }} disabled={completed}>
               <Space direction="vertical" style={{ width: '100%' }}>
                 {patches.map((p) => (
-                  <Radio key={p.label} value={p.label} style={{ color: '#cccccc' }}>
+                  <Radio key={p.label} value={p.label} style={{ color: 'var(--color-text-ide)' }}>
                     <Tooltip title={p.diff} placement="topLeft" overlayStyle={{ maxWidth: 500 }} overlayInnerStyle={{ whiteSpace: 'pre', fontFamily: 'monospace', fontSize: 12 }}>
-                      <Typography.Text style={{ color: '#cccccc' }}>{p.label}</Typography.Text>
+                      <Typography.Text style={{ color: 'var(--color-text-ide)' }}>{p.label}</Typography.Text>
                     </Tooltip>
                   </Radio>
                 ))}

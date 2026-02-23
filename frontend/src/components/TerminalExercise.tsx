@@ -33,11 +33,11 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
   if (completed) {
     return (
       <Card title="Exercise Complete ✅">
-        <div style={{ background: '#1a1a2e', padding: 16, borderRadius: 8, fontFamily: 'monospace', color: '#e0e0e0' }}>
+        <div style={{ background: 'var(--color-bg-terminal)', padding: 16, borderRadius: 8, fontFamily: 'monospace', color: 'var(--color-text-terminal)' }}>
           {history.map((h, i) => (
             <div key={i} style={{ marginBottom: 8 }}>
-              <div style={{ color: '#00ff41' }}>$ {h.command}</div>
-              {h.output && <div style={{ whiteSpace: 'pre-wrap', color: '#ccc' }}>{h.output}</div>}
+              <div style={{ color: 'var(--color-text-terminal-cmd)' }}>$ {h.command}</div>
+              {h.output && <div style={{ whiteSpace: 'pre-wrap', color: 'var(--color-text-terminal-output)' }}>{h.output}</div>}
             </div>
           ))}
         </div>
@@ -89,14 +89,14 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
       )}
 
       {/* Terminal history */}
-      <div style={{ background: '#1a1a2e', padding: 16, borderRadius: 8, fontFamily: 'monospace', color: '#e0e0e0', marginBottom: 16, minHeight: 60 }}>
+      <div style={{ background: 'var(--color-bg-terminal)', padding: 16, borderRadius: 8, fontFamily: 'monospace', color: 'var(--color-text-terminal)', marginBottom: 16, minHeight: 60 }}>
         {history.map((h, i) => (
           <div key={i} style={{ marginBottom: 8 }}>
-            <div style={{ color: '#00ff41' }}>$ {h.command}</div>
-            {h.output && <div style={{ whiteSpace: 'pre-wrap', color: '#ccc' }}>{h.output}</div>}
+            <div style={{ color: 'var(--color-text-terminal-cmd)' }}>$ {h.command}</div>
+            {h.output && <div style={{ whiteSpace: 'pre-wrap', color: 'var(--color-text-terminal-output)' }}>{h.output}</div>}
           </div>
         ))}
-        <div style={{ color: '#00ff41' }}>{step.prompt}</div>
+        <div style={{ color: 'var(--color-text-terminal-cmd)' }}>{step.prompt}</div>
       </div>
 
       {/* Context */}
@@ -122,11 +122,11 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
               style={{
                 display: 'block',
                 padding: '8px 12px',
-                border: '1px solid #d9d9d9',
+                border: '1px solid var(--color-border-input)',
                 borderRadius: 6,
                 fontFamily: 'monospace',
                 ...(disabledCommands.has(p.command)
-                  ? { background: '#fff2f0', textDecoration: 'line-through', borderColor: '#ff4d4f' }
+                  ? { background: 'var(--color-choice-wrong-bg)', textDecoration: 'line-through', borderColor: 'var(--color-choice-wrong-border)' }
                   : {}),
               }}
             >

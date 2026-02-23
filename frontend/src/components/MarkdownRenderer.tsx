@@ -16,12 +16,12 @@ interface MarkdownRendererProps {
 }
 
 const admonitionStyles: Record<string, { color: string; icon: string }> = {
-  tip:     { color: '#52c41a', icon: '💡' },
-  warning: { color: '#faad14', icon: '⚠️' },
-  danger:  { color: '#ff4d4f', icon: '🚨' },
-  info:    { color: '#1890ff', icon: 'ℹ️' },
-  note:    { color: '#722ed1', icon: '📝' },
-  caution: { color: '#faad14', icon: '⚠️' },
+  tip:     { color: 'var(--color-success)', icon: '💡' },
+  warning: { color: 'var(--color-warning)', icon: '⚠️' },
+  danger:  { color: 'var(--color-danger)', icon: '🚨' },
+  info:    { color: 'var(--color-info)', icon: 'ℹ️' },
+  note:    { color: 'var(--color-note)', icon: '📝' },
+  caution: { color: 'var(--color-warning)', icon: '⚠️' },
 };
 
 function Admonition({ type, children }: { type: string; children?: React.ReactNode }) {
@@ -31,7 +31,7 @@ function Admonition({ type, children }: { type: string; children?: React.ReactNo
       borderLeft: `4px solid ${style.color}`,
       padding: '12px 16px',
       margin: '16px 0',
-      background: `${style.color}10`,
+      background: 'var(--color-bg-elevated)',
       borderRadius: 4,
     }}>
       <strong>{style.icon} {type.charAt(0).toUpperCase() + type.slice(1)}</strong>
