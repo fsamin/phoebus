@@ -72,7 +72,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
   const [completed, setCompleted] = useState(false);
   const [bottomPanelHeight, setBottomPanelHeight] = useState(200);
   const editorRef = useRef<unknown>(null);
-  const decorationsRef = useRef<string[]>([]);
+  const decorationsRef = useRef<any>(null);
   const resizingRef = useRef(false);
 
   const currentFile = codebaseFiles.find((f) => f.file_path === selectedFile);
@@ -101,7 +101,10 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
         });
       });
     }
-    decorationsRef.current = editor.deltaDecorations(decorationsRef.current, newDecorations);
+    if (decorationsRef.current) {
+      decorationsRef.current.clear();
+    }
+    decorationsRef.current = editor.createDecorationsCollection(newDecorations);
   }, [selectedLines, phase, target, selectedFile]);
 
   const handleEditorMount = (editor: any) => {
