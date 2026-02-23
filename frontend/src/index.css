@@ -128,6 +128,14 @@ body {
   background-color: #1a1a1a;
 }
 
+/* Dark mode: override Ant Design dark menu submenu popup background */
+[data-theme="dark"] .ant-menu-dark .ant-menu-submenu-popup,
+[data-theme="dark"] .ant-menu-dark.ant-menu-submenu > .ant-menu,
+[data-theme="dark"] .ant-menu-submenu-popup .ant-menu-dark,
+[data-theme="dark"] .ant-menu-submenu-popup .ant-menu {
+  background: #1a1a1a !important;
+}
+
 /* Monaco editor line decorations */
 .line-selected {
   background: rgba(30, 136, 229, 0.15) !important;

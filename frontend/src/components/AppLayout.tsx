@@ -65,7 +65,11 @@ const AppLayout: React.FC = () => {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ display: 'flex', alignItems: 'center', padding: '0 24px', background: '#001529' }}>
+      <Header style={{
+        display: 'flex', alignItems: 'center', padding: '0 24px',
+        background: isDark ? '#1a1a1a' : '#001529',
+        borderBottom: isDark ? '2px solid #ff7a45' : 'none',
+      }}>
         <div
           style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginRight: 32 }}
           onClick={() => navigate('/')}
@@ -81,7 +85,7 @@ const AppLayout: React.FC = () => {
           selectedKeys={[currentKey]}
           items={menuItems}
           onClick={({ key }) => navigate(key)}
-          style={{ flex: 1 }}
+          style={{ flex: 1, background: 'transparent' }}
         />
         <Button
           type="text"
