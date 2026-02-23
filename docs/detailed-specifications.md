@@ -886,7 +886,7 @@ All authenticated views share a common shell layout:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  🔥 Phœbus           Catalog   Dashboard        [User ▾] [Logout] │
+│  🔥 Phœbus           Catalog   Dashboard     [🌙] [User ▾] [Logout]│
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │                        <Page Content>                               │
@@ -898,12 +898,24 @@ All authenticated views share a common shell layout:
 
 | Element | Behavior |
 |---|---|
-| Logo + name | Click → navigates to Dashboard (`/`) |
+| Logo + name | Click → navigates to Dashboard (`/`). **Fixed branding:** dark background (`#001529`), fire icon (`#ff7a45`), white text — does not change with theme |
 | Catalog link | Navigates to `/catalog` |
 | Dashboard link | Navigates to `/` |
 | Analytics link | Visible only for `instructor` and `admin` roles. Navigates to `/analytics` |
 | Admin link | Visible only for `admin` role. Opens a dropdown: Repositories, Users, Health |
-| User menu | Dropdown: display name, role badge, Logout |
+| Theme toggle 🌙/☀️ | Switches between light and dark mode. Icon: moon (→ dark) / sun (→ light). White icon, same branding as header |
+| User menu | Dropdown: display name, role badge, Logout. White icon, same branding as header |
+
+**Theme system:**
+
+| Aspect | Behavior |
+|---|---|
+| Default | Follows system `prefers-color-scheme` media query |
+| Toggle | User clicks moon/sun icon in header to switch mode |
+| Persistence | User preference stored in `localStorage` (`phoebus-theme`). Overrides system detection once set |
+| System follow | If no explicit preference stored, theme tracks system changes in real-time |
+| Implementation | CSS variables on `:root` (light) and `[data-theme="dark"]` (dark). Ant Design `ConfigProvider` with `darkAlgorithm`/`defaultAlgorithm`. All UI components consume CSS variables — no hardcoded colors |
+| Header exception | The header bar keeps its dark branding identity (`#001529` background) regardless of the active theme |
 
 **Unauthenticated views** (Login) render without the header — they use a centered, minimal layout.
 
@@ -1248,6 +1260,8 @@ All authenticated views share a common shell layout:
 | Step entries | Type icon + title + completion indicator (✅ completed, 🔵 in-progress, ○ not started). Click → navigate to that step |
 | Current step | Active state (bold, accent background color) |
 | Scroll | Auto-scrolls to keep the current step visible on load |
+| Resize | Sidebar width is adjustable via a drag handle on the right edge (180px–500px range). Handle highlights blue on hover |
+| Collapse | When collapsed (48px), only the unfold button is visible — the menu is hidden entirely to avoid popup overlap |
 
 **Footer navigation:**
 
@@ -1317,20 +1331,39 @@ Renders the terminal simulator (see section 4 for detailed behavior).
 
 #### 10.7.4 Code Exercise Step
 
-Renders the code viewer with patch selection (see section 5 for detailed behavior).
+Renders a VS Code-like IDE layout with full-bleed display (no padding, no max-width). The layout adapts to the active theme (light/dark).
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  📄 main.go                     [Phase 1: Find the bug]           │  ← Top bar
+├────────┬───────────────────────────────────────────────────────────┤
+│Explorer│  Monaco Editor (read-only)                    ┃ minimap  │
+│        │  1  package main                              ┃          │
+│ 📁 cmd │  2  import "fmt"                              ┃          │
+│ 📄 main│  3  func main() {                             ┃          │
+│ 📄 go. │  4    fmt.Println("Hello")                    ┃          │
+│        │  5  }                                         ┃          │
+├────────┴───────────────────────────────────────────────────────────┤
+│  ═══════════════════════════  (drag handle)                        │
+├────────────────────────────────────────────────────────────────────┤
+│  Description / Controls (bottom panel, resizable 100–500px)       │
+│  Click line numbers to select problematic lines.  [Validate]      │
+└────────────────────────────────────────────────────────────────────┘
+```
 
 | Element | Behavior |
 |---|---|
-| Phase indicator | "Phase 1/2" (modes A/C) or single phase (mode B) |
-| File tree | Left panel (Ant Design Tree). All `codebase/` files shown. Target file pre-selected and marked (★) |
-| Code viewer | Right panel. Monaco Editor (read-only). Syntax highlighting. Clickable lines for modes A/C |
-| Problem description | Markdown-rendered below the code panels |
-| Selected lines | "Selected lines: 12, 13" display. Click line to toggle selection |
+| Top bar | File name + phase indicator tag. Background follows IDE secondary color (`--color-bg-ide-secondary`) |
+| File tree | Left panel (Ant Design Tree, 200px). All `codebase/` files shown. Target file pre-selected. Background transparent over IDE secondary |
+| Code viewer | Center panel. Monaco Editor (read-only). Theme: `vs` (light mode) or `vs-dark` (dark mode), switches automatically. Syntax highlighting, minimap (scale 2, proportional), line numbers, folding |
+| Bottom panel | Resizable via drag handle (100–500px). Contains problem description (Markdown), controls, and feedback |
+| Phase indicator | "Phase 1/2" (modes A/C) or single phase (mode B). Displayed as colored Tag in top bar |
+| Selected lines | Click on gutter (line number / glyph margin) to toggle line selection. Blue highlight decoration. "Selected lines: 12, 13" display |
 | Validate Selection | Phase 1 button. `POST /api/exercises/:stepId/attempt` with `{ phase: "identify", selected_lines }`. Returns `{ is_correct, feedback }` with progressive hints |
-| Patch proposals | Phase 2 (or sole phase for mode B). Monaco inline diff views. Ant Design `Radio.Group` |
+| Patch proposals | Phase 2 (or sole phase for mode B). Radio group in bottom panel. Tooltip shows unified diff on hover |
 | Submit Patch | `POST /api/exercises/:stepId/attempt` with `{ phase: "fix", selected_patch }`. Returns `{ is_correct, explanation }` |
-| Target highlight | Lines stay highlighted in Phase 2 as a visual reference |
-| Reset button | Top-right. Confirmation → `POST /api/exercises/:stepId/reset` |
+| Target highlight | Green decoration on target lines in Phase 2 as visual reference |
+| Disabled button | When Validate/Submit is disabled, uses theme-aware contrast (`--color-ide-disabled-bg/text/border`) |
 
 **API Calls:**
 - `GET /api/learning-paths/:pathId/steps/:stepId` — step metadata + sanitized `exercise_data` (patches without `correct` flags, codebase files, target info) + codebase files content

@@ -530,6 +530,7 @@ Never use panic for control flow — it will crash the server.
 | Sequential progression | Learners progress through steps in order | Must Have |
 | Progress tracking | Track completion of steps, modules, and learning paths | Must Have |
 | Personal dashboard | Learner sees their enrolled paths, progress, and competencies | Must Have |
+| Light/Dark mode | Theme follows system preference by default; toggle in header to override. Preference persisted in `localStorage` | Must Have |
 | Bookmarks & notes | Learners can bookmark steps and take personal notes | Should Have |
 | Exercise reset | Learners can reset any exercise and start over, unlimited resets | Must Have |
 
