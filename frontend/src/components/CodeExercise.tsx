@@ -183,6 +183,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
         .line-glyph-selected { background: #1890ff; border-radius: 50%; margin-left: 4px; width: 8px !important; height: 8px !important; margin-top: 6px; }
         .line-target { background: rgba(82, 196, 26, 0.12) !important; }
         .line-glyph-target { background: #52c41a; border-radius: 50%; margin-left: 4px; width: 8px !important; height: 8px !important; margin-top: 6px; }
+        .ide-bottom-panel .ant-btn-primary:disabled { background: #3c3c3c !important; color: #666 !important; border-color: #555 !important; }
       `}</style>
 
       {/* Top bar: file tabs + phase indicator */}
@@ -273,7 +274,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
       </div>
 
       {/* Bottom panel: description + exercise controls */}
-      <div style={{
+      <div className="ide-bottom-panel" style={{
         height: bottomPanelHeight, background: '#1e1e1e', borderTop: '1px solid #3c3c3c',
         overflow: 'auto', flexShrink: 0, padding: '12px 16px', color: '#cccccc',
       }}>
