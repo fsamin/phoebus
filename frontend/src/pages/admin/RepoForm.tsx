@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Form, Input, Select, Button, Card, Typography, message, Breadcrumb } from 'antd';
+import { Form, Input, Select, Button, Card, Typography, message, Breadcrumb, Alert } from 'antd';
+import { KeyOutlined } from '@ant-design/icons';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { RepoInput } from '../../api/client';
@@ -10,9 +11,11 @@ const RepoForm: React.FC = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [authType, setAuthType] = useState('none');
+  const [sshPublicKey, setSSHPublicKey] = useState('');
   const isEdit = !!repoId;
 
   useEffect(() => {
+    api.sshPublicKey().then(r => setSSHPublicKey(r.public_key)).catch(() => {});
     if (repoId) {
       api.getRepo(repoId).then((repo) => {
         form.setFieldsValue({
@@ -66,6 +69,24 @@ const RepoForm: React.FC = () => {
               <Select.Option value="http-basic">HTTP Basic</Select.Option>
             </Select>
           </Form.Item>
+          {authType === 'instance-ssh-key' && sshPublicKey && (
+            <Alert
+              style={{ marginBottom: 16 }}
+              type="info"
+              showIcon
+              icon={<KeyOutlined />}
+              message="Instance SSH Public Key"
+              description={
+                <div>
+                  <Typography.Text code copyable style={{ wordBreak: 'break-all' }}>{sshPublicKey}</Typography.Text>
+                  <br />
+                  <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                    Add this key as a read-only deploy key on your Git repository.
+                  </Typography.Text>
+                </div>
+              }
+            />
+          )}
           {authType !== 'none' && authType !== 'instance-ssh-key' && (
             <Form.Item
               name="credentials"
