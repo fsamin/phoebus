@@ -136,9 +136,7 @@ body {
   background: rgba(30, 136, 229, 0.25) !important;
 }
 .line-glyph-selected {
-  background: #1890ff !important;
-  border-radius: 50% !important;
-  margin: 4px !important;
+  background: radial-gradient(circle at center, #1890ff 4px, transparent 4px) !important;
 }
 .line-target {
   background: rgba(82, 196, 26, 0.12) !important;
@@ -147,9 +145,7 @@ body {
   background: rgba(82, 196, 26, 0.2) !important;
 }
 .line-glyph-target {
-  background: #52c41a !important;
-  border-radius: 50% !important;
-  margin: 4px !important;
+  background: radial-gradient(circle at center, #52c41a 4px, transparent 4px) !important;
 }
 .ide-bottom-panel .ant-btn-primary:disabled {
   background: var(--color-ide-disabled-bg) !important;
