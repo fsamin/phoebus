@@ -65,13 +65,13 @@ const AppLayout: React.FC = () => {
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Header style={{ display: 'flex', alignItems: 'center', padding: '0 24px', background: 'var(--color-bg-header)' }}>
+      <Header style={{ display: 'flex', alignItems: 'center', padding: '0 24px', background: '#001529' }}>
         <div
           style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginRight: 32 }}
           onClick={() => navigate('/')}
         >
-          <FireOutlined style={{ fontSize: 24, color: 'var(--color-primary)', marginRight: 8 }} />
-          <Typography.Title level={4} style={{ margin: 0, color: 'var(--color-text-header)' }}>
+          <FireOutlined style={{ fontSize: 24, color: '#ff7a45', marginRight: 8 }} />
+          <Typography.Title level={4} style={{ margin: 0, color: '#fff' }}>
             Phoebus
           </Typography.Title>
         </div>
@@ -87,7 +87,7 @@ const AppLayout: React.FC = () => {
           type="text"
           icon={isDark ? <SunOutlined /> : <MoonOutlined />}
           onClick={toggle}
-          style={{ color: 'var(--color-text-header)', marginRight: 8 }}
+          style={{ color: '#fff', marginRight: 8 }}
         />
         <Dropdown
           menu={{
@@ -108,7 +108,7 @@ const AppLayout: React.FC = () => {
             onClick: ({ key }) => { if (key === 'logout') logout(); },
           }}
         >
-          <Button type="text" icon={<UserOutlined />} style={{ color: 'var(--color-text-header)' }}>
+          <Button type="text" icon={<UserOutlined />} style={{ color: '#fff' }}>
             {user.display_name || user.username}
           </Button>
         </Dropdown>
