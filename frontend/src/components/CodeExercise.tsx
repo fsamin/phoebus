@@ -225,16 +225,13 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
             className="ide-tree"
           />
           <style>{`
+            .ide-tree, .ide-tree * { background-color: transparent !important; }
             .ide-tree .ant-tree-node-content-wrapper { color: #cccccc !important; }
-            .ide-tree .ant-tree-node-content-wrapper:hover { background: #2a2d2e !important; }
+            .ide-tree .ant-tree-node-content-wrapper:hover { background-color: #2a2d2e !important; }
             .ide-tree .ant-tree-node-selected .ant-tree-node-content-wrapper,
-            .ide-tree .ant-tree-node-content-wrapper.ant-tree-node-selected { background: #37373d !important; color: #ffffff !important; }
+            .ide-tree .ant-tree-node-content-wrapper.ant-tree-node-selected { background-color: #37373d !important; color: #ffffff !important; }
             .ide-tree .ant-tree-switcher { color: #cccccc !important; }
             .ide-tree .ant-tree-indent-unit { width: 16px; }
-            .ide-tree .ant-tree-list { background: transparent !important; }
-            .ide-tree .ant-tree-list-holder { background: transparent !important; }
-            .ide-tree .ant-tree-list-holder-inner { background: transparent !important; }
-            .ide-tree .ant-tree-treenode { background: transparent !important; }
           `}</style>
         </div>
 
