@@ -432,22 +432,29 @@ No shared filesystem is needed across replicas. All content lives in PostgreSQL 
 ### 6.1 Authentication & Authorization
 
 ```
-Browser ──▶ Backend ──▶ OIDC Provider / LDAP
-                │              (or local auth fallback)
-                ▼
-         JWT session token
-         (httpOnly cookie, SameSite=Lax)
-                │
-                ▼
-         RBAC middleware
-         ┌────────────────┐
-         │ admin          │ Full access (repos, users, all analytics)
-         │ instructor     │ Content management + analytics
-         │ learner        │ Learning paths + own progress
-         └────────────────┘
+Browser ──▶ [Reverse Proxy] ──▶ Backend ──▶ OIDC Provider / LDAP
+                (optional)          │              (or local auth fallback)
+                   │                ▼
+            X-Remote-User    JWT session token
+            X-Remote-Groups  (httpOnly cookie, SameSite=Lax)
+                                    │
+                                    ▼
+                             RBAC middleware
+                             ┌────────────────┐
+                             │ admin          │ Full access (repos, users, all analytics)
+                             │ instructor     │ Content management + analytics
+                             │ learner        │ Learning paths + own progress
+                             └────────────────┘
 ```
 
-Authentication supports OIDC and LDAP as primary providers, with a **local auth fallback** for environments without an identity provider. JWT session tokens are stored in **httpOnly cookies** with `SameSite=Lax`, preventing XSS-based token theft and CSRF from cross-origin requests.
+Authentication supports four providers:
+
+1. **OIDC** — Redirect-based SSO via OpenID Connect
+2. **LDAP** — Username/password with LDAP bind verification
+3. **Local** — Bcrypt-hashed passwords in the database (bootstrap/dev fallback)
+4. **Reverse Proxy** — Transparent auth via HTTP headers injected by an upstream proxy (OAuth2 Proxy, Authelia, Traefik Forward Auth). Header names are configurable (`X-Remote-User`, `X-Remote-Groups`, etc.). When enabled, the `ProxyAuthMiddleware` runs before `AuthMiddleware`: if the user header is present and no valid JWT exists, the user is upserted and a JWT cookie is set. If a valid JWT already exists, the upsert is skipped.
+
+JWT session tokens are stored in **httpOnly cookies** with `SameSite=Lax`, preventing XSS-based token theft and CSRF from cross-origin requests.
 
 ### 6.2 Network Security
 

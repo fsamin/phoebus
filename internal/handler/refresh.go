@@ -62,5 +62,6 @@ func (h *Handler) AuthProviders(w http.ResponseWriter, r *http.Request) {
 		"local": h.cfg.Auth.LocalEnabled,
 		"oidc":  h.cfg.Auth.OIDC.Enabled,
 		"ldap":  h.cfg.Auth.LDAP.Enabled,
+		"proxy": h.cfg.Auth.ProxyAuth.Enabled,
 	})
 }

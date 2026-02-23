@@ -580,7 +580,7 @@ Never use panic for control flow — it will crash the server.
 
 | Feature | Description | Priority |
 |---|---|---|
-| SSO integration | OIDC and LDAP support | Must Have |
+| SSO integration | OIDC, LDAP, and reverse proxy header auth | Must Have |
 | User management | Roles: learner, instructor, admin | Must Have |
 | Git repo registration | Register repos (SSH/HTTPS clone URL, credentials) and generate webhook URLs | Must Have |
 | Platform health monitoring | Dashboards for system health, resource usage | Should Have |
@@ -635,7 +635,7 @@ Never use panic for control flow — it will crash the server.
 
 ### 8.2 Security
 
-- SSO/OIDC for authentication; role-based access control for authorization
+- SSO/OIDC/LDAP for authentication; reverse proxy header auth for environments behind OAuth2 Proxy, Authelia, or Traefik Forward Auth; role-based access control for authorization
 - Content repos can be private (SSH key or token-based Git access)
 - Git credentials are encrypted at rest
 

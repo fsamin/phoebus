@@ -9,6 +9,7 @@ interface AuthProviders {
   local: boolean;
   oidc: boolean;
   ldap: boolean;
+  proxy: boolean;
 }
 
 const Login: React.FC = () => {
@@ -26,7 +27,12 @@ const Login: React.FC = () => {
       .then((r) => r.json())
       .then((p: AuthProviders) => {
         setProviders(p);
-        if (p.oidc && !p.local && !p.ldap) {
+        // If proxy auth is enabled, try to detect if already authenticated
+        if (p.proxy) {
+          fetch('/api/me', { credentials: 'include' })
+            .then((r) => { if (r.ok) window.location.href = redirect; });
+        }
+        if (p.oidc && !p.local && !p.ldap && !p.proxy) {
           window.location.href = '/api/auth/oidc/redirect';
         } else if (p.local) {
           setAuthMode('local');
@@ -165,6 +171,16 @@ const Login: React.FC = () => {
           <Typography.Title level={2} style={{ marginTop: 8 }}>Phoebus</Typography.Title>
         </div>
         {error && <Alert message={error} type="error" showIcon style={{ marginBottom: 16 }} />}
+
+        {providers?.proxy && !providers?.local && !providers?.ldap && !providers?.oidc && (
+          <Alert
+            message="SSO Authentication"
+            description="This platform uses your organization's single sign-on. If you are not redirected automatically, please contact your administrator."
+            type="info"
+            showIcon
+            style={{ marginBottom: 16 }}
+          />
+        )}
 
         {providers?.oidc && (
           <>

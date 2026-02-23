@@ -53,6 +53,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 
 	// Authenticated
 	r.Group(func(r chi.Router) {
+		r.Use(h.ProxyAuthMiddleware)
 		r.Use(h.AuthMiddleware)
 		r.Get("/api/me", h.Me)
 		r.Get("/api/me/dashboard", h.Dashboard)

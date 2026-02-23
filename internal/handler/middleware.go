@@ -14,6 +14,12 @@ const claimsKey contextKey = "claims"
 
 func (h *Handler) AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// If claims already set by upstream middleware (e.g. proxy auth), continue
+		if ClaimsFromContext(r.Context()) != nil {
+			next.ServeHTTP(w, r)
+			return
+		}
+
 		cookie, err := r.Cookie("phoebus_session")
 		if err != nil {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})

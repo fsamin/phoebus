@@ -874,6 +874,38 @@ Administrators can create local users from the Admin > Users view:
 - Disabled in production via `local_auth.enabled: false`
 - When disabled, `/api/auth/register` returns `403 Forbidden` and signup UI is hidden
 
+### 9.5 Reverse Proxy Authentication
+
+**Description:** Transparent authentication via HTTP headers injected by a reverse proxy (OAuth2 Proxy, Authelia, Traefik Forward Auth, etc.). Phœbus trusts the headers and provisions users automatically.
+
+**Flow:**
+
+1. User accesses Phœbus through a reverse proxy that handles SSO authentication
+2. The reverse proxy injects identity headers (e.g., `X-Remote-User`, `X-Remote-Groups`)
+3. Phœbus middleware detects the configured user header and provisions the user:
+   - If no user exists with `auth_provider='proxy'` and matching username → create one
+   - If user already exists → update display name, email, and role from groups
+4. A session token (JWT) is issued as an httpOnly cookie (same as other providers)
+5. Subsequent requests with a valid JWT cookie skip the upsert (performance optimization)
+
+**Configuration:**
+
+| Key | Default | Description |
+|---|---|---|
+| `proxy_auth.enabled` | `false` | Enable reverse proxy authentication |
+| `proxy_auth.header_user` | `X-Remote-User` | Header containing the username (required) |
+| `proxy_auth.header_groups` | `X-Remote-Groups` | Header containing comma-separated group names |
+| `proxy_auth.header_email` | *(empty)* | Header containing the user's email |
+| `proxy_auth.header_display_name` | *(empty)* | Header containing the user's display name |
+| `proxy_auth.default_role` | `learner` | Default role when no group matches |
+| `proxy_auth.group_to_role` | *(empty)* | Map of group name → role (`admin`, `instructor`, `learner`) |
+
+**Group-to-role resolution:** When multiple groups match, the highest-privilege role wins (admin > instructor > learner). This is consistent with LDAP group resolution (§9.2).
+
+**Coexistence:** Proxy auth works alongside other authentication methods. When both proxy headers and other providers are enabled, the proxy middleware runs first. If no proxy header is present, the request falls through to standard JWT cookie authentication.
+
+**Frontend behavior:** When proxy auth is enabled and is the only provider, the login page displays an informational message ("SSO Authentication") instead of a login form. If the user hits `/login`, the frontend tries `GET /api/me` to detect an existing session and auto-redirects to `/` if authenticated.
+
 ---
 
 ## 10. SPA Views

@@ -34,9 +34,20 @@ type AdminConfig struct {
 }
 
 type AuthConfig struct {
-	LocalEnabled bool       `yaml:"local_enabled"`
-	OIDC         OIDCConfig `yaml:"oidc"`
-	LDAP         LDAPConfig `yaml:"ldap"`
+	LocalEnabled bool            `yaml:"local_enabled"`
+	OIDC         OIDCConfig      `yaml:"oidc"`
+	LDAP         LDAPConfig      `yaml:"ldap"`
+	ProxyAuth    ProxyAuthConfig `yaml:"proxy_auth"`
+}
+
+type ProxyAuthConfig struct {
+	Enabled           bool              `yaml:"enabled"`
+	HeaderUser        string            `yaml:"header_user"`
+	HeaderGroups      string            `yaml:"header_groups"`
+	HeaderEmail       string            `yaml:"header_email"`
+	HeaderDisplayName string            `yaml:"header_display_name"`
+	DefaultRole       string            `yaml:"default_role"`
+	GroupToRole       map[string]string `yaml:"group_to_role"`
 }
 
 type OIDCConfig struct {
@@ -95,6 +106,11 @@ func Load() (*Config, error) {
 					DisplayName: "displayName",
 					Email:       "mail",
 				},
+			},
+			ProxyAuth: ProxyAuthConfig{
+				HeaderUser:   "X-Remote-User",
+				HeaderGroups: "X-Remote-Groups",
+				DefaultRole:  "learner",
 			},
 		},
 	}
