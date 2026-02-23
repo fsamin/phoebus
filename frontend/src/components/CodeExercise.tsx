@@ -176,7 +176,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)', margin: '-24px', background: '#1e1e1e' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)', background: '#1e1e1e' }}>
       {/* Injected styles for editor decorations */}
       <style>{`
         .line-selected { background: rgba(30, 136, 229, 0.15) !important; }
@@ -231,6 +231,10 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
             .ide-tree .ant-tree-node-content-wrapper.ant-tree-node-selected { background: #37373d !important; color: #ffffff !important; }
             .ide-tree .ant-tree-switcher { color: #cccccc !important; }
             .ide-tree .ant-tree-indent-unit { width: 16px; }
+            .ide-tree .ant-tree-list { background: transparent !important; }
+            .ide-tree .ant-tree-list-holder { background: transparent !important; }
+            .ide-tree .ant-tree-list-holder-inner { background: transparent !important; }
+            .ide-tree .ant-tree-treenode { background: transparent !important; }
           `}</style>
         </div>
 
