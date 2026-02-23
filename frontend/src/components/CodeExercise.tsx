@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback } from 'react';
+import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
 import { Radio, Button, Alert, Typography, Tag, Space, Tree, Tooltip } from 'antd';
 import { FileOutlined, FolderOutlined, CheckCircleFilled, BugFilled } from '@ant-design/icons';
 import Editor from '@monaco-editor/react';
@@ -72,7 +72,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
   const [completed, setCompleted] = useState(false);
   const [bottomPanelHeight, setBottomPanelHeight] = useState(200);
   const editorRef = useRef<unknown>(null);
-  const decorationsRef = useRef<any>(null);
+  const decorationsRef = useRef<string[]>([]);
   const monacoRef = useRef<any>(null);
   const resizingRef = useRef(false);
 
@@ -103,10 +103,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
         });
       });
     }
-    if (decorationsRef.current) {
-      decorationsRef.current.clear();
-    }
-    decorationsRef.current = editor.createDecorationsCollection(newDecorations);
+    decorationsRef.current = editor.deltaDecorations(decorationsRef.current, newDecorations);
   }, [selectedLines, phase, target, selectedFile]);
 
   const handleEditorMount = (editor: any, monaco: any) => {
@@ -126,7 +123,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
     updateDecorations(editor);
   };
 
-  useMemo(() => {
+  useEffect(() => {
     if (editorRef.current) updateDecorations(editorRef.current);
   }, [selectedLines, updateDecorations]);
 
