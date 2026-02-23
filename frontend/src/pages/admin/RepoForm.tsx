@@ -64,21 +64,16 @@ const RepoForm: React.FC = () => {
               <Select.Option value="instance-ssh-key">Instance SSH Key</Select.Option>
               <Select.Option value="http-token">HTTP Token</Select.Option>
               <Select.Option value="http-basic">HTTP Basic</Select.Option>
-              <Select.Option value="ssh-key">SSH Key (custom)</Select.Option>
             </Select>
           </Form.Item>
           {authType !== 'none' && authType !== 'instance-ssh-key' && (
             <Form.Item
               name="credentials"
-              label={authType === 'ssh-key' ? 'SSH Private Key' : authType === 'http-token' ? 'Token' : 'username:password'}
+              label={authType === 'http-token' ? 'Token' : 'username:password'}
               rules={[{ required: !isEdit }]}
               extra={isEdit ? 'Leave empty to keep existing credentials' : undefined}
             >
-              {authType === 'ssh-key' ? (
-                <Input.TextArea rows={4} placeholder={isEdit ? '••••••••' : '-----BEGIN OPENSSH PRIVATE KEY-----'} />
-              ) : (
-                <Input.Password placeholder={isEdit ? '••••••••' : authType === 'http-token' ? 'ghp_...' : 'user:password'} />
-              )}
+              <Input.Password placeholder={isEdit ? '••••••••' : authType === 'http-token' ? 'ghp_...' : 'user:password'} />
             </Form.Item>
           )}
           <Form.Item>

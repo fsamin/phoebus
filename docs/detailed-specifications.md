@@ -18,7 +18,7 @@ Each section describes the detailed behavior, rules, edge cases, and UI expectat
 
 1. Administrator provides:
    - Clone URL (SSH or HTTPS)
-   - Authentication type: `none`, `instance-ssh-key`, `ssh-key`, `http-basic`, `http-token`
+   - Authentication type: `none`, `instance-ssh-key`, `http-basic`, `http-token`
    - Credentials (private key, username/password, or token) — stored encrypted
    - Branch to track (default: `main`)
 
@@ -1629,9 +1629,8 @@ The instance SSH public key is always displayed above the repository table. It i
 |---|---|---|---|
 | Clone URL | Text input | Must be valid Git URL (SSH or HTTPS) | Yes |
 | Branch | Text input | Default: `main` | No (defaults to `main`) |
-| Authentication type | Select: `none`, `instance-ssh-key`, `ssh-key`, `http-basic`, `http-token` | — | Yes |
+| Authentication type | Select: `none`, `instance-ssh-key`, `http-basic`, `http-token` | — | Yes |
 | | _(selecting `instance-ssh-key` hides all credential fields — uses the instance keypair shown above)_ | | |
-| Private key | Textarea (shown if `ssh-key`) | Must be valid SSH private key format | Conditional |
 | Username | Text input (shown if `http-basic`) | — | Conditional |
 | Password | Password input (shown if `http-basic`) | — | Conditional |
 | Token | Password input (shown if `http-token`) | — | Conditional |

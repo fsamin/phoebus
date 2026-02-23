@@ -470,8 +470,8 @@ Git repositories may be private, requiring authentication for clone/pull operati
 | Auth Type | Storage | Usage |
 |---|---|---|
 | **Instance SSH Key** | Ed25519 keypair in `instance_settings` (private key encrypted) | Default for SSH repos — uses the instance's auto-generated keypair via `GIT_SSH_COMMAND` |
-| **SSH Key** | Private key encrypted in `git_repositories.credentials` | Per-repo custom SSH key, used with `git clone git@...` |
 | **HTTPS Token** | Token encrypted in `git_repositories.credentials` | Used with `git clone https://token@...` |
+| **HTTPS Basic** | Username:password encrypted in `git_repositories.credentials` | Used with `git clone` + HTTP basic auth header |
 | **None** | — | Public repositories, no credentials needed |
 
 - Credentials are encrypted at application level before storage (AES-256-GCM with a key managed as a `configstore` item)

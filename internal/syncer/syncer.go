@@ -168,7 +168,6 @@ func (s *Syncer) processJob(ctx context.Context, jobID, repoID uuid.UUID) {
 		if repo.AuthType == "instance-ssh-key" {
 			// Use the instance-level SSH keypair
 			creds = s.instanceSSHKeyPEM
-			repo.AuthType = "ssh-key" // reuse the same git clone path
 		} else if len(repo.Credentials) > 0 && s.encryptionKey != "" {
 			decrypted, err := crypto.Decrypt(repo.Credentials, []byte(s.encryptionKey))
 			if err != nil {
@@ -249,7 +248,7 @@ func gitClone(cloneURL, branch, destDir, authType string, credentials []byte) er
 		return cmd.Run()
 	}
 
-	if authType == "ssh-key" && len(credentials) > 0 {
+	if authType == "instance-ssh-key" && len(credentials) > 0 {
 		// Write SSH key to temp file
 		tmpKey, err := os.CreateTemp("", "phoebus-ssh-*")
 		if err != nil {
