@@ -73,6 +73,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
   const [bottomPanelHeight, setBottomPanelHeight] = useState(200);
   const editorRef = useRef<unknown>(null);
   const decorationsRef = useRef<any>(null);
+  const monacoRef = useRef<any>(null);
   const resizingRef = useRef(false);
 
   const currentFile = codebaseFiles.find((f) => f.file_path === selectedFile);
@@ -80,9 +81,10 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
 
   // Update editor decorations when selected lines change
   const updateDecorations = useCallback((editor: any) => {
-    if (!editor) return;
+    if (!editor || !monacoRef.current) return;
+    const monaco = monacoRef.current;
     const newDecorations = selectedLines.map((lineNum) => ({
-      range: { startLineNumber: lineNum, startColumn: 1, endLineNumber: lineNum, endColumn: 1 },
+      range: new monaco.Range(lineNum, 1, lineNum, 1),
       options: {
         isWholeLine: true,
         className: 'line-selected',
@@ -92,7 +94,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
     if (phase === 'fix' && target?.file === selectedFile) {
       target.lines.forEach((lineNum) => {
         newDecorations.push({
-          range: { startLineNumber: lineNum, startColumn: 1, endLineNumber: lineNum, endColumn: 1 },
+          range: new monaco.Range(lineNum, 1, lineNum, 1),
           options: {
             isWholeLine: true,
             className: 'line-target',
@@ -107,8 +109,9 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
     decorationsRef.current = editor.createDecorationsCollection(newDecorations);
   }, [selectedLines, phase, target, selectedFile]);
 
-  const handleEditorMount = (editor: any) => {
+  const handleEditorMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
+    monacoRef.current = monaco;
     editor.updateOptions({ readOnly: true, glyphMargin: phase === 'identify' });
     editor.onMouseDown((e: any) => {
       if (phase !== 'identify' || feedback) return;
