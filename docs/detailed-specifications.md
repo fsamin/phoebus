@@ -1611,11 +1611,17 @@ The instance SSH public key is always displayed above the repository table. It i
 │                                                                      │
 │  Branch             [main_________________________________]          │
 │                                                                      │
-│  Authentication     [None ▾]                                         │
+│  Authentication     [Instance SSH Key ▾]                              │
 │                                                                      │
-│  ── Credentials (shown when auth ≠ none) ────────────────────────   │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │ 🔑 Instance SSH Public Key                        [Copy]    │    │
+│  │ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... phoebus-instance  │    │
+│  │ Add this key as a read-only deploy key on your Git repo.    │    │
+│  └──────────────────────────────────────────────────────────────┘    │
 │                                                                      │
-│  Token / Key        [_______________________________________]        │
+│  ── Credentials (shown when auth = http-basic or http-token) ─────  │
+│                                                                      │
+│  Token              [_______________________________________]        │
 │                                                                      │
 │                                                                      │
 │  [Cancel]                                           [Save & Sync]    │
@@ -1630,7 +1636,7 @@ The instance SSH public key is always displayed above the repository table. It i
 | Clone URL | Text input | Must be valid Git URL (SSH or HTTPS) | Yes |
 | Branch | Text input | Default: `main` | No (defaults to `main`) |
 | Authentication type | Select: `none`, `instance-ssh-key`, `http-basic`, `http-token` | — | Yes |
-| | _(selecting `instance-ssh-key` hides all credential fields — uses the instance keypair shown above)_ | | |
+| | _(selecting `instance-ssh-key` displays the instance SSH public key in an info alert below, with a copy button — no credential fields shown)_ | | |
 | Username | Text input (shown if `http-basic`) | — | Conditional |
 | Password | Password input (shown if `http-basic`) | — | Conditional |
 | Token | Password input (shown if `http-token`) | — | Conditional |
