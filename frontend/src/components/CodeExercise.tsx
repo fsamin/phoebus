@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Radio, Button, Alert, Typography, Tag, Space, Tree, Tooltip } from 'antd';
 import { FileOutlined, FolderOutlined, CheckCircleFilled, BugFilled } from '@ant-design/icons';
 import Editor from '@monaco-editor/react';
@@ -71,7 +71,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
   const [submitting, setSubmitting] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [bottomPanelHeight, setBottomPanelHeight] = useState(200);
-  const editorRef = useRef<unknown>(null);
+  const editorRef = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
   const monacoRef = useRef<any>(null);
   const resizingRef = useRef(false);
@@ -80,10 +80,11 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
   const treeData = useMemo(() => buildTreeData(codebaseFiles), [codebaseFiles]);
 
   // Update editor decorations when selected lines change
-  const updateDecorations = useCallback((editor: any) => {
-    if (!editor || !monacoRef.current) return;
+  useEffect(() => {
+    const editor = editorRef.current;
     const monaco = monacoRef.current;
-    const newDecorations = selectedLines.map((lineNum) => ({
+    if (!editor || !monaco) return;
+    const newDecorations: any[] = selectedLines.map((lineNum) => ({
       range: new monaco.Range(lineNum, 1, lineNum, 1),
       options: {
         isWholeLine: true,
@@ -92,7 +93,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
       },
     }));
     if (phase === 'fix' && target?.file === selectedFile) {
-      target.lines.forEach((lineNum) => {
+      target.lines.forEach((lineNum: number) => {
         newDecorations.push({
           range: new monaco.Range(lineNum, 1, lineNum, 1),
           options: {
@@ -120,12 +121,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
         );
       }
     });
-    updateDecorations(editor);
   };
-
-  useEffect(() => {
-    if (editorRef.current) updateDecorations(editorRef.current);
-  }, [selectedLines, updateDecorations]);
 
   const handleSubmitIdentify = async () => {
     setSubmitting(true);
@@ -167,13 +163,6 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)', background: 'var(--color-bg-ide)' }}>
-      <style>{`
-        .line-selected { background: var(--color-ide-line-selected) !important; }
-        .line-glyph-selected { background: var(--color-ide-glyph-selected); border-radius: 50%; margin-left: 4px; width: 8px !important; height: 8px !important; margin-top: 6px; }
-        .line-target { background: var(--color-ide-line-target) !important; }
-        .line-glyph-target { background: var(--color-ide-glyph-target); border-radius: 50%; margin-left: 4px; width: 8px !important; height: 8px !important; margin-top: 6px; }
-        .ide-bottom-panel .ant-btn-primary:disabled { background: var(--color-ide-disabled-bg) !important; color: var(--color-ide-disabled-text) !important; border-color: var(--color-ide-disabled-border) !important; }
-      `}</style>
 
       {/* Top bar */}
       <div style={{
