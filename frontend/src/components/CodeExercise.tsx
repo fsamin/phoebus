@@ -245,7 +245,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
             onMount={handleEditorMount}
             options={{
               readOnly: true,
-              minimap: { enabled: true },
+              minimap: { enabled: true, scale: 2, maxColumn: 80 },
               fontSize: 14,
               lineNumbers: 'on',
               scrollBeyondLastLine: false,
