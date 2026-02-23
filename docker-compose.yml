@@ -22,6 +22,12 @@ services:
       - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    command: >
+      postgres
+      -c log_min_messages=warning
+      -c log_min_error_statement=error
+      -c log_statement=none
+      -c log_min_duration_statement=500
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U phoebus"]
       interval: 2s

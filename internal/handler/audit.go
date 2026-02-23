@@ -9,7 +9,7 @@ import (
 
 // auditLog records an action to the audit_log table.
 func (h *Handler) auditLog(ctx context.Context, claims *auth.Claims, action, resourceType, resourceID string, metadata map[string]any) {
-	var metaJSON []byte
+	metaJSON := []byte("{}")
 	if metadata != nil {
 		metaJSON, _ = json.Marshal(metadata)
 	}
