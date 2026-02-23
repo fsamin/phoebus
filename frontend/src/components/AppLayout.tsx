@@ -33,7 +33,7 @@ const AppLayout: React.FC = () => {
     return <Navigate to={`/login?redirect=${encodeURIComponent(location.pathname)}`} replace />;
   }
 
-  const menuItems: Array<{ key: string; icon: React.ReactNode; label: string; children?: Array<{ key: string; icon: React.ReactNode; label: string }> }> = [
+  const menuItems: { key: string; icon: React.ReactNode; label: string; children?: { key: string; icon: React.ReactNode; label: string }[] }[] = [
     { key: '/', icon: <DashboardOutlined />, label: 'Dashboard' },
     { key: '/catalog', icon: <BookOutlined />, label: 'Catalog' },
   ];

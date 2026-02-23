@@ -152,13 +152,15 @@ const StepView: React.FC = () => {
             </>
           )}
         </div>
-        <Menu
-          mode="inline"
-          selectedKeys={[stepId || '']}
-          openKeys={path.modules.map((m) => m.id)}
-          items={sidebarItems}
-          onClick={({ key }) => navigate(`/paths/${pathId}/steps/${key}`)}
-        />
+        {!collapsed && (
+          <Menu
+            mode="inline"
+            selectedKeys={[stepId || '']}
+            openKeys={path.modules.map((m) => m.id)}
+            items={sidebarItems}
+            onClick={({ key }) => navigate(`/paths/${pathId}/steps/${key}`)}
+          />
+        )}
         </div>
       </Sider>
       <Content style={{ padding: 24, overflow: 'auto' }}>
