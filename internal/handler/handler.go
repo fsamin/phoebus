@@ -313,7 +313,7 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		FROM (
 			SELECT p.user_id, lp.id AS path_id
 			FROM learning_paths lp
-			JOIN modules m ON m.learning_path_id = lp.id AND m.deleted_at IS NULL
+			JOIN modules m ON m.learning_path_id = lp.id
 			JOIN steps s ON s.module_id = m.id AND s.deleted_at IS NULL
 			LEFT JOIN progress p ON p.step_id = s.id AND p.status = 'completed'
 			GROUP BY p.user_id, lp.id
