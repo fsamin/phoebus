@@ -128,7 +128,7 @@ const StepView: React.FC = () => {
   const isCompleted = getStepStatus(step.id) === 'completed';
 
   return (
-    <Layout style={{ minHeight: 'calc(100vh - 64px)', margin: '-24px -48px' }}>
+    <Layout style={{ minHeight: 'calc(100vh - 64px)', margin: '-24px -48px', flexDirection: 'row' }}>
       <div style={{
         width: collapsed ? 48 : sidebarWidth, flexShrink: 0, display: 'flex',
         background: '#fff', borderRight: '1px solid #f0f0f0', position: 'relative',
