@@ -1,36 +1,9 @@
-import React, { useState, useMemo } from 'react';
-import { Card, Radio, Button, Alert, Typography, Tag, Space, Divider, Tree } from 'antd';
-import { FileOutlined, FolderOutlined } from '@ant-design/icons';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
+import { Radio, Button, Alert, Typography, Tag, Space, Tree, Tooltip } from 'antd';
+import { FileOutlined, FolderOutlined, CheckCircleFilled, BugFilled } from '@ant-design/icons';
+import Editor from '@monaco-editor/react';
 import MarkdownRenderer from './MarkdownRenderer';
 import type { CodebaseFile } from '../api/client';
-import hljs from 'highlight.js/lib/core';
-import javascript from 'highlight.js/lib/languages/javascript';
-import typescript from 'highlight.js/lib/languages/typescript';
-import python from 'highlight.js/lib/languages/python';
-import go from 'highlight.js/lib/languages/go';
-import yaml from 'highlight.js/lib/languages/yaml';
-import json from 'highlight.js/lib/languages/json';
-import bash from 'highlight.js/lib/languages/bash';
-import dockerfile from 'highlight.js/lib/languages/dockerfile';
-import xml from 'highlight.js/lib/languages/xml';
-import css from 'highlight.js/lib/languages/css';
-import sql from 'highlight.js/lib/languages/sql';
-import markdown from 'highlight.js/lib/languages/markdown';
-import 'highlight.js/styles/github.css';
-
-hljs.registerLanguage('javascript', javascript);
-hljs.registerLanguage('typescript', typescript);
-hljs.registerLanguage('python', python);
-hljs.registerLanguage('go', go);
-hljs.registerLanguage('yaml', yaml);
-hljs.registerLanguage('json', json);
-hljs.registerLanguage('bash', bash);
-hljs.registerLanguage('dockerfile', dockerfile);
-hljs.registerLanguage('xml', xml);
-hljs.registerLanguage('html', xml);
-hljs.registerLanguage('css', css);
-hljs.registerLanguage('sql', sql);
-hljs.registerLanguage('markdown', markdown);
 
 interface Patch {
   label: string;
@@ -48,7 +21,20 @@ interface CodeExerciseProps {
   onSubmit: (body: Record<string, unknown>) => Promise<Record<string, unknown>>;
 }
 
-// Build tree data from flat file paths
+// Map file extensions to Monaco language IDs
+function getLanguage(filePath: string): string {
+  const ext = filePath.split('.').pop()?.toLowerCase() || '';
+  const map: Record<string, string> = {
+    js: 'javascript', jsx: 'javascript', ts: 'typescript', tsx: 'typescript',
+    py: 'python', go: 'go', yml: 'yaml', yaml: 'yaml', json: 'json',
+    sh: 'shell', bash: 'shell', dockerfile: 'dockerfile', html: 'html',
+    htm: 'html', xml: 'xml', css: 'css', sql: 'sql', md: 'markdown',
+    rs: 'rust', rb: 'ruby', java: 'java', c: 'c', cpp: 'cpp', h: 'c',
+    tf: 'hcl', toml: 'ini', ini: 'ini', makefile: 'makefile',
+  };
+  return map[ext] || 'plaintext';
+}
+
 function buildTreeData(files: CodebaseFile[]) {
   const root: Record<string, unknown>[] = [];
   const dirs: Record<string, Record<string, unknown>> = {};
@@ -82,37 +68,65 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
   const [feedback, setFeedback] = useState<Record<string, unknown> | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [completed, setCompleted] = useState(false);
+  const [bottomPanelHeight, setBottomPanelHeight] = useState(200);
+  const editorRef = useRef<unknown>(null);
+  const decorationsRef = useRef<string[]>([]);
+  const resizingRef = useRef(false);
 
   const currentFile = codebaseFiles.find((f) => f.file_path === selectedFile);
-  const lines = currentFile?.content.split('\n') || [];
-  const treeData = buildTreeData(codebaseFiles);
+  const treeData = useMemo(() => buildTreeData(codebaseFiles), [codebaseFiles]);
 
-  // Syntax highlighting
-  const highlightedLines = useMemo(() => {
-    if (!currentFile) return [];
-    const ext = selectedFile.split('.').pop()?.toLowerCase() || '';
-    const langMap: Record<string, string> = {
-      js: 'javascript', jsx: 'javascript', ts: 'typescript', tsx: 'typescript',
-      py: 'python', go: 'go', yml: 'yaml', yaml: 'yaml', json: 'json',
-      sh: 'bash', bash: 'bash', dockerfile: 'dockerfile', html: 'html',
-      htm: 'html', xml: 'xml', css: 'css', sql: 'sql', md: 'markdown',
-    };
-    const lang = langMap[ext];
-    if (!lang) return lines.map((l) => l);
-    try {
-      const result = hljs.highlight(currentFile.content, { language: lang });
-      return result.value.split('\n');
-    } catch {
-      return lines.map((l) => l);
+  // Update editor decorations when selected lines change
+  const updateDecorations = useCallback((editor: any) => {
+    if (!editor) return;
+    const newDecorations = selectedLines.map((lineNum) => ({
+      range: { startLineNumber: lineNum, startColumn: 1, endLineNumber: lineNum, endColumn: 1 },
+      options: {
+        isWholeLine: true,
+        className: 'line-selected',
+        glyphMarginClassName: 'line-glyph-selected',
+      },
+    }));
+    // Add target line decorations in fix phase
+    if (phase === 'fix' && target?.file === selectedFile) {
+      target.lines.forEach((lineNum) => {
+        newDecorations.push({
+          range: { startLineNumber: lineNum, startColumn: 1, endLineNumber: lineNum, endColumn: 1 },
+          options: {
+            isWholeLine: true,
+            className: 'line-target',
+            glyphMarginClassName: 'line-glyph-target',
+          },
+        });
+      });
     }
-  }, [currentFile, selectedFile, lines]);
+    decorationsRef.current = editor.deltaDecorations(decorationsRef.current, newDecorations);
+  }, [selectedLines, phase, target, selectedFile]);
 
-  const toggleLine = (lineNum: number) => {
-    if (phase !== 'identify' || feedback) return;
-    setSelectedLines((prev) =>
-      prev.includes(lineNum) ? prev.filter((l) => l !== lineNum) : [...prev, lineNum]
-    );
+  const handleEditorMount = (editor: any) => {
+    editorRef.current = editor;
+    editor.updateOptions({ readOnly: true, glyphMargin: phase === 'identify' });
+
+    // Click on gutter to toggle line selection (identify phase)
+    editor.onMouseDown((e: any) => {
+      if (phase !== 'identify' || feedback) return;
+      const lineNum = e.target?.position?.lineNumber;
+      if (!lineNum) return;
+      // Allow click on line number or glyph margin
+      if (e.target.type === 2 || e.target.type === 3 || e.target.type === 4) {
+        setSelectedLines((prev) =>
+          prev.includes(lineNum) ? prev.filter((l) => l !== lineNum) : [...prev, lineNum]
+        );
+      }
+    });
+
+    updateDecorations(editor);
   };
+
+  // Update decorations when selectedLines change
+  useMemo(() => {
+    if (editorRef.current) updateDecorations(editorRef.current);
+  }, [selectedLines, updateDecorations]);
 
   const handleSubmitIdentify = async () => {
     setSubmitting(true);
@@ -135,151 +149,205 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
     try {
       const result = await onSubmit({ phase: 'fix', selected_patch: selectedPatch });
       setFeedback(result);
-      if (result.is_correct) {
-        setCompleted(true);
-      }
+      if (result.is_correct) setCompleted(true);
     } finally {
       setSubmitting(false);
     }
   };
 
-  if (completed) {
-    return (
-      <Card title="Exercise Complete ✅">
-        <Alert message="Well done!" type="success" showIcon />
-        {typeof feedback?.explanation === 'string' && (
-          <Card size="small" style={{ marginTop: 12, background: '#fafafa' }}>
-            <MarkdownRenderer content={feedback.explanation} />
-          </Card>
-        )}
-      </Card>
-    );
-  }
+  // Resize handle for bottom panel
+  const handleResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    resizingRef.current = true;
+    const startY = e.clientY;
+    const startHeight = bottomPanelHeight;
+    const onMove = (ev: MouseEvent) => {
+      if (!resizingRef.current) return;
+      const newH = Math.max(100, Math.min(500, startHeight + (startY - ev.clientY)));
+      setBottomPanelHeight(newH);
+    };
+    const onUp = () => {
+      resizingRef.current = false;
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  };
 
   return (
-    <Card
-      title={
-        <span>
-          Code Exercise
-          {mode !== 'B' && <Tag style={{ marginLeft: 12 }}>Phase {phase === 'identify' ? '1: Identify' : '2: Fix'}</Tag>}
-        </span>
-      }
-    >
-      <div style={{ display: 'flex', gap: 16, marginBottom: 16 }}>
-        {/* File tree */}
-        <div style={{ width: 200, borderRight: '1px solid #f0f0f0', paddingRight: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 64px)', margin: '-24px', background: '#1e1e1e' }}>
+      {/* Injected styles for editor decorations */}
+      <style>{`
+        .line-selected { background: rgba(30, 136, 229, 0.15) !important; }
+        .line-glyph-selected { background: #1890ff; border-radius: 50%; margin-left: 4px; width: 8px !important; height: 8px !important; margin-top: 6px; }
+        .line-target { background: rgba(82, 196, 26, 0.12) !important; }
+        .line-glyph-target { background: #52c41a; border-radius: 50%; margin-left: 4px; width: 8px !important; height: 8px !important; margin-top: 6px; }
+      `}</style>
+
+      {/* Top bar: file tabs + phase indicator */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '0 12px', height: 36, background: '#252526', borderBottom: '1px solid #3c3c3c',
+        flexShrink: 0,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <FileOutlined style={{ color: '#cccccc', fontSize: 13 }} />
+          <Typography.Text style={{ color: '#cccccc', fontSize: 13 }}>{selectedFile}</Typography.Text>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {completed && <Tag color="success" icon={<CheckCircleFilled />}>Completed</Tag>}
+          {!completed && mode !== 'B' && (
+            <Tag color={phase === 'identify' ? 'processing' : 'warning'} icon={<BugFilled />}>
+              {phase === 'identify' ? 'Phase 1: Find the bug' : 'Phase 2: Select the fix'}
+            </Tag>
+          )}
+          {!completed && mode === 'B' && <Tag color="warning">Select the fix</Tag>}
+        </div>
+      </div>
+
+      {/* Main area: sidebar + editor */}
+      <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
+        {/* File explorer */}
+        <div style={{
+          width: 200, background: '#252526', borderRight: '1px solid #3c3c3c',
+          overflow: 'auto', flexShrink: 0, padding: '8px 0',
+        }}>
+          <div style={{ padding: '4px 12px 8px', color: '#bbbbbb', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>
+            Explorer
+          </div>
           <Tree
             treeData={treeData}
             selectedKeys={[selectedFile]}
             onSelect={(keys) => keys[0] && setSelectedFile(keys[0] as string)}
             defaultExpandAll
+            style={{ background: 'transparent', color: '#cccccc' }}
+            className="ide-tree"
           />
+          <style>{`
+            .ide-tree .ant-tree-node-content-wrapper { color: #cccccc !important; }
+            .ide-tree .ant-tree-node-content-wrapper:hover { background: #2a2d2e !important; }
+            .ide-tree .ant-tree-node-selected .ant-tree-node-content-wrapper,
+            .ide-tree .ant-tree-node-content-wrapper.ant-tree-node-selected { background: #37373d !important; color: #ffffff !important; }
+            .ide-tree .ant-tree-switcher { color: #cccccc !important; }
+            .ide-tree .ant-tree-indent-unit { width: 16px; }
+          `}</style>
         </div>
 
-        {/* Code viewer */}
-        <div style={{ flex: 1, overflow: 'auto', maxHeight: 400 }}>
-          <pre style={{ margin: 0, padding: 16, background: '#f6f8fa', borderRadius: 6, fontSize: 13, lineHeight: '20px' }}>
-            {lines.map((_line, i) => {
-              const lineNum = i + 1;
-              const isSelected = selectedLines.includes(lineNum);
-              const isTarget = target?.file === selectedFile && target?.lines.includes(lineNum);
-              return (
-                <div
-                  key={i}
-                  onClick={() => toggleLine(lineNum)}
-                  style={{
-                    cursor: phase === 'identify' && !feedback ? 'pointer' : 'default',
-                    background: isSelected
-                      ? '#e6f7ff'
-                      : (phase === 'fix' && isTarget)
-                      ? '#f6ffed'
-                      : 'transparent',
-                    display: 'flex',
-                    borderLeft: isSelected ? '3px solid #1890ff' : isTarget && phase === 'fix' ? '3px solid #52c41a' : '3px solid transparent',
-                  }}
-                >
-                  <span style={{ width: 40, textAlign: 'right', paddingRight: 12, color: '#999', userSelect: 'none' }}>
-                    {lineNum}
-                  </span>
-                  <code dangerouslySetInnerHTML={{ __html: highlightedLines[i] || '' }} />
-                </div>
-              );
-            })}
-          </pre>
+        {/* Monaco editor */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <Editor
+            height="100%"
+            language={getLanguage(selectedFile)}
+            value={currentFile?.content || '// No file selected'}
+            theme="vs-dark"
+            onMount={handleEditorMount}
+            options={{
+              readOnly: true,
+              minimap: { enabled: true },
+              fontSize: 14,
+              lineNumbers: 'on',
+              scrollBeyondLastLine: false,
+              glyphMargin: phase === 'identify',
+              folding: true,
+              renderLineHighlight: 'line',
+              wordWrap: 'off',
+              automaticLayout: true,
+              contextmenu: false,
+              cursorStyle: 'line',
+            }}
+          />
         </div>
       </div>
 
-      {/* Description */}
-      <Card size="small" style={{ marginBottom: 16, background: '#fafafa' }}>
-        <MarkdownRenderer content={description} />
-      </Card>
+      {/* Resize handle */}
+      <div
+        onMouseDown={handleResizeStart}
+        style={{
+          height: 4, background: '#3c3c3c', cursor: 'ns-resize', flexShrink: 0,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        <div style={{ width: 40, height: 2, background: '#666', borderRadius: 1 }} />
+      </div>
 
-      {phase === 'identify' && (
-        <>
-          <Typography.Text>
-            Selected lines: {selectedLines.sort((a, b) => a - b).join(', ') || 'none'}
-          </Typography.Text>
-
-          {feedback && !feedback.is_correct && (
-            <Alert
-              message={`${(feedback as Record<string, unknown>).matched}/${(feedback as Record<string, unknown>).total} lines found`}
-              description={(feedback as Record<string, unknown>).hint as string}
-              type="warning"
-              showIcon
-              style={{ marginTop: 12 }}
-            />
-          )}
-          {feedback?.is_correct && (
-            <Alert message="Correct! Moving to fix phase..." type="success" showIcon style={{ marginTop: 12 }} />
-          )}
-
-          <Divider />
-          <Button type="primary" onClick={handleSubmitIdentify} loading={submitting} disabled={selectedLines.length === 0}>
-            Validate Selection
-          </Button>
-        </>
-      )}
-
-      {phase === 'fix' && (
-        <>
-          <Typography.Text strong>Select the correct fix:</Typography.Text>
-          <Radio.Group
-            onChange={(e) => setSelectedPatch(e.target.value)}
-            value={selectedPatch}
-            style={{ width: '100%', marginTop: 8 }}
-            disabled={completed}
-          >
-            <Space direction="vertical" style={{ width: '100%' }}>
-              {patches.map((p) => (
-                <Radio key={p.label} value={p.label} style={{ display: 'block', padding: '8px 0' }}>
-                  <div>
-                    <Typography.Text strong>{p.label}</Typography.Text>
-                    <pre style={{ margin: '8px 0', padding: 12, background: '#f6f8fa', borderRadius: 6, fontSize: 12, whiteSpace: 'pre-wrap' }}>
-                      {p.diff}
-                    </pre>
-                  </div>
-                </Radio>
-              ))}
-            </Space>
-          </Radio.Group>
-
-          {feedback && (
-            <Alert
-              message={feedback.is_correct ? 'Correct!' : 'Incorrect'}
-              description={feedback.explanation as string}
-              type={feedback.is_correct ? 'success' : 'error'}
-              showIcon
-              style={{ marginTop: 16 }}
-            />
-          )}
-
-          <Divider />
-          <Button type="primary" onClick={handleSubmitFix} loading={submitting} disabled={!selectedPatch || completed}>
-            Submit Fix
-          </Button>
-        </>
-      )}
-    </Card>
+      {/* Bottom panel: description + exercise controls */}
+      <div style={{
+        height: bottomPanelHeight, background: '#1e1e1e', borderTop: '1px solid #3c3c3c',
+        overflow: 'auto', flexShrink: 0, padding: '12px 16px', color: '#cccccc',
+      }}>
+        {completed ? (
+          <div>
+            <Alert message="Exercise complete!" type="success" showIcon style={{ marginBottom: 8 }} />
+            {typeof feedback?.explanation === 'string' && (
+              <div style={{ background: '#252526', padding: 12, borderRadius: 4, color: '#cccccc' }}>
+                <MarkdownRenderer content={feedback.explanation} />
+              </div>
+            )}
+          </div>
+        ) : phase === 'identify' ? (
+          <div>
+            <div style={{ marginBottom: 8 }}>
+              <MarkdownRenderer content={description} />
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <Typography.Text style={{ color: '#cccccc' }}>
+                Click line numbers to select problematic lines.
+                Selected: <strong>{selectedLines.length > 0 ? selectedLines.sort((a, b) => a - b).join(', ') : 'none'}</strong>
+              </Typography.Text>
+              <Button type="primary" size="small" onClick={handleSubmitIdentify} loading={submitting} disabled={selectedLines.length === 0}>
+                Validate
+              </Button>
+            </div>
+            {feedback && !feedback.is_correct && (
+              <Alert
+                message={`${feedback.matched}/${feedback.total} lines found`}
+                description={feedback.hint as string}
+                type="warning" showIcon style={{ marginTop: 8 }}
+              />
+            )}
+            {feedback && (feedback.is_correct as boolean) && (
+              <Alert message="Correct! Moving to fix phase..." type="success" showIcon style={{ marginTop: 8 }} />
+            )}
+          </div>
+        ) : (
+          <div>
+            <div style={{ marginBottom: 8 }}>
+              <Typography.Text strong style={{ color: '#cccccc' }}>Select the correct fix:</Typography.Text>
+            </div>
+            <Radio.Group
+              onChange={(e) => setSelectedPatch(e.target.value)}
+              value={selectedPatch}
+              style={{ width: '100%' }}
+              disabled={completed}
+            >
+              <Space direction="vertical" style={{ width: '100%' }}>
+                {patches.map((p) => (
+                  <Radio key={p.label} value={p.label} style={{ color: '#cccccc' }}>
+                    <Tooltip title={p.diff} placement="topLeft" overlayStyle={{ maxWidth: 500 }} overlayInnerStyle={{ whiteSpace: 'pre', fontFamily: 'monospace', fontSize: 12 }}>
+                      <Typography.Text style={{ color: '#cccccc' }}>{p.label}</Typography.Text>
+                    </Tooltip>
+                  </Radio>
+                ))}
+              </Space>
+            </Radio.Group>
+            <div style={{ marginTop: 8 }}>
+              <Button type="primary" size="small" onClick={handleSubmitFix} loading={submitting} disabled={!selectedPatch || completed}>
+                Submit Fix
+              </Button>
+            </div>
+            {feedback && (
+              <Alert
+                message={feedback.is_correct ? 'Correct!' : 'Incorrect'}
+                description={feedback.explanation as string}
+                type={feedback.is_correct ? 'success' : 'error'}
+                showIcon style={{ marginTop: 8 }}
+              />
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 

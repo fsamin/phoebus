@@ -163,7 +163,17 @@ const StepView: React.FC = () => {
         )}
         </div>
       </Sider>
-      <Content style={{ padding: 24, overflow: 'auto' }}>
+      <Content style={step.type === 'code-exercise' ? { padding: 0, overflow: 'hidden' } : { padding: 24, overflow: 'auto' }}>
+        {step.type === 'code-exercise' && exerciseData ? (
+          <CodeExercise
+            mode={exerciseData.mode as string || 'A'}
+            description={exerciseData.description as string || ''}
+            target={exerciseData.target as any}
+            patches={(exerciseData.patches as Record<string, unknown>[]).map((p) => p as any)}
+            codebaseFiles={step.codebase_files || []}
+            onSubmit={handleSubmitAttempt}
+          />
+        ) : (
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <Typography.Title level={3}>{step.title}</Typography.Title>
 
@@ -200,17 +210,6 @@ const StepView: React.FC = () => {
             />
           )}
 
-          {step.type === 'code-exercise' && exerciseData && (
-            <CodeExercise
-              mode={exerciseData.mode as string || 'A'}
-              description={exerciseData.description as string || ''}
-              target={exerciseData.target as any}
-              patches={(exerciseData.patches as Record<string, unknown>[]).map((p) => p as any)}
-              codebaseFiles={step.codebase_files || []}
-              onSubmit={handleSubmitAttempt}
-            />
-          )}
-
           {/* Reset button for exercises */}
           {step.type !== 'lesson' && (
             <div style={{ marginTop: 24, textAlign: 'center' }}>
@@ -238,6 +237,7 @@ const StepView: React.FC = () => {
             )}
           </div>
         </div>
+        )}
       </Content>
     </Layout>
   );
