@@ -21,16 +21,18 @@ import (
 )
 
 type Syncer struct {
-	db            *sqlx.DB
-	encryptionKey string
-	notify        chan struct{} // signals the worker that a new job is available
+	db                *sqlx.DB
+	encryptionKey     string
+	instanceSSHKeyPEM []byte // instance-level SSH private key (decrypted)
+	notify            chan struct{} // signals the worker that a new job is available
 }
 
-func New(db *sqlx.DB, encryptionKey string) *Syncer {
+func New(db *sqlx.DB, encryptionKey string, instanceSSHKeyPEM []byte) *Syncer {
 	return &Syncer{
-		db:            db,
-		encryptionKey: encryptionKey,
-		notify:        make(chan struct{}, 1),
+		db:                db,
+		encryptionKey:     encryptionKey,
+		instanceSSHKeyPEM: instanceSSHKeyPEM,
+		notify:            make(chan struct{}, 1),
 	}
 }
 
@@ -163,7 +165,11 @@ func (s *Syncer) processJob(ctx context.Context, jobID, repoID uuid.UUID) {
 	} else {
 		// Decrypt credentials if needed
 		var creds []byte
-		if len(repo.Credentials) > 0 && s.encryptionKey != "" {
+		if repo.AuthType == "instance-ssh-key" {
+			// Use the instance-level SSH keypair
+			creds = s.instanceSSHKeyPEM
+			repo.AuthType = "ssh-key" // reuse the same git clone path
+		} else if len(repo.Credentials) > 0 && s.encryptionKey != "" {
 			decrypted, err := crypto.Decrypt(repo.Credentials, []byte(s.encryptionKey))
 			if err != nil {
 				// Fallback: might be plaintext (pre-encryption migration)

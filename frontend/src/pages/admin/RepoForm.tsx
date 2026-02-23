@@ -61,12 +61,13 @@ const RepoForm: React.FC = () => {
           <Form.Item name="auth_type" label="Authentication">
             <Select onChange={setAuthType}>
               <Select.Option value="none">None (public)</Select.Option>
+              <Select.Option value="instance-ssh-key">Instance SSH Key</Select.Option>
               <Select.Option value="http-token">HTTP Token</Select.Option>
               <Select.Option value="http-basic">HTTP Basic</Select.Option>
-              <Select.Option value="ssh-key">SSH Key</Select.Option>
+              <Select.Option value="ssh-key">SSH Key (custom)</Select.Option>
             </Select>
           </Form.Item>
-          {authType !== 'none' && (
+          {authType !== 'none' && authType !== 'instance-ssh-key' && (
             <Form.Item
               name="credentials"
               label={authType === 'ssh-key' ? 'SSH Private Key' : authType === 'http-token' ? 'Token' : 'username:password'}

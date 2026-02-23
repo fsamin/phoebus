@@ -59,6 +59,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Ensure instance SSH keypair exists (generate if first boot)
+	sshKeyPair, err := database.EnsureSSHKey(db, cfg.EncryptionKey)
+	if err != nil {
+		slog.Error("failed to ensure SSH keypair", "error", err)
+		os.Exit(1)
+	}
+
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
@@ -66,12 +73,12 @@ func main() {
 	r.Use(middleware.Timeout(30 * time.Second))
 
 	// Create and start the sync worker
-	syncWorker := syncer.New(db, cfg.EncryptionKey)
+	syncWorker := syncer.New(db, cfg.EncryptionKey, sshKeyPair.PrivateKeyPEM)
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
 	go syncWorker.Start(workerCtx)
 
-	h := handler.New(db, cfg, syncWorker)
+	h := handler.New(db, cfg, syncWorker, sshKeyPair.PublicKey)
 	h.RegisterRoutes(r)
 
 	// Serve embedded SPA for all non-API routes

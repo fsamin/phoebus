@@ -159,6 +159,16 @@ The `content_md` column stores **raw Markdown**, consistent with client-side ren
 │ sync_status      │
 └─────────────────┘
 
+┌─────────────────┐
+│ instance_settings│
+│                  │
+│ key (PK)         │
+│ value (TEXT)     │
+│ encrypted (BOOL) │
+│ created_at       │
+│ updated_at       │
+└─────────────────┘
+
 ┌─────────────────┐     ┌─────────────────────┐
 │ codebase_files   │     │ audit_log            │
 │                  │     │                      │
@@ -459,12 +469,30 @@ Git repositories may be private, requiring authentication for clone/pull operati
 
 | Auth Type | Storage | Usage |
 |---|---|---|
-| **SSH Key** | Private key encrypted in `git_repositories.credentials` | Used with `git clone git@...` |
+| **Instance SSH Key** | Ed25519 keypair in `instance_settings` (private key encrypted) | Default for SSH repos — uses the instance's auto-generated keypair via `GIT_SSH_COMMAND` |
+| **SSH Key** | Private key encrypted in `git_repositories.credentials` | Per-repo custom SSH key, used with `git clone git@...` |
 | **HTTPS Token** | Token encrypted in `git_repositories.credentials` | Used with `git clone https://token@...` |
 | **None** | — | Public repositories, no credentials needed |
 
 - Credentials are encrypted at application level before storage (AES-256-GCM with a key managed as a `configstore` item)
 - Credentials are decrypted in-memory only during Git operations and never logged
+
+### 6.4 Instance SSH Key Management
+
+At first startup, Phœbus generates a unique **Ed25519 SSH keypair** for the instance:
+
+1. **Startup check:** Query `instance_settings` for keys `ssh_private_key` and `ssh_public_key`
+2. **If not found:** Generate a new Ed25519 keypair → encrypt the private key (AES-256-GCM) → store both in `instance_settings` (`ssh_private_key` encrypted, `ssh_public_key` in clear text)
+3. **If found:** Decrypt the private key from the database and hold it in memory
+
+The public key is exposed via `GET /api/admin/ssh-public-key` (admin-only) for display in the repository management UI. Administrators copy this key and add it as a **read-only deploy key** on their Git hosting platform.
+
+When the Content Syncer clones a repo with `auth_type = instance-ssh-key`:
+1. Write the decrypted private key to a temporary file (mode `0600`)
+2. Run `ssh-keyscan {host}` to populate a temporary `known_hosts` file
+3. Set `GIT_SSH_COMMAND="ssh -i /tmp/key -o UserKnownHostsFile=/tmp/known_hosts -o StrictHostKeyChecking=yes"`
+4. Execute `git clone --depth 1`
+5. Delete the temporary key and known_hosts files immediately after clone
 
 ### 6.4 Configuration & Secrets Management
 

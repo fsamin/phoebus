@@ -429,6 +429,7 @@ Never use panic for control flow — it will crash the server.
 - Content versioning is inherently handled by Git history
 - Instructors can use branches and pull requests for content review before merging to `main`
 - Phœbus supports **any Git hosting platform** (GitHub, GitLab, Gitea, Bitbucket, self-hosted, etc.) since it only relies on standard Git clone (SSH/HTTPS) and a generic webhook endpoint
+- **Instance SSH Key:** At first startup, Phœbus generates a unique **Ed25519 SSH keypair** for the instance. The private key is stored encrypted (AES-256-GCM) in the database, and the public key is displayed on the repository management page so administrators can add it as a **deploy key** (read-only) on their Git repositories. This enables SSH-based clone without managing per-repo credentials
 
 ---
 

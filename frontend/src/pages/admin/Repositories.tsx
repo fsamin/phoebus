@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Tag, Space, Typography, Popconfirm, Popover, message, Tooltip } from 'antd';
-import { PlusOutlined, SyncOutlined, CopyOutlined, DeleteOutlined, EditOutlined, UnorderedListOutlined } from '@ant-design/icons';
+import { Table, Button, Tag, Space, Typography, Popconfirm, Popover, message, Tooltip, Alert } from 'antd';
+import { PlusOutlined, SyncOutlined, CopyOutlined, DeleteOutlined, EditOutlined, UnorderedListOutlined, KeyOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { GitRepository } from '../../api/client';
@@ -19,13 +19,17 @@ const Repositories: React.FC = () => {
   const navigate = useNavigate();
   const [repos, setRepos] = useState<Array<GitRepository & { path_titles: string[] }>>([]);
   const [loading, setLoading] = useState(true);
+  const [sshPublicKey, setSSHPublicKey] = useState('');
 
   const fetchRepos = () => {
     setLoading(true);
     api.listRepos().then(setRepos).finally(() => setLoading(false));
   };
 
-  useEffect(fetchRepos, []);
+  useEffect(() => {
+    fetchRepos();
+    api.sshPublicKey().then(r => setSSHPublicKey(r.public_key)).catch(() => {});
+  }, []);
 
   const handleSync = async (id: string) => {
     await api.syncRepo(id);
@@ -61,6 +65,25 @@ const Repositories: React.FC = () => {
           Add Repository
         </Button>
       </div>
+
+      {sshPublicKey && (
+        <Alert
+          style={{ marginBottom: 16 }}
+          type="info"
+          showIcon
+          icon={<KeyOutlined />}
+          message="Instance SSH Public Key"
+          description={
+            <div>
+              <Typography.Text code copyable style={{ wordBreak: 'break-all' }}>{sshPublicKey}</Typography.Text>
+              <br />
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                Add this key as a read-only deploy key on your Git repositories to use SSH clone URLs (git@…).
+              </Typography.Text>
+            </div>
+          }
+        />
+      )}
 
       <Table
         dataSource={repos}

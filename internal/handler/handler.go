@@ -15,16 +15,18 @@ import (
 )
 
 type Handler struct {
-	db     *sqlx.DB
-	cfg    *config.Config
-	syncer *syncer.Syncer
+	db           *sqlx.DB
+	cfg          *config.Config
+	syncer       *syncer.Syncer
+	sshPublicKey string
 }
 
-func New(db *sqlx.DB, cfg *config.Config, s *syncer.Syncer) *Handler {
+func New(db *sqlx.DB, cfg *config.Config, s *syncer.Syncer, sshPublicKey string) *Handler {
 	return &Handler{
-		db:     db,
-		cfg:    cfg,
-		syncer: s,
+		db:           db,
+		cfg:          cfg,
+		syncer:       s,
+		sshPublicKey: sshPublicKey,
 	}
 }
 
@@ -93,6 +95,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 			r.Post("/api/admin/repos/{repoId}/sync", h.SyncRepo)
 			r.Get("/api/admin/repos/{repoId}/sync-logs", h.SyncLogs)
 			r.Get("/api/admin/health", h.AdminHealth)
+			r.Get("/api/admin/ssh-public-key", h.SSHPublicKey)
 		})
 	})
 }

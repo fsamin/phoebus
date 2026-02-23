@@ -18,9 +18,11 @@ Each section describes the detailed behavior, rules, edge cases, and UI expectat
 
 1. Administrator provides:
    - Clone URL (SSH or HTTPS)
-   - Authentication type: `none`, `ssh-key`, `http-basic`, `http-token`
+   - Authentication type: `none`, `instance-ssh-key`, `ssh-key`, `http-basic`, `http-token`
    - Credentials (private key, username/password, or token) — stored encrypted
    - Branch to track (default: `main`)
+
+> **Note:** When `instance-ssh-key` is selected, no credentials are needed — Phœbus uses the instance's auto-generated Ed25519 SSH keypair (see section 10.11). The administrator must add the instance public key as a deploy key on the Git repository.
 
 2. Upon registration, Phœbus:
    - Generates a unique webhook UUID
@@ -1512,11 +1514,11 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 
 ### 10.11 Repository Management (`/admin/repositories`)
 
-**Purpose:** List and manage registered Git repositories.
+**Purpose:** List and manage registered Git repositories. Display the instance SSH public key for deploy key setup.
 
 **Required role:** `admin`
 
-**Layout:** Global shell. Ant Design Table with action buttons.
+**Layout:** Global shell. Ant Design Table with action buttons. SSH public key banner above the table.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -1524,6 +1526,14 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  Repository Management                          [+ Add Repository]   │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │ 🔑 Instance SSH Public Key                          [Copy]    │  │
+│  │ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... phoebus-instance    │  │
+│  │                                                                │  │
+│  │ Add this key as a read-only deploy key on your Git             │  │
+│  │ repositories to use SSH clone URLs (git@…).                    │  │
+│  └────────────────────────────────────────────────────────────────┘  │
 │                                                                      │
 │  ┌────────────────────────────────────────────────────────────────┐  │
 │  │ Name             Clone URL              Branch  Status   Act. │  │
@@ -1534,6 +1544,18 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 │                                                                      │
 └──────────────────────────────────────────────────────────────────────┘
 ```
+
+**SSH Public Key Banner (Ant Design Alert, type: info):**
+
+The instance SSH public key is always displayed above the repository table. It is generated once at first startup and persists across restarts.
+
+| Element | Description |
+|---|---|
+| Key display | Full public key in `ssh-ed25519 AAAA...` format, monospace font |
+| Copy button | Copies the full public key to clipboard. Toast: "SSH public key copied" |
+| Help text | "Add this key as a read-only deploy key on your Git repositories to use SSH clone URLs (git@…)." |
+
+**API Call:** `GET /api/admin/ssh-public-key` — returns `{ "public_key": "ssh-ed25519 AAAA..." }`
 
 **Table columns (Ant Design Table):**
 
@@ -1607,7 +1629,8 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 |---|---|---|---|
 | Clone URL | Text input | Must be valid Git URL (SSH or HTTPS) | Yes |
 | Branch | Text input | Default: `main` | No (defaults to `main`) |
-| Authentication type | Select: `none`, `ssh-key`, `http-basic`, `http-token` | — | Yes |
+| Authentication type | Select: `none`, `instance-ssh-key`, `ssh-key`, `http-basic`, `http-token` | — | Yes |
+| | _(selecting `instance-ssh-key` hides all credential fields — uses the instance keypair shown above)_ | | |
 | Private key | Textarea (shown if `ssh-key`) | Must be valid SSH private key format | Conditional |
 | Username | Text input (shown if `http-basic`) | — | Conditional |
 | Password | Password input (shown if `http-basic`) | — | Conditional |

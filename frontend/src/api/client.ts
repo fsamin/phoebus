@@ -86,6 +86,7 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(data),
     }),
+  sshPublicKey: () => request<{ public_key: string }>('/admin/ssh-public-key'),
 };
 
 // --- Types ---

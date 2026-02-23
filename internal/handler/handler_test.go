@@ -91,7 +91,7 @@ func TestMain(m *testing.M) {
 func setupTest(t *testing.T) (*httptest.Server, func()) {
 	t.Helper()
 
-	h := New(testDB, testCfg, nil)
+	h := New(testDB, testCfg, nil, "ssh-ed25519 AAAA-test-key phoebus-instance")
 	r := chi.NewRouter()
 	h.RegisterRoutes(r)
 	srv := httptest.NewServer(r)
@@ -478,5 +478,40 @@ func TestDashboard(t *testing.T) {
 	if resp.StatusCode != 200 {
 		body, _ := io.ReadAll(resp.Body)
 		t.Fatalf("Dashboard: status = %d, body = %s", resp.StatusCode, body)
+	}
+}
+
+// --- SSH Public Key ---
+
+func TestSSHPublicKeyEndpoint(t *testing.T) {
+	srv, cleanup := setupTest(t)
+	defer cleanup()
+
+	// Unauthenticated → 401
+	resp := doRequest(t, srv, "GET", "/api/admin/ssh-public-key", nil, nil)
+	if resp.StatusCode != 401 {
+		t.Fatalf("unauthenticated: status = %d, want 401", resp.StatusCode)
+	}
+
+	// Learner → 403
+	learnerCookie := loginAs(t, model.RoleLearner)
+	resp = doRequest(t, srv, "GET", "/api/admin/ssh-public-key", nil, learnerCookie)
+	if resp.StatusCode != 403 {
+		t.Fatalf("learner: status = %d, want 403", resp.StatusCode)
+	}
+
+	// Admin → 200 with key
+	adminCookie := loginAs(t, model.RoleAdmin)
+	resp = doRequest(t, srv, "GET", "/api/admin/ssh-public-key", nil, adminCookie)
+	if resp.StatusCode != 200 {
+		t.Fatalf("admin: status = %d, want 200", resp.StatusCode)
+	}
+	data := readJSON(t, resp)
+	key, ok := data["public_key"].(string)
+	if !ok || key == "" {
+		t.Error("expected non-empty public_key in response")
+	}
+	if !strings.HasPrefix(key, "ssh-ed25519 ") {
+		t.Errorf("public_key should start with ssh-ed25519, got: %s", key[:20])
 	}
 }
