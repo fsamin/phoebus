@@ -13,7 +13,7 @@ import Quiz from '../components/Quiz';
 import TerminalExercise from '../components/TerminalExercise';
 import CodeExercise from '../components/CodeExercise';
 
-const { Sider, Content } = Layout;
+const { Content } = Layout;
 
 const stepIcon = (type: string) => {
   switch (type) {
@@ -33,7 +33,9 @@ const StepView: React.FC = () => {
   const [progress, setProgress] = useState<Progress[]>([]);
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(280);
   const sidebarRef = useRef<HTMLDivElement>(null);
+  const resizingRef = useRef(false);
 
   useEffect(() => {
     if (!pathId || !stepId) return;
@@ -127,15 +129,12 @@ const StepView: React.FC = () => {
 
   return (
     <Layout style={{ minHeight: 'calc(100vh - 64px)', margin: '-24px -48px' }}>
-      <Sider
-        width={280}
-        collapsible
-        collapsed={collapsed}
-        onCollapse={setCollapsed}
-        trigger={null}
-        theme="light"
-        style={{ borderRight: '1px solid #f0f0f0', overflow: 'auto' }}
-      >
+      <div style={{
+        width: collapsed ? 48 : sidebarWidth, flexShrink: 0, display: 'flex',
+        background: '#fff', borderRight: '1px solid #f0f0f0', position: 'relative',
+        transition: collapsed ? 'width 0.2s' : undefined,
+      }}>
+        <div style={{ flex: 1, overflow: 'auto' }}>
         <div ref={sidebarRef} style={{ height: '100%', overflow: 'auto' }}>
         <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0', display: 'flex', alignItems: 'center', gap: 8 }}>
           <Button
@@ -162,7 +161,36 @@ const StepView: React.FC = () => {
           />
         )}
         </div>
-      </Sider>
+        </div>
+        {/* Resize handle */}
+        {!collapsed && (
+          <div
+            onMouseDown={(e) => {
+              e.preventDefault();
+              resizingRef.current = true;
+              const startX = e.clientX;
+              const startW = sidebarWidth;
+              const onMove = (ev: MouseEvent) => {
+                if (!resizingRef.current) return;
+                setSidebarWidth(Math.max(180, Math.min(500, startW + ev.clientX - startX)));
+              };
+              const onUp = () => {
+                resizingRef.current = false;
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp);
+              };
+              window.addEventListener('mousemove', onMove);
+              window.addEventListener('mouseup', onUp);
+            }}
+            style={{
+              width: 4, cursor: 'col-resize', background: 'transparent',
+              position: 'absolute', right: 0, top: 0, bottom: 0, zIndex: 10,
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.background = '#1890ff')}
+            onMouseLeave={(e) => { if (!resizingRef.current) e.currentTarget.style.background = 'transparent'; }}
+          />
+        )}
+      </div>
       <Content style={step.type === 'code-exercise' ? { padding: 0, overflow: 'hidden' } : { padding: 24, overflow: 'auto' }}>
         {step.type === 'code-exercise' && exerciseData ? (
           <CodeExercise
