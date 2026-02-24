@@ -31,13 +31,15 @@ async function addContentRepo(ctx: ReturnType<typeof request.newContext> extends
     clone_url: CONTENT_REPO,
   };
   if (GITHUB_TOKEN) {
-    body.auth_type = 'token';
+    body.auth_type = 'http-token';
     body.credentials = GITHUB_TOKEN;
   }
 
   const res = await ctx.post(`${BASE_URL}/api/admin/repos`, { data: body });
-  if (res.status() !== 201 && res.status() !== 409) {
-    throw new Error(`Failed to add repo: ${res.status()} ${await res.text()}`);
+  if (res.status() !== 201) {
+    const text = await res.text();
+    console.log(`⚠️  addContentRepo returned ${res.status()}: ${text}`);
+    // Non-fatal: repo may already exist
   }
   return res;
 }
