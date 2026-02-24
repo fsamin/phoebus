@@ -3,9 +3,9 @@ package syncer
 import (
 	"context"
 	"database/sql"
-	"encoding/base64"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -218,16 +218,15 @@ func (s *Syncer) failJob(ctx context.Context, jobID, repoID uuid.UUID, syncErr e
 func gitClone(cloneURL, branch, destDir, authType string, credentials []byte) error {
 	args := []string{"clone", "--branch", branch, "--depth", "1", "--single-branch"}
 
-	// For HTTP token auth, inject token into the URL via GIT_ASKPASS
+	// For HTTP token auth, inject token into the clone URL
 	if authType == "http-token" && len(credentials) > 0 {
-		// Use clone URL with token via header
-		args = append(args, cloneURL, destDir)
+		authURL, err := injectTokenInURL(cloneURL, string(credentials))
+		if err != nil {
+			return fmt.Errorf("inject token in URL: %w", err)
+		}
+		args = append(args, authURL, destDir)
 		cmd := exec.Command("git", args...)
-		cmd.Env = append(os.Environ(),
-			fmt.Sprintf("GIT_CONFIG_COUNT=1"),
-			fmt.Sprintf("GIT_CONFIG_KEY_0=http.extraHeader"),
-			fmt.Sprintf("GIT_CONFIG_VALUE_0=Authorization: Bearer %s", string(credentials)),
-		)
+		cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		return cmd.Run()
@@ -235,14 +234,13 @@ func gitClone(cloneURL, branch, destDir, authType string, credentials []byte) er
 
 	if authType == "http-basic" && len(credentials) > 0 {
 		// credentials expected as "username:password"
-		args = append(args, cloneURL, destDir)
+		authURL, err := injectBasicAuthInURL(cloneURL, string(credentials))
+		if err != nil {
+			return fmt.Errorf("inject basic auth in URL: %w", err)
+		}
+		args = append(args, authURL, destDir)
 		cmd := exec.Command("git", args...)
-		cmd.Env = append(os.Environ(),
-			fmt.Sprintf("GIT_CONFIG_COUNT=1"),
-			fmt.Sprintf("GIT_CONFIG_KEY_0=http.extraHeader"),
-			fmt.Sprintf("GIT_CONFIG_VALUE_0=Authorization: Basic %s",
-				base64Encode(credentials)),
-		)
+		cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		return cmd.Run()
@@ -275,13 +273,35 @@ func gitClone(cloneURL, branch, destDir, authType string, credentials []byte) er
 	// No auth
 	args = append(args, cloneURL, destDir)
 	cmd := exec.Command("git", args...)
+	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	return cmd.Run()
 }
 
-func base64Encode(data []byte) string {
-	return base64.StdEncoding.EncodeToString(data)
+// injectTokenInURL returns https://x-access-token:<token>@host/path
+func injectTokenInURL(cloneURL, token string) (string, error) {
+	u, err := url.Parse(cloneURL)
+	if err != nil {
+		return "", err
+	}
+	u.User = url.UserPassword("x-access-token", token)
+	return u.String(), nil
+}
+
+// injectBasicAuthInURL returns https://user:pass@host/path
+func injectBasicAuthInURL(cloneURL, userpass string) (string, error) {
+	u, err := url.Parse(cloneURL)
+	if err != nil {
+		return "", err
+	}
+	parts := strings.SplitN(userpass, ":", 2)
+	if len(parts) == 2 {
+		u.User = url.UserPassword(parts[0], parts[1])
+	} else {
+		u.User = url.User(parts[0])
+	}
+	return u.String(), nil
 }
 
 func (s *Syncer) syncContent(ctx context.Context, repoID uuid.UUID, repoDir string) error {
