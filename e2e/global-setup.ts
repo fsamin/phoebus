@@ -28,12 +28,11 @@ async function loginAdmin(ctx: ReturnType<typeof request.newContext> extends Pro
 
 async function addContentRepo(ctx: ReturnType<typeof request.newContext> extends Promise<infer T> ? T : never) {
   const body: Record<string, string> = {
-    name: 'content-samples',
     clone_url: CONTENT_REPO,
   };
   if (GITHUB_TOKEN) {
-    body.auth_method = 'token';
-    body.credential = GITHUB_TOKEN;
+    body.auth_type = 'token';
+    body.credentials = GITHUB_TOKEN;
   }
 
   const res = await ctx.post(`${BASE_URL}/api/admin/repos`, { data: body });
@@ -46,7 +45,7 @@ async function addContentRepo(ctx: ReturnType<typeof request.newContext> extends
 async function waitForSync(ctx: ReturnType<typeof request.newContext> extends Promise<infer T> ? T : never, timeoutMs = 120_000) {
   const reposRes = await ctx.get(`${BASE_URL}/api/admin/repos`);
   const repos = await reposRes.json();
-  const repo = repos.find((r: { name: string }) => r.name === 'content-samples');
+  const repo = repos.find((r: { clone_url: string }) => r.clone_url.includes('phoebus-content-samples'));
   if (!repo) {
     console.log('⚠️  Repo content-samples not found after creation — skipping sync wait');
     return false;
@@ -78,6 +77,9 @@ export default async function globalSetup(config: FullConfig) {
   await loginAdmin(ctx);
   const storageDir = path.join(__dirname, 'storage-state');
   fs.mkdirSync(storageDir, { recursive: true });
+  // Clean up stale content-synced flag from previous runs
+  const syncFlagPath = path.join(storageDir, 'content-synced');
+  if (fs.existsSync(syncFlagPath)) fs.unlinkSync(syncFlagPath);
   await ctx.storageState({ path: path.join(storageDir, 'admin.json') });
   console.log('✅ Admin logged in, storage state saved');
 
@@ -89,7 +91,7 @@ export default async function globalSetup(config: FullConfig) {
     const synced = await waitForSync(ctx);
     if (synced) {
       console.log('✅ Content synced');
-      process.env.CONTENT_SYNCED = 'true';
+      fs.writeFileSync(path.join(__dirname, 'storage-state', 'content-synced'), 'true');
     } else {
       console.log('⚠️  Content not available — content-dependent tests will be skipped');
     }

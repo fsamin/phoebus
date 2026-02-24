@@ -1,4 +1,6 @@
 import { test, expect } from '@playwright/test';
+import fs from 'fs';
+import path from 'path';
 
 test.describe('Admin', () => {
   test('repositories page lists repos', async ({ page }) => {
@@ -7,8 +9,8 @@ test.describe('Admin', () => {
   });
 
   test('sync logs page shows sync history', async ({ page }) => {
-    const needsContent = !!process.env.GITHUB_TOKEN;
-    test.skip(!needsContent, 'GITHUB_TOKEN not set — no repos to show sync logs for');
+    const contentSynced = fs.existsSync(path.join(__dirname, '..', 'storage-state', 'content-synced'));
+    test.skip(!contentSynced, 'Content not synced — skipping');
 
     await page.goto('/admin/repositories');
     await page.waitForTimeout(2000);

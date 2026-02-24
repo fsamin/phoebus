@@ -1,10 +1,12 @@
 import { test, expect } from '@playwright/test';
+import fs from 'fs';
+import path from 'path';
 
 test.describe('Exercises & Progress', () => {
-  const needsContent = !!process.env.GITHUB_TOKEN;
+  const contentSynced = fs.existsSync(path.join(__dirname, '..', 'storage-state', 'content-synced'));
 
   test('quiz correct answer shows success feedback', async ({ page, request }) => {
-    test.skip(!needsContent, 'GITHUB_TOKEN not set — no content synced');
+    test.skip(!contentSynced, 'Content not synced — skipping');
 
     // Find a quiz step via the API
     const pathsRes = await request.get('/api/learning-paths');
@@ -40,7 +42,7 @@ test.describe('Exercises & Progress', () => {
   });
 
   test('progress updates after completing a step', async ({ page, request }) => {
-    test.skip(!needsContent, 'GITHUB_TOKEN not set — no content synced');
+    test.skip(!contentSynced, 'Content not synced — skipping');
 
     // Get initial progress
     const progressBefore = await request.get('/api/progress');

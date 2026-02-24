@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
+import fs from 'fs';
+import path from 'path';
 
 test.describe('Catalog & Learning Path', () => {
-  const needsContent = !!process.env.GITHUB_TOKEN;
+  const contentSynced = fs.existsSync(path.join(__dirname, '..', 'storage-state', 'content-synced'));
 
   test('dashboard displays stats', async ({ page }) => {
     await page.goto('/');
@@ -9,7 +11,7 @@ test.describe('Catalog & Learning Path', () => {
   });
 
   test('catalog lists learning paths', async ({ page }) => {
-    test.skip(!needsContent, 'GITHUB_TOKEN not set — no content synced');
+    test.skip(!contentSynced, 'Content not synced — skipping');
     await page.goto('/catalog');
     await expect(page.getByText(/catalog/i).first()).toBeVisible();
     // Should have at least one learning path card
@@ -20,7 +22,7 @@ test.describe('Catalog & Learning Path', () => {
   });
 
   test('click on a learning path shows overview with modules', async ({ page }) => {
-    test.skip(!needsContent, 'GITHUB_TOKEN not set — no content synced');
+    test.skip(!contentSynced, 'Content not synced — skipping');
     await page.goto('/catalog');
     const firstCard = page.locator('[class*="ant-card"]').first();
     await firstCard.click();
@@ -29,7 +31,7 @@ test.describe('Catalog & Learning Path', () => {
   });
 
   test('step view renders markdown content', async ({ page }) => {
-    test.skip(!needsContent, 'GITHUB_TOKEN not set — no content synced');
+    test.skip(!contentSynced, 'Content not synced — skipping');
     await page.goto('/catalog');
     const firstCard = page.locator('[class*="ant-card"]').first();
     await firstCard.click();
@@ -45,7 +47,7 @@ test.describe('Catalog & Learning Path', () => {
   });
 
   test('admonitions are rendered as styled blocks', async ({ page }) => {
-    test.skip(!needsContent, 'GITHUB_TOKEN not set — no content synced');
+    test.skip(!contentSynced, 'Content not synced — skipping');
     // Navigate to a step that has admonitions (containerization path usually has them)
     await page.goto('/catalog');
     const firstCard = page.locator('[class*="ant-card"]').first();
@@ -63,7 +65,7 @@ test.describe('Catalog & Learning Path', () => {
   });
 
   test('code blocks have syntax highlighting', async ({ page }) => {
-    test.skip(!needsContent, 'GITHUB_TOKEN not set — no content synced');
+    test.skip(!contentSynced, 'Content not synced — skipping');
     await page.goto('/catalog');
     const firstCard = page.locator('[class*="ant-card"]').first();
     await firstCard.click();
