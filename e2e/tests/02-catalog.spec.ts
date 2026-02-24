@@ -36,9 +36,9 @@ test.describe('Catalog & Learning Path', () => {
     const firstCard = page.locator('[class*="ant-card"]').first();
     await firstCard.click();
 
-    // Click on the first available step link
-    const stepLink = page.locator('a[href*="/step"]').first();
-    await stepLink.click();
+    // Click on the first available step in the module list
+    const stepItem = page.locator('.ant-list-item').first();
+    await stepItem.click();
 
     // Markdown should be rendered (no raw --- or #)
     await page.waitForTimeout(2000);
@@ -53,11 +53,8 @@ test.describe('Catalog & Learning Path', () => {
     const firstCard = page.locator('[class*="ant-card"]').first();
     await firstCard.click();
 
-    const stepLink = page.locator('a[href*="/step"]').first();
-    await stepLink.click();
-    await page.waitForTimeout(2000);
-
-    // Look for admonition-styled elements (our Admonition component uses Alert or custom divs)
+    const stepItem = page.locator('.ant-list-item').first();
+    await stepItem.click();
     const admonitions = page.locator('[class*="admonition"], [class*="ant-alert"], [role="alert"]');
     // This might not always be present depending on the step, so we just check the page loaded
     const body = await page.textContent('body');
@@ -70,11 +67,8 @@ test.describe('Catalog & Learning Path', () => {
     const firstCard = page.locator('[class*="ant-card"]').first();
     await firstCard.click();
 
-    const stepLink = page.locator('a[href*="/step"]').first();
-    await stepLink.click();
-    await page.waitForTimeout(2000);
-
-    // Syntax highlighting produces <code> elements with class containing language info or <pre>
+    const stepItem = page.locator('.ant-list-item').first();
+    await stepItem.click();
     const codeBlocks = page.locator('pre code, [class*="hljs"], [class*="prism"]');
     // Not all steps have code blocks, so just verify the page is functional
     const body = await page.textContent('body');
