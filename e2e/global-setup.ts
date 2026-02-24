@@ -57,7 +57,7 @@ async function waitForSync(ctx: ReturnType<typeof request.newContext> extends Pr
   while (Date.now() - start < timeoutMs) {
     const logsRes = await ctx.get(`${BASE_URL}/api/admin/repos/${repo.id}/sync-logs`);
     const logs = await logsRes.json();
-    if (logs.length > 0 && logs[0].status === 'completed') return true;
+    if (logs.length > 0 && logs[0].status === 'done') return true;
     if (logs.length > 0 && logs[0].status === 'failed') {
       console.log(`⚠️  Sync failed: ${logs[0].error}`);
       return false;
