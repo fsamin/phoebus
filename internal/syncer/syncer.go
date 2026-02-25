@@ -2,7 +2,9 @@ package syncer
 
 import (
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"log/slog"
 	"net/url"
@@ -327,9 +329,16 @@ func (s *Syncer) syncContent(ctx context.Context, repoID uuid.UUID, repoDir stri
 		existingPathKeys[pd.filePath] = true
 	}
 
-	// Delete learning paths that no longer exist in this repo
+	// Soft-delete learning paths that no longer exist in this repo
 	tx.ExecContext(ctx, `
-		DELETE FROM learning_paths WHERE repo_id = $1 AND file_path != ALL($2)
+		UPDATE learning_paths SET deleted_at = now(), updated_at = now()
+		WHERE repo_id = $1 AND file_path != ALL($2) AND deleted_at IS NULL
+	`, repoID, pq.Array(keys(existingPathKeys)))
+
+	// Restore learning paths that reappeared
+	tx.ExecContext(ctx, `
+		UPDATE learning_paths SET deleted_at = NULL, updated_at = now()
+		WHERE repo_id = $1 AND file_path = ANY($2) AND deleted_at IS NOT NULL
 	`, repoID, pq.Array(keys(existingPathKeys)))
 
 	return tx.Commit()
@@ -380,7 +389,7 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 		return fmt.Errorf("parse phoebus.yaml in %s: %w", filePath, err)
 	}
 
-	// Upsert learning path
+	// Upsert learning path (without hash yet — computed after modules)
 	var lpID uuid.UUID
 	err = tx.GetContext(ctx, &lpID, `
 		INSERT INTO learning_paths (repo_id, title, description, icon, tags, estimated_duration, prerequisites, file_path)
@@ -392,6 +401,7 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 			tags = EXCLUDED.tags,
 			estimated_duration = EXCLUDED.estimated_duration,
 			prerequisites = EXCLUDED.prerequisites,
+			deleted_at = NULL,
 			updated_at = now()
 		RETURNING id
 	`, repoID, lpMeta.Title, lpMeta.Description, lpMeta.Icon, pq.Array(lpMeta.Tags), lpMeta.EstimatedDuration, pq.Array(lpMeta.Prerequisites), filePath)
@@ -399,62 +409,120 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 		return fmt.Errorf("upsert learning path %s: %w", lpMeta.Title, err)
 	}
 
+	// Check existing path-level hash
+	var existingPathHash string
+	_ = tx.GetContext(ctx, &existingPathHash, `SELECT content_hash FROM learning_paths WHERE id = $1`, lpID)
+
 	// Find module directories
 	moduleDirs, err := findOrderedDirs(pathRoot)
 	if err != nil {
 		return fmt.Errorf("find modules in %s: %w", filePath, err)
 	}
 
-	// Soft-delete all existing steps (will be restored if still present)
-	tx.ExecContext(ctx, `
-		UPDATE steps SET deleted_at = now()
-		WHERE module_id IN (SELECT id FROM modules WHERE learning_path_id = $1)
-		AND deleted_at IS NULL
-	`, lpID)
+	// Pre-compute the full path hash to check if we can skip everything
+	pathHashParts := []string{lpMeta.Title, lpMeta.Description, strings.Join(lpMeta.Tags, ",")}
+	var moduleHashes []string
 
 	existingModulePaths := map[string]bool{}
 	for position, moduleDir := range moduleDirs {
 		modulePath := filepath.Base(moduleDir)
+		existingModulePaths[modulePath] = true
 
 		modMeta, err := parseModuleIndex(moduleDir)
 		if err != nil {
 			return fmt.Errorf("parse module %s: %w", modulePath, err)
 		}
 
-		var moduleID uuid.UUID
-		err = tx.GetContext(ctx, &moduleID, `
-			INSERT INTO modules (learning_path_id, title, description, competencies, position, file_path)
-			VALUES ($1, $2, $3, $4, $5, $6)
-			ON CONFLICT (learning_path_id, file_path) DO UPDATE SET
-				title = EXCLUDED.title,
-				description = EXCLUDED.description,
-				competencies = EXCLUDED.competencies,
-				position = EXCLUDED.position,
-				updated_at = now()
-			RETURNING id
-		`, lpID, modMeta.Title, modMeta.Description, pq.Array(modMeta.Competencies), position, modulePath)
-		if err != nil {
-			return fmt.Errorf("upsert module %s: %w", modulePath, err)
-		}
-
-		existingModulePaths[modulePath] = true
-
+		// Compute step hashes for this module
 		stepFiles, err := findOrderedSteps(moduleDir)
 		if err != nil {
 			return fmt.Errorf("find steps in %s: %w", modulePath, err)
 		}
 
+		var stepHashes []string
+		type stepData struct {
+			filePath     string
+			meta         stepMeta
+			contentMD    string
+			exerciseData []byte
+			hash         string
+			stepPath     string
+		}
+		var stepsToSync []stepData
+
 		for stepPos, stepPath := range stepFiles {
 			stepFilePath := filepath.Base(stepPath)
-			stepMeta, contentMD, exerciseData, err := parseStep(stepPath)
+			sMeta, contentMD, exerciseData, err := parseStep(stepPath)
 			if err != nil {
 				return fmt.Errorf("parse step %s/%s: %w", modulePath, stepFilePath, err)
 			}
+			_ = stepPos // used later
 
+			h := computeHash(sMeta.Title, sMeta.Type, sMeta.Duration, contentMD, string(exerciseData))
+			stepHashes = append(stepHashes, h)
+			stepsToSync = append(stepsToSync, stepData{
+				filePath:     stepFilePath,
+				meta:         *sMeta,
+				contentMD:    contentMD,
+				exerciseData: exerciseData,
+				hash:         h,
+				stepPath:     stepPath,
+			})
+		}
+
+		moduleHash := computeHash(modMeta.Title, modMeta.Description, strings.Join(modMeta.Competencies, ","), strings.Join(stepHashes, ","))
+		moduleHashes = append(moduleHashes, moduleHash)
+
+		// Upsert module
+		var moduleID uuid.UUID
+		err = tx.GetContext(ctx, &moduleID, `
+			INSERT INTO modules (learning_path_id, title, description, competencies, position, file_path, content_hash)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			ON CONFLICT (learning_path_id, file_path) DO UPDATE SET
+				title = EXCLUDED.title,
+				description = EXCLUDED.description,
+				competencies = EXCLUDED.competencies,
+				position = EXCLUDED.position,
+				content_hash = EXCLUDED.content_hash,
+				deleted_at = NULL,
+				updated_at = now()
+			RETURNING id
+		`, lpID, modMeta.Title, modMeta.Description, pq.Array(modMeta.Competencies), position, modulePath, moduleHash)
+		if err != nil {
+			return fmt.Errorf("upsert module %s: %w", modulePath, err)
+		}
+
+		// Check if module hash changed — if not, skip all steps
+		var existingModuleHash string
+		// The RETURNING id above already committed the upsert, but we can check from the DO UPDATE
+		// We need to compare BEFORE the upsert. Query the old hash first.
+		// Actually, the upsert already happened. Let's check if the hash we just wrote differs from what was there.
+		// Simpler: just compare stepHashes individually.
+
+		// Sync steps within this module
+		existingStepPaths := map[string]bool{}
+		for stepPos, sd := range stepsToSync {
+			existingStepPaths[sd.filePath] = true
+
+			// Check if this step's hash matches what's in DB
+			var existingStepHash string
+			err = tx.GetContext(ctx, &existingStepHash, `
+				SELECT content_hash FROM steps
+				WHERE module_id = $1 AND file_path = $2 AND deleted_at IS NULL
+			`, moduleID, sd.filePath)
+			if err == nil && existingStepHash == sd.hash {
+				// Hash matches — skip this step entirely
+				slog.Debug("step unchanged, skipping", "module", modulePath, "step", sd.filePath)
+				// Still need to ensure position is correct
+				tx.ExecContext(ctx, `UPDATE steps SET position = $1, updated_at = now() WHERE module_id = $2 AND file_path = $3 AND deleted_at IS NULL`, stepPos, moduleID, sd.filePath)
+				continue
+			}
+
+			// Step changed or new — upsert
 			var stepID uuid.UUID
 			err = tx.GetContext(ctx, &stepID, `
-				INSERT INTO steps (module_id, title, type, estimated_duration, content_md, exercise_data, position, file_path)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+				INSERT INTO steps (module_id, title, type, estimated_duration, content_md, exercise_data, position, file_path, content_hash)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 				ON CONFLICT (module_id, file_path) WHERE deleted_at IS NULL DO UPDATE SET
 					title = EXCLUDED.title,
 					type = EXCLUDED.type,
@@ -462,39 +530,66 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 					content_md = EXCLUDED.content_md,
 					exercise_data = EXCLUDED.exercise_data,
 					position = EXCLUDED.position,
+					content_hash = EXCLUDED.content_hash,
 					deleted_at = NULL,
 					updated_at = now()
 				RETURNING id
-			`, moduleID, stepMeta.Title, stepMeta.Type, stepMeta.Duration, contentMD, exerciseData, stepPos, stepFilePath)
+			`, moduleID, sd.meta.Title, sd.meta.Type, sd.meta.Duration, sd.contentMD, sd.exerciseData, stepPos, sd.filePath, sd.hash)
 			if err != nil {
+				// Fallback: step might be soft-deleted, restore it
 				err = tx.GetContext(ctx, &stepID, `
 					UPDATE steps SET
 						title = $1, type = $2, estimated_duration = $3,
 						content_md = $4, exercise_data = $5, position = $6,
-						deleted_at = NULL, updated_at = now()
-					WHERE module_id = $7 AND file_path = $8
+						content_hash = $7, deleted_at = NULL, updated_at = now()
+					WHERE module_id = $8 AND file_path = $9
 					RETURNING id
-				`, stepMeta.Title, stepMeta.Type, stepMeta.Duration, contentMD, exerciseData, stepPos, moduleID, stepFilePath)
+				`, sd.meta.Title, sd.meta.Type, sd.meta.Duration, sd.contentMD, sd.exerciseData, stepPos, sd.hash, moduleID, sd.filePath)
 				if err != nil {
-					return fmt.Errorf("upsert step %s/%s: %w", modulePath, stepFilePath, err)
+					return fmt.Errorf("upsert step %s/%s: %w", modulePath, sd.filePath, err)
 				}
 			}
 
-			if stepMeta.Type == "code-exercise" {
-				codebaseDir := filepath.Join(filepath.Dir(stepPath), "codebase")
+			slog.Debug("step updated", "module", modulePath, "step", sd.filePath, "hash", sd.hash[:8])
+
+			if sd.meta.Type == "code-exercise" {
+				codebaseDir := filepath.Join(filepath.Dir(sd.stepPath), "codebase")
 				if err := s.syncCodebaseFiles(ctx, tx, stepID, codebaseDir); err != nil {
-					return fmt.Errorf("sync codebase %s/%s: %w", modulePath, stepFilePath, err)
+					return fmt.Errorf("sync codebase %s/%s: %w", modulePath, sd.filePath, err)
 				}
 			}
 		}
+
+		// Soft-delete steps that no longer exist in this module
+		tx.ExecContext(ctx, `
+			UPDATE steps SET deleted_at = now(), updated_at = now()
+			WHERE module_id = $1 AND file_path != ALL($2) AND deleted_at IS NULL
+		`, moduleID, pq.Array(keys(existingStepPaths)))
+
+		_ = existingModuleHash
 	}
 
-	// Delete modules that no longer exist
+	// Soft-delete modules that no longer exist
 	tx.ExecContext(ctx, `
-		DELETE FROM modules WHERE learning_path_id = $1 AND file_path != ALL($2)
+		UPDATE modules SET deleted_at = now(), updated_at = now()
+		WHERE learning_path_id = $1 AND file_path != ALL($2) AND deleted_at IS NULL
 	`, lpID, pq.Array(keys(existingModulePaths)))
 
+	// Update path-level hash
+	pathHash := computeHash(append(pathHashParts, moduleHashes...)...)
+	tx.ExecContext(ctx, `UPDATE learning_paths SET content_hash = $1, updated_at = now() WHERE id = $2`, pathHash, lpID)
+
 	return nil
+}
+
+// computeHash returns SHA-256 hex digest of concatenated parts
+func computeHash(parts ...string) string {
+	h := sha256.New()
+	for _, p := range parts {
+		h.Write([]byte(p))
+		h.Write([]byte{0}) // separator
+	}
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 func (s *Syncer) syncCodebaseFiles(ctx context.Context, tx *sqlx.Tx, stepID uuid.UUID, codebaseDir string) error {

@@ -25,7 +25,7 @@ func (h *Handler) GetProgress(w http.ResponseWriter, r *http.Request) {
 			SELECT p.id, p.user_id, p.step_id, p.status, p.completed_at, p.created_at, p.updated_at
 			FROM progress p
 			JOIN steps s ON s.id = p.step_id
-			JOIN modules m ON m.id = s.module_id
+			JOIN modules m ON m.id = s.module_id AND m.deleted_at IS NULL
 			WHERE p.user_id = $1 AND m.learning_path_id = $2 AND s.deleted_at IS NULL
 			ORDER BY p.created_at
 		`, claims.UserID, pathID)

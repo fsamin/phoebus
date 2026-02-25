@@ -24,8 +24,9 @@ func (h *Handler) ListLearningPaths(w http.ResponseWriter, r *http.Request) {
 		       COUNT(DISTINCT m.id) AS module_count,
 		       COUNT(DISTINCT s.id) AS step_count
 		FROM learning_paths lp
-		LEFT JOIN modules m ON m.learning_path_id = lp.id
+		LEFT JOIN modules m ON m.learning_path_id = lp.id AND m.deleted_at IS NULL
 		LEFT JOIN steps s ON s.module_id = m.id AND s.deleted_at IS NULL
+		WHERE lp.deleted_at IS NULL
 		GROUP BY lp.id
 		ORDER BY lp.title
 	`)
@@ -51,11 +52,11 @@ func (h *Handler) ListLearningPaths(w http.ResponseWriter, r *http.Request) {
 			       COUNT(DISTINCT s.id) AS total,
 			       COUNT(DISTINCT CASE WHEN p.status = 'completed' THEN s.id END) AS completed
 			FROM steps s
-			JOIN modules m ON m.id = s.module_id
+			JOIN modules m ON m.id = s.module_id AND m.deleted_at IS NULL
 			LEFT JOIN progress p ON p.step_id = s.id AND p.user_id = $1
 			WHERE s.deleted_at IS NULL AND EXISTS (
 				SELECT 1 FROM progress p2 JOIN steps s2 ON s2.id = p2.step_id
-				JOIN modules m2 ON m2.id = s2.module_id
+				JOIN modules m2 ON m2.id = s2.module_id AND m2.deleted_at IS NULL
 				WHERE p2.user_id = $1 AND m2.learning_path_id = m.learning_path_id
 			)
 			GROUP BY m.learning_path_id
@@ -106,7 +107,7 @@ func (h *Handler) GetLearningPath(w http.ResponseWriter, r *http.Request) {
 	var lp model.LearningPath
 	err := h.db.GetContext(r.Context(), &lp, `
 		SELECT id, repo_id, title, description, icon, tags, estimated_duration, prerequisites, created_at, updated_at
-		FROM learning_paths WHERE id = $1
+		FROM learning_paths WHERE id = $1 AND deleted_at IS NULL
 	`, pathID)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "learning path not found"})
@@ -116,7 +117,7 @@ func (h *Handler) GetLearningPath(w http.ResponseWriter, r *http.Request) {
 	var modules []model.Module
 	err = h.db.SelectContext(r.Context(), &modules, `
 		SELECT id, learning_path_id, title, description, competencies, position, file_path, created_at, updated_at
-		FROM modules WHERE learning_path_id = $1
+		FROM modules WHERE learning_path_id = $1 AND deleted_at IS NULL
 		ORDER BY position
 	`, pathID)
 	if err != nil {

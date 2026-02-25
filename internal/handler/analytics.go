@@ -31,7 +31,7 @@ func (h *Handler) AnalyticsOverview(w http.ResponseWriter, r *http.Request) {
 	var overview analyticsOverview
 
 	// Total learning paths
-	h.db.GetContext(ctx, &overview.TotalPaths, `SELECT COUNT(*) FROM learning_paths`)
+	h.db.GetContext(ctx, &overview.TotalPaths, `SELECT COUNT(*) FROM learning_paths WHERE deleted_at IS NULL`)
 
 	// Total learners (users with at least one progress record)
 	h.db.GetContext(ctx, &overview.TotalLearners, `SELECT COUNT(DISTINCT user_id) FROM progress`)
@@ -52,14 +52,15 @@ func (h *Handler) AnalyticsOverview(w http.ResponseWriter, r *http.Request) {
 		WITH path_steps AS (
 			SELECT lp.id AS path_id, lp.title, COUNT(s.id) AS total_steps
 			FROM learning_paths lp
-			LEFT JOIN modules m ON m.learning_path_id = lp.id
+			LEFT JOIN modules m ON m.learning_path_id = lp.id AND m.deleted_at IS NULL
 			LEFT JOIN steps s ON s.module_id = m.id AND s.deleted_at IS NULL
+			WHERE lp.deleted_at IS NULL
 			GROUP BY lp.id, lp.title
 		),
 		path_enrollment AS (
 			SELECT ps.path_id, COUNT(DISTINCT p.user_id) AS enrolled_count
 			FROM path_steps ps
-			LEFT JOIN modules m ON m.learning_path_id = ps.path_id
+			LEFT JOIN modules m ON m.learning_path_id = ps.path_id AND m.deleted_at IS NULL
 			LEFT JOIN steps s ON s.module_id = m.id AND s.deleted_at IS NULL
 			LEFT JOIN progress p ON p.step_id = s.id
 			GROUP BY ps.path_id
@@ -70,7 +71,7 @@ func (h *Handler) AnalyticsOverview(w http.ResponseWriter, r *http.Request) {
 			       ELSE COALESCE(
 			           (SELECT COUNT(*)::float FROM progress pr
 			            JOIN steps s2 ON s2.id = pr.step_id AND s2.deleted_at IS NULL
-			            JOIN modules m2 ON m2.id = s2.module_id AND m2.learning_path_id = ps.path_id
+			            JOIN modules m2 ON m2.id = s2.module_id AND m2.learning_path_id = ps.path_id AND m2.deleted_at IS NULL
 			            WHERE pr.status = 'completed')
 			           / NULLIF(ps.total_steps * NULLIF(pe.enrolled_count, 0), 0) * 100, 0)
 			       END AS completion_rate
@@ -116,8 +117,8 @@ func (h *Handler) AnalyticsActivity(w http.ResponseWriter, r *http.Request) {
 		FROM progress p
 		JOIN users u ON u.id = p.user_id
 		JOIN steps s ON s.id = p.step_id
-		JOIN modules m ON m.id = s.module_id
-		JOIN learning_paths lp ON lp.id = m.learning_path_id
+		JOIN modules m ON m.id = s.module_id AND m.deleted_at IS NULL
+		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL
 		ORDER BY p.updated_at DESC
 		LIMIT $1
 	`, limit)
@@ -162,7 +163,7 @@ func (h *Handler) AnalyticsPath(w http.ResponseWriter, r *http.Request) {
 	// Get path info
 	var detail pathAnalyticsDetail
 	var title string
-	err := h.db.GetContext(ctx, &title, `SELECT title FROM learning_paths WHERE id = $1`, pathID)
+	err := h.db.GetContext(ctx, &title, `SELECT title FROM learning_paths WHERE id = $1 AND deleted_at IS NULL`, pathID)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "path not found"})
 		return
@@ -175,7 +176,7 @@ func (h *Handler) AnalyticsPath(w http.ResponseWriter, r *http.Request) {
 		SELECT COUNT(DISTINCT p.user_id)
 		FROM progress p
 		JOIN steps s ON s.id = p.step_id AND s.deleted_at IS NULL
-		JOIN modules m ON m.id = s.module_id AND m.learning_path_id = $1
+		JOIN modules m ON m.id = s.module_id AND m.learning_path_id = $1 AND m.deleted_at IS NULL
 	`, pathID)
 
 	// Per-step analytics
@@ -190,7 +191,7 @@ func (h *Handler) AnalyticsPath(w http.ResponseWriter, r *http.Request) {
 	h.db.SelectContext(ctx, &steps, `
 		SELECT s.id, s.title, s.type, s.position, m.position AS module_pos
 		FROM steps s
-		JOIN modules m ON m.id = s.module_id AND m.learning_path_id = $1
+		JOIN modules m ON m.id = s.module_id AND m.learning_path_id = $1 AND m.deleted_at IS NULL
 		WHERE s.deleted_at IS NULL
 		ORDER BY m.position, s.position
 	`, pathID)
@@ -236,7 +237,7 @@ func (h *Handler) AnalyticsPath(w http.ResponseWriter, r *http.Request) {
 			SELECT COUNT(*)
 			FROM progress p
 			JOIN steps s ON s.id = p.step_id AND s.deleted_at IS NULL
-			JOIN modules m ON m.id = s.module_id AND m.learning_path_id = $1
+			JOIN modules m ON m.id = s.module_id AND m.learning_path_id = $1 AND m.deleted_at IS NULL
 			WHERE p.status = 'completed'
 		`, pathID)
 		detail.CompletionRate = float64(totalCompleted) / float64(totalSteps*detail.EnrolledCount) * 100
@@ -251,7 +252,7 @@ func (h *Handler) AnalyticsPath(w http.ResponseWriter, r *http.Request) {
 		FROM progress p
 		JOIN users u ON u.id = p.user_id
 		JOIN steps s ON s.id = p.step_id AND s.deleted_at IS NULL
-		JOIN modules m ON m.id = s.module_id AND m.learning_path_id = $1
+		JOIN modules m ON m.id = s.module_id AND m.learning_path_id = $1 AND m.deleted_at IS NULL
 		GROUP BY p.user_id, u.username, u.display_name
 		ORDER BY u.username
 	`, pathID)
@@ -368,8 +369,8 @@ func (h *Handler) AnalyticsLearner(w http.ResponseWriter, r *http.Request) {
 		       COUNT(*) AS total
 		FROM progress p
 		JOIN steps s ON s.id = p.step_id AND s.deleted_at IS NULL
-		JOIN modules m ON m.id = s.module_id
-		JOIN learning_paths lp ON lp.id = m.learning_path_id
+		JOIN modules m ON m.id = s.module_id AND m.deleted_at IS NULL
+		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL
 		WHERE p.user_id = $1
 		GROUP BY lp.id, lp.title
 		ORDER BY lp.title
@@ -380,7 +381,7 @@ func (h *Handler) AnalyticsLearner(w http.ResponseWriter, r *http.Request) {
 		var totalSteps int
 		h.db.GetContext(ctx, &totalSteps, `
 			SELECT COUNT(s.id) FROM steps s
-			JOIN modules m ON m.id = s.module_id AND m.learning_path_id = $1
+			JOIN modules m ON m.id = s.module_id AND m.learning_path_id = $1 AND m.deleted_at IS NULL
 			WHERE s.deleted_at IS NULL
 		`, ep.PathID)
 		if totalSteps > 0 {
@@ -397,8 +398,8 @@ func (h *Handler) AnalyticsLearner(w http.ResponseWriter, r *http.Request) {
 		       p.status AS event, p.updated_at AS timestamp
 		FROM progress p
 		JOIN steps s ON s.id = p.step_id
-		JOIN modules m ON m.id = s.module_id
-		JOIN learning_paths lp ON lp.id = m.learning_path_id
+		JOIN modules m ON m.id = s.module_id AND m.deleted_at IS NULL
+		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL
 		WHERE p.user_id = $1
 		ORDER BY p.updated_at DESC
 		LIMIT 50
