@@ -31,6 +31,12 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
   const [completed, setCompleted] = useState(false);
   const [disabledCommands, setDisabledCommands] = useState<Set<string>>(new Set());
   const terminalEndRef = useRef<HTMLDivElement>(null);
+  const terminalRef = useRef<HTMLDivElement>(null);
+
+  // Auto-focus terminal on mount so keyboard works immediately
+  useEffect(() => {
+    terminalRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -117,6 +123,7 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
 
       {/* Terminal */}
       <div
+        ref={terminalRef}
         onKeyDown={handleKeyDown}
         tabIndex={0}
         style={{
