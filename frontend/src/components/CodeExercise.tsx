@@ -164,6 +164,16 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
   const affectedFiles = useMemo(() => selectedPatchObj?.diff ? getAffectedFiles(selectedPatchObj.diff) : [], [selectedPatchObj?.diff]);
   const showDiffEditor = phase === 'fix' && !!selectedPatch && !!diffData && diffData.has(selectedFile);
 
+  // Keep stable DiffEditor props — only update when diff is actively shown
+  // This prevents @monaco-editor/react from disposing models when props go empty
+  const stableDiffRef = useRef<{ original: string; modified: string; language: string }>({ original: '', modified: '', language: 'plaintext' });
+  if (showDiffEditor && diffData) {
+    const d = diffData.get(selectedFile);
+    if (d) {
+      stableDiffRef.current = { original: d.original, modified: d.modified, language: getLanguage(selectedFile) };
+    }
+  }
+
   // Auto-navigate to first affected file when a patch is selected
   useEffect(() => {
     if (affectedFiles.length > 0 && selectedPatch) {
@@ -348,9 +358,9 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
             {diffEditorMounted && (
               <DiffEditor
                 height="100%"
-                language={getLanguage(selectedFile)}
-                original={diffData?.get(selectedFile)?.original ?? ''}
-                modified={diffData?.get(selectedFile)?.modified ?? ''}
+                language={stableDiffRef.current.language}
+                original={stableDiffRef.current.original}
+                modified={stableDiffRef.current.modified}
                 theme={isDark ? 'vs-dark' : 'vs'}
                 onMount={(editor) => { diffEditorRef.current = editor; }}
                 options={{
