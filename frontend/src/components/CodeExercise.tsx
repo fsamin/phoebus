@@ -235,8 +235,8 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
       setFeedback(result);
       setBottomPanelHeight((h) => Math.max(h, 220));
       if (result.is_correct) {
-        setSelectedPatch(''); // Clear patch first to unmount DiffEditor cleanly
-        setCompleted(true);
+        setSelectedPatch(''); // Unmount DiffEditor first
+        setTimeout(() => setCompleted(true), 50); // Then complete after DiffEditor cleanup
       } else {
         setDisabledPatches((prev) => new Set([...prev, selectedPatch]));
         setSelectedPatch('');
