@@ -135,6 +135,7 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
           overflow: 'hidden',
           border: '1px solid var(--color-terminal-border)',
           boxShadow: 'var(--terminal-shadow)',
+          outline: 'none',
         }}
       >
         {/* Title bar */}
