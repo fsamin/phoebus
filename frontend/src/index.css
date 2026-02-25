@@ -190,3 +190,63 @@ body {
   border-color: var(--color-ide-disabled-border) !important;
 }
 
+/* ── Markdown code blocks ── */
+.markdown-body pre {
+  background: #f6f8fa;
+  border-radius: 8px;
+  padding: 16px 20px;
+  overflow-x: auto;
+  border: 1px solid #e1e4e8;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.markdown-body pre code {
+  background: transparent !important;
+  padding: 0 !important;
+  border: none !important;
+}
+.markdown-body :not(pre) > code {
+  background: #eff1f3;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 0.9em;
+  color: #d63384;
+}
+
+/* Dark theme: code block colors (override github.css) */
+[data-theme="dark"] .markdown-body pre {
+  background: #1c1c1c;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+[data-theme="dark"] .markdown-body pre code.hljs {
+  background: transparent !important;
+  color: #adbac7 !important;
+}
+[data-theme="dark"] .hljs-keyword,
+[data-theme="dark"] .hljs-selector-tag,
+[data-theme="dark"] .hljs-literal { color: #f47067 !important; }
+[data-theme="dark"] .hljs-string,
+[data-theme="dark"] .hljs-addition { color: #96d0ff !important; }
+[data-theme="dark"] .hljs-comment,
+[data-theme="dark"] .hljs-quote { color: #768390 !important; }
+[data-theme="dark"] .hljs-number,
+[data-theme="dark"] .hljs-regexp { color: #6cb6ff !important; }
+[data-theme="dark"] .hljs-title,
+[data-theme="dark"] .hljs-function { color: #dcbdfb !important; }
+[data-theme="dark"] .hljs-built_in,
+[data-theme="dark"] .hljs-type { color: #f69d50 !important; }
+[data-theme="dark"] .hljs-attr,
+[data-theme="dark"] .hljs-variable,
+[data-theme="dark"] .hljs-name { color: #6cb6ff !important; }
+[data-theme="dark"] .hljs-symbol,
+[data-theme="dark"] .hljs-bullet { color: #f69d50 !important; }
+[data-theme="dark"] .hljs-meta { color: #768390 !important; }
+[data-theme="dark"] .hljs-deletion { color: #ff938a !important; background: rgba(255, 129, 130, 0.1) !important; }
+[data-theme="dark"] .hljs-addition { background: rgba(87, 171, 90, 0.1) !important; }
+[data-theme="dark"] .markdown-body :not(pre) > code {
+  background: #2d2d2d;
+  color: #ff9a6c;
+}
+
