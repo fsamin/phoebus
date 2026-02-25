@@ -93,11 +93,11 @@
   --color-terminal-border: rgba(255, 255, 255, 0.08);
   --color-terminal-titlebar: rgba(255, 255, 255, 0.05);
   --color-terminal-muted: rgba(255, 255, 255, 0.4);
-  --color-terminal-prompt: #6ec6ff;
+  --color-terminal-prompt: #ff9a6c;
   --color-terminal-separator: rgba(255, 255, 255, 0.1);
-  --color-terminal-selection: rgba(110, 198, 255, 0.15);
+  --color-terminal-selection: rgba(255, 122, 69, 0.15);
   --color-terminal-hover: rgba(255, 255, 255, 0.07);
-  --color-terminal-cmd-suggestion: #80d8ff;
+  --color-terminal-cmd-suggestion: #ffb899;
   --terminal-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
 
   --color-text-primary: rgba(255, 255, 255, 0.87);
