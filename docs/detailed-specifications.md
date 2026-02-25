@@ -386,53 +386,53 @@ No exercise data to extract. The Markdown body is stored in `content_md` as-is.
 **UI Layout:**
 
 ```
-┌──────────────────────────────────────────────────────┐
-│ ● Set Up a Local Cluster                    Step 1/3 │
-├──────────────────────────────────────────────────────┤
-│                                                      │
-│  You are logged into a fresh Ubuntu 22.04 server.    │
-│  You need to install the container runtime first.    │
-│                                                      │
-│  ┌────────────────────────────────────────────────┐  │
-│  │ $ ▌                                            │  │
-│  └────────────────────────────────────────────────┘  │
-│                                                      │
-│  Choose the correct command:                         │
-│                                                      │
-│  ┌────────────────────────────────────────────────┐  │
-│  │ ○  apt install docker.io                       │  │
-│  │ ○  apt install containerd                      │  │
-│  │ ○  snap install microk8s                       │  │
-│  └────────────────────────────────────────────────┘  │
-│                                                      │
-│                          [Submit]                     │
-└──────────────────────────────────────────────────────┘
+  You are logged into a fresh Ubuntu 22.04 server.
+  You need to install the container runtime first.
+
+  [Step 1/3]
+
+  ┌─── ● ● ● ──────────── Terminal Exercise ───┐
+  │                                             │
+  │  ~ › apt update                             │
+  │  Hit:1 http://archive.ubuntu.com/ubuntu ... │
+  │                                             │
+  │  ~ › ▌                                      │
+  │                                             │
+  │  ─── Select a command: ─────────────────    │
+  │                                             │
+  │    $ apt install docker.io                  │
+  │    $ apt install containerd                 │
+  │    $ snap install microk8s                  │
+  │                                             │
+  └─────────────────────────────────────────────┘
 ```
 
 **UI Elements:**
-- Header: exercise title + step counter (Step N/M)
-- Context area: introduction text + per-step context text (Markdown-rendered)
-- Prompt area: styled as a terminal (monospace font, dark background). The prompt area renders the instructor-defined `` ```console `` block content as-is. The instructor writes realistic prompts (`root@k8s-master:~# ▌` or `$ ▌`) depending on the scenario context — the prompt is part of the pedagogical exercise
-- Command proposals: radio button list (single selection)
-- Submit button: validates the selected command
+- Context area: introduction text + per-step context text (Markdown-rendered), displayed **above** the terminal
+- Step counter: badge showing current step (Step N/M), displayed above the terminal
+- Immersive terminal window: dark background, monospace font, macOS-style title bar with traffic-light dots
+  - Command history: previous steps' commands and outputs scroll upward
+  - Active prompt line: `~ ›` prefix with blinking cursor `▌`; when a command is selected, it appears on the prompt line
+  - Command suggestions: displayed inside the terminal below a thin separator, styled as clickable items prefixed with `$`; the selected command is highlighted in blue with a "press Enter ⏎" hint; incorrect commands are struck-through and grayed out
+  - Feedback: success (green ✓) and error messages (red ✗ with explanation) appear inline in the terminal
+- Validation: clicking a suggestion fills the prompt; pressing Enter submits the command (no separate Submit button)
 
 ### 4.2 Step-by-Step Flow
 
 **Behavior:**
 
-1. Exercise loads with Step 1 displayed
-2. Learner reads the context and selects a command
-3. On submit:
+1. Exercise loads with Step 1 displayed; context text appears above the terminal
+2. Learner clicks a command suggestion inside the terminal; the command appears on the active prompt line
+3. Learner presses Enter (keyboard) or the suggestion is submitted on click:
    - **Correct**: 
-     - The selected command is appended to the prompt area (typed in)
-     - The simulated output is displayed below the prompt (terminal-style)
-     - A brief success indicator is shown (green check, "Correct!")
-     - After a short delay (or user click), the exercise advances to the next step
-     - The prompt area accumulates: previous commands and outputs remain visible (scroll up)
+     - A green "Correct!" message appears inline in the terminal
+     - After a short delay, the command and its simulated output are added to the terminal history
+     - The exercise advances to the next step; the terminal scrolls down
+     - Previous commands and outputs remain visible (scrollable history)
    - **Incorrect**:
-     - The explanation for the incorrect choice is displayed (inline, below the proposals)
-     - The incorrect choice is visually marked (red, strike-through) and disabled
-     - The learner selects another command and re-submits
+     - The explanation for the incorrect choice is displayed inline in the terminal (red)
+     - The incorrect suggestion is struck-through, grayed out, and disabled
+     - The prompt is cleared; the learner selects another command
      - Number of retries is unlimited
 4. When the last step is answered correctly:
    - The exercise is marked as completed
