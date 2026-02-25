@@ -6,10 +6,29 @@ import remarkDirective from 'remark-directive';
 import remarkDirectiveRehype from 'remark-directive-rehype';
 import rehypeHighlight from 'rehype-highlight';
 import rehypeRaw from 'rehype-raw';
+import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
+import DOMPurify from 'dompurify';
 import mermaid from 'mermaid';
 import 'highlight.js/styles/github.css';
 
-mermaid.initialize({ startOnLoad: false, theme: 'default' });
+mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'strict' });
+
+// Sanitization schema: extend default to allow hljs classes and admonition directives
+const sanitizeSchema = {
+  ...defaultSchema,
+  attributes: {
+    ...defaultSchema.attributes,
+    // Allow className on all elements (needed for hljs, admonitions, mermaid code blocks)
+    '*': [...(defaultSchema.attributes?.['*'] || []), 'className'],
+    code: [...(defaultSchema.attributes?.['code'] || []), 'className'],
+    span: [...(defaultSchema.attributes?.['span'] || []), 'className'],
+    div: [...(defaultSchema.attributes?.['div'] || []), 'className'],
+  },
+  // Block dangerous tags (script, style, iframe, object, embed, form)
+  tagNames: (defaultSchema.tagNames || []).filter(
+    (tag: string) => !['script', 'style', 'iframe', 'object', 'embed', 'form', 'textarea'].includes(tag)
+  ),
+};
 
 interface MarkdownRendererProps {
   content: string;
@@ -63,7 +82,11 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
       const id = `mermaid-${Date.now()}-${i}`;
       try {
         const { svg } = await mermaid.render(id, block.textContent || '');
-        parent.outerHTML = `<div class="mermaid-diagram">${svg}</div>`;
+        const sanitizedSvg = DOMPurify.sanitize(svg, { USE_PROFILES: { svg: true, svgFilters: true }, ADD_TAGS: ['foreignObject'] });
+        const wrapper = document.createElement('div');
+        wrapper.className = 'mermaid-diagram';
+        wrapper.innerHTML = sanitizedSvg;
+        parent.replaceWith(wrapper);
       } catch {
         // leave code block as-is if rendering fails
       }
@@ -74,7 +97,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
     <div className="markdown-body" ref={containerRef}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkDirective, remarkDirectiveRehype]}
-        rehypePlugins={[rehypeHighlight, rehypeRaw]}
+        rehypePlugins={[rehypeHighlight, rehypeRaw, [rehypeSanitize, sanitizeSchema]]}
         components={components}
       >
         {content}
