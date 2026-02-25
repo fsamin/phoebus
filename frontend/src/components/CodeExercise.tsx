@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Button, Alert, Typography, Tag, Tree } from 'antd';
-import { FileOutlined, FolderOutlined, CheckCircleFilled, BugFilled, CloseCircleFilled, DiffOutlined } from '@ant-design/icons';
+import { FileOutlined, FolderOutlined, CheckCircleFilled, BugFilled, CloseCircleFilled, DiffOutlined, ArrowLeftOutlined, ArrowRightOutlined, ReloadOutlined } from '@ant-design/icons';
 import Editor, { DiffEditor } from '@monaco-editor/react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { useTheme } from '../contexts/ThemeContext';
@@ -20,6 +20,12 @@ interface CodeExerciseProps {
   patches: Patch[];
   codebaseFiles: CodebaseFile[];
   onSubmit: (body: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  onNext?: () => void;
+  onBack?: () => void;
+  onOverview?: () => void;
+  nextLabel?: string;
+  prevLabel?: string;
+  onReset?: () => void;
 }
 
 // Map file extensions to Monaco language IDs
@@ -129,7 +135,7 @@ function getAffectedFiles(diff: string): string[] {
   return paths;
 }
 
-const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, patches, codebaseFiles, onSubmit }) => {
+const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, patches, codebaseFiles, onSubmit, onNext, onBack, onOverview, nextLabel, prevLabel, onReset }) => {
   const { isDark } = useTheme();
   const [selectedFile, setSelectedFile] = useState(target?.file || codebaseFiles[0]?.file_path || '');
   const [selectedLines, setSelectedLines] = useState<number[]>([]);
@@ -374,12 +380,33 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
       }}>
         {completed ? (
           <div>
-            <Alert message="Exercise complete!" type="success" showIcon style={{ marginBottom: 8 }} />
+            <Alert message="Exercise complete!" type="success" showIcon style={{ marginBottom: 12 }} />
             {typeof feedback?.explanation === 'string' && (
-              <div style={{ background: 'var(--color-bg-ide-secondary)', padding: 12, borderRadius: 4 }}>
+              <div style={{ background: 'var(--color-bg-ide-secondary)', padding: 12, borderRadius: 4, marginBottom: 12 }}>
                 <MarkdownRenderer content={feedback.explanation} />
               </div>
             )}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: 8, borderTop: '1px solid var(--color-border-ide)' }}>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {onBack && (
+                  <Button icon={<ArrowLeftOutlined />} onClick={onBack}>
+                    {prevLabel || 'Previous'}
+                  </Button>
+                )}
+                {onReset && (
+                  <Button icon={<ReloadOutlined />} onClick={onReset}>Reset</Button>
+                )}
+              </div>
+              {onNext ? (
+                <Button type="primary" onClick={onNext}>
+                  {nextLabel || 'Next'} <ArrowRightOutlined />
+                </Button>
+              ) : onOverview ? (
+                <Button type="primary" onClick={onOverview}>
+                  Back to Overview <ArrowRightOutlined />
+                </Button>
+              ) : null}
+            </div>
           </div>
         ) : phase === 'identify' ? (
           <div>

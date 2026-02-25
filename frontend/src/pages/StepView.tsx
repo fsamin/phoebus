@@ -200,6 +200,12 @@ const StepView: React.FC = () => {
             patches={(exerciseData.patches as Record<string, unknown>[]).map((p) => p as any)}
             codebaseFiles={step.codebase_files || []}
             onSubmit={handleSubmitAttempt}
+            onNext={nextStep ? () => navigate(`/paths/${pathId}/steps/${nextStep.id}`) : undefined}
+            onBack={prevStep ? () => navigate(`/paths/${pathId}/steps/${prevStep.id}`) : undefined}
+            onOverview={() => navigate(`/paths/${pathId}`)}
+            nextLabel={nextStep?.title}
+            prevLabel={prevStep?.title}
+            onReset={handleReset}
           />
         ) : (
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
