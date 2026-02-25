@@ -114,6 +114,7 @@ func (h *Handler) UpdateProgress(w http.ResponseWriter, r *http.Request) {
 			ON CONFLICT (user_id, step_id)
 			DO UPDATE SET status = 'completed', completed_at = $3, updated_at = now()
 		`, claims.UserID, stepID, now)
+		stepsCompletedTotal.Inc()
 
 	default:
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "status must be 'in_progress' or 'completed'"})
@@ -288,6 +289,13 @@ func (h *Handler) SubmitAttempt(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Metrics
+	correctLabel := "false"
+	if result.isCorrect {
+		correctLabel = "true"
+	}
+	exerciseAttemptsTotal.WithLabelValues(string(step.Type), correctLabel).Inc()
+
 	// If correct and this completes the exercise, check completion
 	if result.shouldComplete {
 		now := time.Now()
@@ -297,6 +305,7 @@ func (h *Handler) SubmitAttempt(w http.ResponseWriter, r *http.Request) {
 			ON CONFLICT (user_id, step_id)
 			DO UPDATE SET status = 'completed', completed_at = $3, updated_at = now()
 		`, claims.UserID, step.ID, now)
+		stepsCompletedTotal.Inc()
 	}
 
 	writeJSON(w, http.StatusOK, result.response)

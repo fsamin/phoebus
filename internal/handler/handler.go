@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -31,12 +32,18 @@ func New(db *sqlx.DB, cfg *config.Config, s *syncer.Syncer, sshPublicKey string)
 }
 
 func (h *Handler) RegisterRoutes(r chi.Router) {
-	// Latency tracking middleware
+	// Latency & metrics tracking middleware
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			start := time.Now()
-			next.ServeHTTP(w, req)
-			latencyTracker.Record(time.Since(start))
+			sr := &statusRecorder{ResponseWriter: w, statusCode: 200}
+			next.ServeHTTP(sr, req)
+			duration := time.Since(start)
+			latencyTracker.Record(duration)
+
+			path := normalizePath(req.URL.Path)
+			httpRequestsTotal.WithLabelValues(req.Method, path, fmt.Sprintf("%d", sr.statusCode)).Inc()
+			httpRequestDuration.WithLabelValues(req.Method, path).Observe(duration.Seconds())
 		})
 	})
 
@@ -119,6 +126,9 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 			r.Get("/api/admin/ssh-public-key", h.SSHPublicKey)
 		})
 	})
+
+	// Start background gauge updater
+	go h.updateGauges()
 }
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {

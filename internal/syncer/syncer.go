@@ -128,6 +128,7 @@ func (s *Syncer) pickAndProcess(ctx context.Context) bool {
 // processJob clones the repo, parses content, and updates the database.
 func (s *Syncer) processJob(ctx context.Context, jobID, repoID uuid.UUID) {
 	logger := slog.With("repo_id", repoID, "job_id", jobID)
+	syncStart := time.Now()
 
 	// Fetch repo details
 	var repo struct {
@@ -204,10 +205,13 @@ func (s *Syncer) processJob(ctx context.Context, jobID, repoID uuid.UUID) {
 		UPDATE sync_jobs SET status = 'done', completed_at = now(), updated_at = now() WHERE id = $1
 	`, jobID)
 
+	syncJobsTotal.WithLabelValues("done").Inc()
+	syncDuration.Observe(time.Since(syncStart).Seconds())
 	logger.Info("sync completed successfully")
 }
 
 func (s *Syncer) failJob(ctx context.Context, jobID, repoID uuid.UUID, syncErr error) {
+	syncJobsTotal.WithLabelValues("failed").Inc()
 	errMsg := syncErr.Error()
 	s.db.ExecContext(ctx, `
 		UPDATE git_repositories SET sync_status = 'error', sync_error = $1, updated_at = now() WHERE id = $2
