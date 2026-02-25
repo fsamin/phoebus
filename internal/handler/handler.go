@@ -49,10 +49,11 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 			w.Header().Set("X-XSS-Protection", "0") // Modern browsers use CSP instead
 			w.Header().Set("Content-Security-Policy",
 				"default-src 'self'; "+
-					"script-src 'self'; "+
+					"script-src 'self' blob:; "+ // blob: needed for Monaco Editor web workers
+					"worker-src 'self' blob:; "+
 					"style-src 'self' 'unsafe-inline'; "+ // Ant Design uses inline styles
 					"img-src 'self' data:; "+
-					"font-src 'self'; "+
+					"font-src 'self' data:; "+
 					"connect-src 'self'; "+
 					"frame-ancestors 'none'")
 			next.ServeHTTP(w, req)
