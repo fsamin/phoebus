@@ -161,7 +161,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
     return applyUnifiedDiff(selectedPatchObj.diff, codebaseFiles);
   }, [selectedPatchObj?.diff, codebaseFiles]); // eslint-disable-line react-hooks/exhaustive-deps
   const affectedFiles = useMemo(() => selectedPatchObj?.diff ? getAffectedFiles(selectedPatchObj.diff) : [], [selectedPatchObj?.diff]);
-  const showDiffEditor = phase === 'fix' && selectedPatch && diffData && diffData.has(selectedFile);
+  const showDiffEditor = phase === 'fix' && !!selectedPatch && !!diffData && diffData.has(selectedFile);
 
   // Auto-navigate to first affected file when a patch is selected
   useEffect(() => {
@@ -235,11 +235,19 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
       setFeedback(result);
       setBottomPanelHeight((h) => Math.max(h, 220));
       if (result.is_correct) {
-        setSelectedPatch(''); // Unmount DiffEditor first
-        setTimeout(() => setCompleted(true), 50); // Then complete after DiffEditor cleanup
+        // Delay: first remove DiffEditor, then mark completed
+        setTimeout(() => {
+          setSelectedPatch('');
+          setTimeout(() => setCompleted(true), 50);
+        }, 1200);
       } else {
         setDisabledPatches((prev) => new Set([...prev, selectedPatch]));
-        setSelectedPatch('');
+        // Don't clear selectedPatch here — DiffEditor stays visible during feedback
+        // It will be cleared when feedback is dismissed below
+        setTimeout(() => {
+          setSelectedPatch('');
+          setFeedback(null);
+        }, 2000);
       }
     } finally { setSubmitting(false); }
   };
