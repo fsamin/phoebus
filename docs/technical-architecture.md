@@ -129,10 +129,11 @@ The `content_md` column stores **raw Markdown**, consistent with client-side ren
 │ title            │     │ title            │     │ title            │
 │ description      │     │ description      │     │ type (enum)      │
 │ metadata (JSONB) │     │ position         │     │ position         │
-│ synced_at        │     │ competencies     │     │ content_md       │
-└─────────────────┘     │   (JSONB)        │     │ exercise_data    │
-                         └─────────────────┘     │   (JSONB)        │
-                                                  │ metadata (JSONB) │
+│ content_hash     │     │ competencies     │     │ content_md       │
+│ deleted_at       │     │   (JSONB)        │     │ exercise_data    │
+│ synced_at        │     │ content_hash     │     │   (JSONB)        │
+└─────────────────┘     │ deleted_at       │     │ metadata (JSONB) │
+                         └─────────────────┘     │ content_hash     │
                                                   │ deleted_at       │
                                                   └────────┬─────────┘
                                                            │
@@ -205,7 +206,9 @@ The `content_md` column stores **raw Markdown**, consistent with client-side ren
   - For **terminal exercises**: array of steps with prompt, proposals, correct command, and simulated output
   - For **code exercises**: exercise mode, target lines, array of patches with diffs and correctness flags
 - **`steps.content_md`** — raw Markdown body (the content after front matter), rendered client-side by remark/rehype
-- **`steps.deleted_at`** — nullable timestamp for soft-delete. Steps removed from the repo during sync are flagged (`deleted_at = NOW()`), not physically deleted. If a step file reappears at the same path, it is auto-restored (`deleted_at = NULL`). Learner APIs filter `WHERE deleted_at IS NULL`; analytics include deleted steps with a visual indicator
+- **`content_hash`** (on `learning_paths`, `modules`, `steps`) — `TEXT` column storing the SHA-256 content hash. Used by the Content Syncer to skip unchanged elements during re-sync (zero DB writes for unchanged content). Step hash = `SHA256(title + type + duration + content_md + exercise_data)`; module hash = `SHA256(metadata + concatenated step hashes)`; path hash = `SHA256(metadata + concatenated module hashes)`
+- **`deleted_at`** (on `learning_paths`, `modules`, `steps`) — nullable `TIMESTAMPTZ` for soft-delete. Content removed from the repo during sync is flagged (`deleted_at = NOW()`), never physically deleted. If an item reappears at the same path, it is auto-restored (`deleted_at = NULL`). Learner APIs filter `WHERE deleted_at IS NULL`; analytics include deleted items with a visual indicator
+- **`progress.step_id`** and **`exercise_attempts.step_id`** — FK changed from `ON DELETE CASCADE` to `ON DELETE SET NULL` (step_id is nullable). Learner progress is **never** lost, even if a step is eventually purged. Migration: `007_content_hash_sync.up.sql`
 - **`exercise_attempts`** — records every attempt a learner makes on an exercise. The `answers` JSONB stores the learner's selections (which command, which patch, which quiz answers). This enables instructors to analyze how learners approach problems.
 - **`codebase_files`** — stores the file contents from code exercise `codebase/` directories inline in PostgreSQL, keyed by step and file path. Served to the frontend for Monaco Editor rendering.
 - **`progress`** — tracks step-level completion status. `status` enum: `not_started`, `in_progress`, `completed`
@@ -253,10 +256,19 @@ Webhook POST ──▶ Insert job into sync_jobs table
                        Store in codebase_files table
                               │
                               ▼
+                     Compute SHA-256 content hashes
+                     (step → module → path)
+                              │
+                              ▼
+                     Compare hashes with stored values;
+                     skip unchanged subtrees (0 DB writes)
+                              │
+                              ▼
                      Upsert learning_paths, modules,
                      steps, codebase_files in PostgreSQL
                      (within a transaction)
-                     Soft-delete steps no longer in repo
+                     Soft-delete removed content
+                     (steps, modules, learning_paths)
                               │
                               ▼
                      Update sync_jobs status,
@@ -274,8 +286,9 @@ Webhook POST ──▶ Insert job into sync_jobs table
 - Ordering is determined by the directory/file naming convention (numeric prefix)
 - Code exercise `codebase/` directories are read file-by-file and stored in `codebase_files` with their relative paths
 - Sync is **all-or-nothing per repository**: if any file fails to parse, the entire sync is rolled back and an error is surfaced to administrators
-- Existing learner progress is **never deleted** during content sync — steps may be updated or soft-deleted but `progress` and `exercise_attempts` records are preserved
-- Steps removed from the repo are **soft-deleted** (`deleted_at` timestamp), not physically deleted. Re-publishing the same file path auto-restores the step
+- **Hash-based skip logic**: each level (learning path, module, step) carries a SHA-256 content hash. On re-sync, hashes are compared top-down; unchanged subtrees are skipped entirely (zero DB writes). This makes re-syncing unchanged content essentially free
+- Existing learner progress is **never deleted** during content sync — steps may be updated or soft-deleted but `progress` and `exercise_attempts` records are preserved. FK constraints use `ON DELETE SET NULL` (not CASCADE)
+- Steps, modules, and learning paths removed from the repo are **soft-deleted** (`deleted_at` timestamp), not physically deleted. Re-publishing the same file path auto-restores the item
 
 ---
 
@@ -306,7 +319,8 @@ Read codebase/ files for code exercises
          │
          ▼
 Upsert into PostgreSQL (learning_paths, modules, steps, codebase_files)
-Soft-delete steps no longer present in repo
+Soft-delete removed content (steps, modules, learning_paths)
+Compare SHA-256 hashes; skip unchanged subtrees
          │
          ▼
 Delete ephemeral clone from /tmp
@@ -472,6 +486,23 @@ Internet ──▶ [Reverse Proxy / LB] ──▶ Backend (:8080)
 - Git credentials (SSH keys or tokens) are encrypted at rest in PostgreSQL
 - Webhook endpoints use **UUID only** (122-bit UUIDv4) — knowledge of the UUID is required to trigger a sync. The webhook body is ignored (not used for anything), so HMAC signature verification is unnecessary. This preserves Git-provider agnosticism (signature formats vary per provider). If a UUID is compromised, the admin regenerates it from the UI.
 
+**Content Security Policy (CSP) Headers:**
+
+A backend middleware sets the following headers on all responses:
+
+| Directive | Value | Rationale |
+|---|---|---|
+| `default-src` | `'self'` | Same-origin only |
+| `script-src` | `'self' blob:` | `blob:` for Monaco Editor web workers |
+| `worker-src` | `'self' blob:` | Monaco workers loaded as blobs |
+| `style-src` | `'self' 'unsafe-inline'` | Ant Design inline styles |
+| `img-src` | `'self' data:` | Data URIs for inline images |
+| `font-src` | `'self' data:` | Embedded fonts |
+| `connect-src` | `'self'` | API calls to same origin |
+| `frame-ancestors` | `'none'` | Prevent clickjacking |
+
+Additional headers: `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-XSS-Protection: 0`.
+
 ### 6.3 Git Credential Management
 
 Git repositories may be private, requiring authentication for clone/pull operations:
@@ -506,6 +537,27 @@ When the Content Syncer clones a repo with `auth_type = instance-ssh-key`:
 ### 6.4 Configuration & Secrets Management
 
 All configuration — including the AES-256-GCM encryption key — is managed through **`github.com/ovh/configstore`**. The store is initialized from environment variables (`CONFIGURATION_FROM=env`) for development or from a file tree (`CONFIGURATION_FROM=filetree:/etc/phoebus/conf.d`) for production. The encryption key is a configstore item like any other configuration value, keeping secret management consistent and auditable.
+
+### 6.5 Content Security
+
+**Markdown XSS Prevention:**
+
+The frontend Markdown rendering pipeline includes `rehype-sanitize` (after `rehypeRaw`) with a strict schema:
+
+- **Allowed classes:** hljs highlight classes, admonition directive classes, Mermaid classes
+- **Blocked elements:** `<script>`, `<style>`, `<iframe>`, `<object>`, `<embed>`, `<form>`, `<textarea>`
+- **Protocol whitelist:** `href` allows `http`, `https`, `mailto` only; `src` allows `http`, `https` only — blocks `file://`, `javascript:`, and `data:` URIs in links
+
+**Mermaid SVG Sanitization:**
+
+- All Mermaid SVG output is sanitized through **DOMPurify** with `USE_PROFILES: { svg: true }` before injection into the DOM
+- Mermaid itself is configured with `securityLevel: 'strict'`
+
+**Monaco Editor CSP Compliance:**
+
+- Monaco is loaded as a local bundle (no CDN) via `loader.config({ monaco })` with Vite worker imports
+- `self.MonacoEnvironment.getWorker()` is configured to use blob workers, compatible with the `script-src 'self' blob:` CSP directive
+- `manualChunks` in `vite.config.ts` splits Monaco into a separate ~3.7 MB chunk
 
 ---
 

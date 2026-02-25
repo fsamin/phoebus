@@ -89,10 +89,30 @@ Each section describes the detailed behavior, rules, edge cases, and UI expectat
 - If a file/directory has no numeric prefix, it is sorted alphabetically after numbered items
 - The numeric prefix is stripped from the display title (the title from front matter is used)
 
+**Hash-Based Content Sync:**
+
+Each level of the content hierarchy carries a **SHA-256 content hash** to avoid unnecessary database writes:
+
+- **Step hash** = `SHA256(title + type + duration + content_md + exercise_data)`
+- **Module hash** = `SHA256(module metadata + concatenated step hashes)`
+- **Path hash** = `SHA256(path metadata + concatenated module hashes)`
+
+On re-sync, hashes are compared at each level. If a hash matches, the entire subtree is **skipped** (zero DB writes for unchanged content). Only modified elements are upserted. Result: re-syncing unchanged content produces **0 database writes**.
+
+Hash values are stored in a `content_hash TEXT` column on `learning_paths`, `modules`, and `steps`.
+
+**Soft-Delete Rules:**
+
+- Steps, modules, and learning paths removed from the repo are **soft-deleted** (`deleted_at = NOW()`), never physically deleted
+- If a previously deleted item reappears at the same path, it is automatically restored (`deleted_at = NULL`)
+- `progress.step_id` and `exercise_attempts.step_id` use `ON DELETE SET NULL` (step_id is nullable) — learner progress is **never** lost, even if a step is eventually purged
+- Migration: `007_content_hash_sync.up.sql`
+
 **Content Update Rules:**
 - Steps are matched by their file path (relative to repo root) — renaming a file creates a new step
 - Updated steps overwrite content and exercise data, but **never delete learner progress**
 - Deleted steps (files removed from repo): the `steps` record is soft-deleted (flagged, not removed), preserving associated progress
+- Deleted modules and learning paths are likewise soft-deleted (`deleted_at` column)
 - New steps are inserted at the position determined by their numeric prefix
 
 **Edge Cases:**
@@ -410,12 +430,16 @@ No exercise data to extract. The Markdown body is stored in `content_md` as-is.
 **UI Elements:**
 - Context area: introduction text + per-step context text (Markdown-rendered), displayed **above** the terminal
 - Step counter: badge showing current step (Step N/M), displayed above the terminal
-- Immersive terminal window: dark background, monospace font, macOS-style title bar with traffic-light dots
+- **Immersive terminal design** (no Card wrapper): full dark theme with a fire orange palette (`#ff9a6c`, `#ffb899`) on a neutral gray background (`#1c1c1c`), monospace font
+  - Numbered badges `[1]`, `[2]` displayed before each command choice
+  - **Arrow key navigation** (↑↓) to move between commands + Enter to validate the selection
+  - Auto-focus on mount, no visible focus outline
+  - Auto-select first available (non-eliminated) command
   - Command history: previous steps' commands and outputs scroll upward
   - Active prompt line: `~ ›` prefix with blinking cursor `▌`; when a command is selected, it appears on the prompt line
-  - Command suggestions: displayed inside the terminal below a thin separator, styled as clickable items prefixed with `$`; the selected command is highlighted in blue with a "press Enter ⏎" hint; incorrect commands are struck-through and grayed out
   - Feedback: success (green ✓) and error messages (red ✗ with explanation) appear inline in the terminal
-- Validation: clicking a suggestion fills the prompt; pressing Enter submits the command (no separate Submit button)
+  - Incorrect commands are struck-through and grayed out
+- Validation: selecting a suggestion (click or arrow keys) fills the prompt; pressing Enter submits the command (no separate Submit button)
 
 ### 4.2 Step-by-Step Flow
 
@@ -507,11 +531,12 @@ A new attempt record is created for every submission. The `answers` JSONB stores
 
 **UI Elements:**
 - **File tree** (left panel): navigable file tree from the `codebase/` directory. The target file is highlighted (★)
-- **Code viewer** (right panel): Monaco Editor in read-only mode. Line numbers, syntax highlighting. Clickable lines (for modes A/C)
-- **Problem description**: Markdown-rendered text below the code viewer
+- **Code viewer** (right panel): Monaco Editor in read-only mode. Line numbers, syntax highlighting. Clickable lines (for modes A/C). Uses `monaco-editor` local bundle (no CDN) via `loader.config({ monaco })` with Vite worker imports for all Monaco workers (editor, json, css, html, ts) and `self.MonacoEnvironment.getWorker()` configuration for CSP compliance. `manualChunks` in `vite.config.ts` splits Monaco into a separate ~3.7 MB chunk
+- **Problem description / Feedback panel**: Markdown-rendered text below the code viewer. When feedback is available (after an attempt), the feedback **replaces** the description panel and auto-expands to 220 px
 - **Phase indicator**: shows current phase (Phase 1: Identify, Phase 2: Fix) for modes A/C
 - **Selected lines display**: shows the lines the learner has clicked on
-- **Patch proposals** (Phase 2): displayed as inline unified diffs (Monaco inline diff view). The familiar `git diff` / PR format fits the constrained layout and matches the authoring format. Side-by-side diff can be added later if needed
+- **Patch proposals** (Phase 2): displayed as radio buttons. Each patch shows its label and a **DiffEditor preview** (Monaco side-by-side diff view) when selected. The DiffEditor remains visible after exercise completion. Incorrect patches are displayed with disabled radio buttons and strikethrough text
+- **Navigation buttons**: Previous / Reset / Next buttons displayed in the completed state
 
 ### 5.2 Mode A — Identify & Fix
 
@@ -905,6 +930,43 @@ Administrators can create local users from the Admin > Users view:
 **Coexistence:** Proxy auth works alongside other authentication methods. When both proxy headers and other providers are enabled, the proxy middleware runs first. If no proxy header is present, the request falls through to standard JWT cookie authentication.
 
 **Frontend behavior:** When proxy auth is enabled and is the only provider, the login page displays an informational message ("SSO Authentication") instead of a login form. If the user hits `/login`, the frontend tries `GET /api/me` to detect an existing session and auto-redirects to `/` if authenticated.
+
+### 9.6 Content Security
+
+**Markdown XSS Prevention:**
+
+The Markdown rendering pipeline includes `rehype-sanitize` (inserted after `rehypeRaw`) with a strict schema:
+
+- **Allowed classes:** hljs highlight classes, admonition classes, Mermaid classes
+- **Blocked elements:** `<script>`, `<style>`, `<iframe>`, `<object>`, `<embed>`, `<form>`, `<textarea>`
+- **Protocol whitelist:** `href` allows `http`, `https`, `mailto` only; `src` allows `http`, `https` only — blocks `file://`, `javascript:`, and `data:` URIs in links
+
+**Mermaid SVG Sanitization:**
+
+- Mermaid output is sanitized with **DOMPurify** using `USE_PROFILES: { svg: true }` before DOM injection
+- Mermaid is configured with `securityLevel: 'strict'`
+
+**Content Security Policy (CSP) Headers:**
+
+A backend middleware sets the following CSP headers on all responses:
+
+| Directive | Value | Rationale |
+|---|---|---|
+| `default-src` | `'self'` | Only same-origin resources by default |
+| `script-src` | `'self' blob:` | `blob:` required for Monaco Editor web workers |
+| `worker-src` | `'self' blob:` | Same — Monaco workers loaded as blobs |
+| `style-src` | `'self' 'unsafe-inline'` | Ant Design injects inline styles |
+| `img-src` | `'self' data:` | Data URIs for small inline images |
+| `font-src` | `'self' data:` | Data URIs for embedded fonts |
+| `connect-src` | `'self'` | API calls to same origin only |
+| `frame-ancestors` | `'none'` | Prevent framing (clickjacking) |
+
+**Additional Security Headers:**
+
+- `X-Frame-Options: DENY`
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `X-XSS-Protection: 0` (disabled — CSP supersedes it; the legacy header can cause issues)
 
 ---
 

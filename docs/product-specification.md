@@ -430,6 +430,8 @@ Never use panic for control flow — it will crash the server.
 - Instructors can use branches and pull requests for content review before merging to `main`
 - Phœbus supports **any Git hosting platform** (GitHub, GitLab, Gitea, Bitbucket, self-hosted, etc.) since it only relies on standard Git clone (SSH/HTTPS) and a generic webhook endpoint
 - **Instance SSH Key:** At first startup, Phœbus generates a unique **Ed25519 SSH keypair** for the instance. The private key is stored encrypted (AES-256-GCM) in the database, and the public key is displayed on the repository management page so administrators can add it as a **deploy key** (read-only) on their Git repositories. This enables SSH-based clone without managing per-repo credentials
+- **Synchronisation par hash de contenu (SHA-256) :** chaque niveau de la hiérarchie (learning path, module, step) possède un hash calculé à partir de son contenu et de ses métadonnées. Lors d'une re-synchronisation, Phœbus compare les hashs à chaque niveau et **ignore entièrement** les éléments inchangés (zéro écriture en base). Seuls les éléments modifiés sont mis à jour — résultat : une re-sync de contenu identique ne produit aucune écriture
+- **Soft-delete généralisé :** les modules et learning paths supprimés du dépôt reçoivent un `deleted_at = NOW()` au lieu d'être physiquement supprimés (même comportement que les steps). Un contenu réapparu est automatiquement restauré (`deleted_at = NULL`). La progression des apprenants n'est **jamais** perdue
 
 ---
 
@@ -638,6 +640,10 @@ Never use panic for control flow — it will crash the server.
 - SSO/OIDC/LDAP for authentication; reverse proxy header auth for environments behind OAuth2 Proxy, Authelia, or Traefik Forward Auth; role-based access control for authorization
 - Content repos can be private (SSH key or token-based Git access)
 - Git credentials are encrypted at rest
+- **Prévention XSS dans le Markdown :** le pipeline de rendu utilise `rehype-sanitize` (après `rehypeRaw`) avec un schéma strict — autorise les classes hljs/admonition/mermaid, bloque `<script>`, `<style>`, `<iframe>`, `<object>`, `<embed>`, `<form>`, `<textarea>`. Liste blanche de protocoles : `href` accepte http/https/mailto uniquement ; `src` accepte http/https uniquement (bloque `file://`, `javascript:`, `data:` dans les liens)
+- **Assainissement SVG Mermaid :** DOMPurify avec `USE_PROFILES: { svg: true }` avant injection dans le DOM ; `securityLevel: 'strict'` sur Mermaid
+- **En-têtes CSP (Content Security Policy) :** middleware backend configurant `default-src 'self'`, `script-src 'self' blob:` (blob pour les workers Monaco), `worker-src 'self' blob:`, `style-src 'self' 'unsafe-inline'` (styles inline Ant Design), `img-src 'self' data:`, `font-src 'self' data:`, `connect-src 'self'`, `frame-ancestors 'none'`
+- **Autres en-têtes de sécurité :** `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-XSS-Protection: 0`
 
 ### 8.3 Reliability
 
