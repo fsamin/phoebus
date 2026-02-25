@@ -147,7 +147,6 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
   const [bottomPanelHeight, setBottomPanelHeight] = useState(200);
   const [disabledPatches, setDisabledPatches] = useState<Set<string>>(new Set());
   const editorRef = useRef<any>(null);
-  const diffEditorRef = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
   const monacoRef = useRef<any>(null);
   const resizingRef = useRef(false);
@@ -162,10 +161,10 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
     return applyUnifiedDiff(selectedPatchObj.diff, codebaseFiles);
   }, [selectedPatchObj?.diff, codebaseFiles]); // eslint-disable-line react-hooks/exhaustive-deps
   const affectedFiles = useMemo(() => selectedPatchObj?.diff ? getAffectedFiles(selectedPatchObj.diff) : [], [selectedPatchObj?.diff]);
+  // Show DiffEditor when a patch is selected in fix phase (keep visible after completion)
   const showDiffEditor = phase === 'fix' && !!selectedPatch && !!diffData && diffData.has(selectedFile);
 
   // Keep stable DiffEditor props — only update when diff is actively shown
-  // This prevents @monaco-editor/react from disposing models when props go empty
   const stableDiffRef = useRef<{ original: string; modified: string; language: string }>({ original: '', modified: '', language: 'plaintext' });
   if (showDiffEditor && diffData) {
     const d = diffData.get(selectedFile);
@@ -239,18 +238,6 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
     } finally { setSubmitting(false); }
   };
 
-  // Safely dispose DiffEditor models before unmounting
-  const disposeDiffEditor = () => {
-    try {
-      const editor = diffEditorRef.current;
-      if (editor) {
-        editor.getModel()?.original?.dispose();
-        editor.getModel()?.modified?.dispose();
-        diffEditorRef.current = null;
-      }
-    } catch { /* ignore disposal errors */ }
-  };
-
   // Track if DiffEditor has ever been shown (to avoid mounting it needlessly)
   const [diffEditorMounted, setDiffEditorMounted] = useState(false);
   useEffect(() => {
@@ -264,15 +251,11 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
       setFeedback(result);
       setBottomPanelHeight((h) => Math.max(h, 220));
       if (result.is_correct) {
-        setTimeout(() => {
-          disposeDiffEditor();
-          setSelectedPatch('');
-          setTimeout(() => setCompleted(true), 50);
-        }, 1200);
+        // Keep selectedPatch so DiffEditor stays visible with the correct fix
+        setTimeout(() => setCompleted(true), 1200);
       } else {
         setDisabledPatches((prev) => new Set([...prev, selectedPatch]));
         setTimeout(() => {
-          disposeDiffEditor();
           setSelectedPatch('');
           setFeedback(null);
         }, 2000);
@@ -362,7 +345,6 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
                 original={stableDiffRef.current.original}
                 modified={stableDiffRef.current.modified}
                 theme={isDark ? 'vs-dark' : 'vs'}
-                onMount={(editor) => { diffEditorRef.current = editor; }}
                 options={{
                   readOnly: true,
                   renderSideBySide: true,
