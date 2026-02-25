@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Radio, Button, Alert, Typography, Tag, Space, Tree, Tooltip } from 'antd';
-import { FileOutlined, FolderOutlined, CheckCircleFilled, BugFilled } from '@ant-design/icons';
+import { Button, Alert, Typography, Tag, Tree } from 'antd';
+import { FileOutlined, FolderOutlined, CheckCircleFilled, BugFilled, CloseCircleFilled } from '@ant-design/icons';
 import Editor from '@monaco-editor/react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { useTheme } from '../contexts/ThemeContext';
@@ -71,6 +71,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
   const [submitting, setSubmitting] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [bottomPanelHeight, setBottomPanelHeight] = useState(200);
+  const [disabledPatches, setDisabledPatches] = useState<Set<string>>(new Set());
   const editorRef = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
   const monacoRef = useRef<any>(null);
@@ -128,6 +129,8 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
     try {
       const result = await onSubmit({ phase: 'identify', selected_lines: selectedLines });
       setFeedback(result);
+      // Auto-expand panel to show feedback
+      setBottomPanelHeight((h) => Math.max(h, 220));
       if (result.is_correct) {
         setTimeout(() => { setPhase('fix'); setFeedback(null); }, 1500);
       }
@@ -139,7 +142,13 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
     try {
       const result = await onSubmit({ phase: 'fix', selected_patch: selectedPatch });
       setFeedback(result);
-      if (result.is_correct) setCompleted(true);
+      setBottomPanelHeight((h) => Math.max(h, 220));
+      if (result.is_correct) {
+        setCompleted(true);
+      } else {
+        setDisabledPatches((prev) => new Set([...prev, selectedPatch]));
+        setSelectedPatch('');
+      }
     } finally { setSubmitting(false); }
   };
 
@@ -255,6 +264,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
       <div className="ide-bottom-panel" style={{
         height: bottomPanelHeight, background: 'var(--color-bg-ide-panel)', borderTop: '1px solid var(--color-border-ide)',
         overflow: 'auto', flexShrink: 0, padding: '12px 16px', color: 'var(--color-text-ide)',
+        transition: 'height 0.2s ease',
       }}>
         {completed ? (
           <div>
@@ -267,9 +277,22 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
           </div>
         ) : phase === 'identify' ? (
           <div>
-            <div style={{ marginBottom: 8 }}>
-              <MarkdownRenderer content={description} />
-            </div>
+            {/* Show feedback OR description, not both */}
+            {feedback && !feedback.is_correct ? (
+              <Alert
+                message={`${feedback.matched}/${feedback.total} lines found`}
+                description={feedback.hint as string}
+                type="warning"
+                showIcon
+                style={{ marginBottom: 8 }}
+              />
+            ) : feedback?.is_correct ? (
+              <Alert message="Correct! Moving to fix phase..." type="success" showIcon style={{ marginBottom: 8 }} />
+            ) : (
+              <div style={{ marginBottom: 8 }}>
+                <MarkdownRenderer content={description} />
+              </div>
+            )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <Typography.Text style={{ color: 'var(--color-text-ide)' }}>
                 Click line numbers to select problematic lines.
@@ -279,41 +302,69 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
                 Validate
               </Button>
             </div>
-            {feedback && !feedback.is_correct && (
-              <Alert message={`${feedback.matched}/${feedback.total} lines found`} description={feedback.hint as string} type="warning" showIcon style={{ marginTop: 8 }} />
-            )}
-            {feedback && (feedback.is_correct as boolean) && (
-              <Alert message="Correct! Moving to fix phase..." type="success" showIcon style={{ marginTop: 8 }} />
-            )}
           </div>
         ) : (
           <div>
-            <div style={{ marginBottom: 8 }}>
-              <Typography.Text strong style={{ color: 'var(--color-text-ide)' }}>Select the correct fix:</Typography.Text>
-            </div>
-            <Radio.Group onChange={(e) => setSelectedPatch(e.target.value)} value={selectedPatch} style={{ width: '100%' }} disabled={completed}>
-              <Space direction="vertical" style={{ width: '100%' }}>
-                {patches.map((p) => (
-                  <Radio key={p.label} value={p.label} style={{ color: 'var(--color-text-ide)' }}>
-                    <Tooltip title={p.diff} placement="topLeft" overlayStyle={{ maxWidth: 500 }} overlayInnerStyle={{ whiteSpace: 'pre', fontFamily: 'monospace', fontSize: 12 }}>
-                      <Typography.Text style={{ color: 'var(--color-text-ide)' }}>{p.label}</Typography.Text>
-                    </Tooltip>
-                  </Radio>
-                ))}
-              </Space>
-            </Radio.Group>
-            <div style={{ marginTop: 8 }}>
-              <Button type="primary" size="small" onClick={handleSubmitFix} loading={submitting} disabled={!selectedPatch || completed}>
-                Submit Fix
-              </Button>
-            </div>
-            {feedback && (
+            {/* Show feedback OR patch selection */}
+            {feedback ? (
               <Alert
                 message={feedback.is_correct ? 'Correct!' : 'Incorrect'}
                 description={feedback.explanation as string}
                 type={feedback.is_correct ? 'success' : 'error'}
-                showIcon style={{ marginTop: 8 }}
+                showIcon
+                style={{ marginBottom: 8 }}
               />
+            ) : (
+              <>
+                <div style={{ marginBottom: 8 }}>
+                  <Typography.Text strong style={{ color: 'var(--color-text-ide)', fontSize: 13 }}>
+                    Select the correct fix:
+                  </Typography.Text>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {patches.map((p) => {
+                    const isDisabled = disabledPatches.has(p.label);
+                    const isSelected = selectedPatch === p.label;
+                    return (
+                      <div
+                        key={p.label}
+                        onClick={() => { if (!isDisabled) setSelectedPatch(p.label); }}
+                        style={{
+                          padding: '8px 12px',
+                          borderRadius: 6,
+                          cursor: isDisabled ? 'not-allowed' : 'pointer',
+                          border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border-ide)'}`,
+                          background: isSelected ? 'var(--color-ide-patch-selected)' : 'var(--color-bg-ide-secondary)',
+                          opacity: isDisabled ? 0.4 : 1,
+                          transition: 'all 0.15s',
+                          display: 'flex',
+                          alignItems: 'flex-start',
+                          gap: 10,
+                        }}
+                      >
+                        <Typography.Text strong style={{ color: isSelected ? 'var(--color-primary)' : 'var(--color-text-ide)', fontSize: 13, whiteSpace: 'nowrap' }}>
+                          {p.label}
+                        </Typography.Text>
+                        <pre style={{
+                          margin: 0, flex: 1, fontSize: 12, lineHeight: 1.5, overflow: 'hidden',
+                          fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                          color: 'var(--color-text-ide-secondary)',
+                          whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+                          maxHeight: 60,
+                        }}>
+                          {p.diff}
+                        </pre>
+                        {isDisabled && <CloseCircleFilled style={{ color: 'var(--color-danger)', marginTop: 2 }} />}
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{ marginTop: 10 }}>
+                  <Button type="primary" size="small" onClick={handleSubmitFix} loading={submitting} disabled={!selectedPatch}>
+                    Submit Fix
+                  </Button>
+                </div>
+              </>
             )}
           </div>
         )}

@@ -63,6 +63,7 @@
   --color-ide-glyph-selected: #1890ff;
   --color-ide-line-target: rgba(82, 196, 26, 0.12);
   --color-ide-glyph-target: #52c41a;
+  --color-ide-patch-selected: rgba(255, 122, 69, 0.08);
 
   --color-ide-tree-hover: #e8e8e8;
   --color-ide-tree-selected: #d0d0d0;
@@ -124,6 +125,7 @@
 
   --color-ide-tree-hover: #2a2d2e;
   --color-ide-tree-selected: #37373d;
+  --color-ide-patch-selected: rgba(255, 122, 69, 0.12);
 
   --color-ide-disabled-bg: #3c3c3c;
   --color-ide-disabled-text: #666;
