@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Button, Alert, Typography, Tag, Tree } from 'antd';
-import { FileOutlined, FolderOutlined, CheckCircleFilled, BugFilled, CloseCircleFilled } from '@ant-design/icons';
-import Editor from '@monaco-editor/react';
+import { FileOutlined, FolderOutlined, CheckCircleFilled, BugFilled, CloseCircleFilled, DiffOutlined } from '@ant-design/icons';
+import Editor, { DiffEditor } from '@monaco-editor/react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { useTheme } from '../contexts/ThemeContext';
 import type { CodebaseFile } from '../api/client';
@@ -61,6 +61,74 @@ function buildTreeData(files: CodebaseFile[]) {
   return root;
 }
 
+// Parse a unified diff and apply it to original file contents
+// Returns a map of filePath -> { original, modified } for each file in the diff
+function applyUnifiedDiff(diff: string, files: CodebaseFile[]): Map<string, { original: string; modified: string }> {
+  const result = new Map<string, { original: string; modified: string }>();
+  if (!diff) return result;
+
+  // Split into per-file sections
+  const fileSections = diff.split(/^(?=--- )/m).filter(Boolean);
+
+  for (const section of fileSections) {
+    const lines = section.split('\n');
+    // Extract file path from --- a/path or --- path
+    const minusMatch = lines[0]?.match(/^--- (?:a\/)?(.+)/);
+    const plusMatch = lines[1]?.match(/^\+\+\+ (?:b\/)?(.+)/);
+    if (!minusMatch || !plusMatch) continue;
+
+    const filePath = plusMatch[1];
+    const sourceFile = files.find((f) => f.file_path === filePath || f.file_path.endsWith(filePath));
+    if (!sourceFile) continue;
+
+    const originalLines = sourceFile.content.split('\n');
+    const modifiedLines = [...originalLines];
+    let offset = 0; // track line shifts from insertions/deletions
+
+    // Process each hunk
+    const hunkRegex = /^@@ -(\d+)(?:,\d+)? \+\d+(?:,\d+)? @@/;
+    for (let i = 2; i < lines.length; i++) {
+      const hunkMatch = lines[i].match(hunkRegex);
+      if (!hunkMatch) continue;
+
+      let origLine = parseInt(hunkMatch[1], 10) - 1; // 0-based index in original
+      let pos = origLine + offset; // position in modifiedLines
+      i++;
+
+      while (i < lines.length && !lines[i].match(hunkRegex) && !lines[i].startsWith('--- ')) {
+        const line = lines[i];
+        if (line.startsWith('-')) {
+          modifiedLines.splice(pos, 1);
+          offset--;
+          // don't increment pos — next line is now at same pos
+        } else if (line.startsWith('+')) {
+          modifiedLines.splice(pos, 0, line.substring(1));
+          offset++;
+          pos++;
+        } else if (line.startsWith(' ') || line === '') {
+          pos++;
+        }
+        i++;
+      }
+      i--; // back up so the outer loop re-evaluates this line
+    }
+
+    result.set(sourceFile.file_path, {
+      original: sourceFile.content,
+      modified: modifiedLines.join('\n'),
+    });
+  }
+  return result;
+}
+
+// Get file paths affected by a diff
+function getAffectedFiles(diff: string): string[] {
+  const paths: string[] = [];
+  const matches = diff.matchAll(/^\+\+\+ (?:b\/)?(.+)$/gm);
+  for (const m of matches) paths.push(m[1]);
+  return paths;
+}
+
 const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, patches, codebaseFiles, onSubmit }) => {
   const { isDark } = useTheme();
   const [selectedFile, setSelectedFile] = useState(target?.file || codebaseFiles[0]?.file_path || '');
@@ -79,6 +147,23 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
 
   const currentFile = codebaseFiles.find((f) => f.file_path === selectedFile);
   const treeData = useMemo(() => buildTreeData(codebaseFiles), [codebaseFiles]);
+
+  // Compute diff data for selected patch
+  const selectedPatchObj = patches.find((p) => p.label === selectedPatch);
+  const diffData = useMemo(() => {
+    if (!selectedPatchObj?.diff) return null;
+    return applyUnifiedDiff(selectedPatchObj.diff, codebaseFiles);
+  }, [selectedPatchObj?.diff, codebaseFiles]); // eslint-disable-line react-hooks/exhaustive-deps
+  const affectedFiles = useMemo(() => selectedPatchObj?.diff ? getAffectedFiles(selectedPatchObj.diff) : [], [selectedPatchObj?.diff]);
+  const showDiffEditor = phase === 'fix' && selectedPatch && diffData && diffData.has(selectedFile);
+
+  // Auto-navigate to first affected file when a patch is selected
+  useEffect(() => {
+    if (affectedFiles.length > 0 && selectedPatch) {
+      const match = codebaseFiles.find((f) => affectedFiles.some((af) => f.file_path === af || f.file_path.endsWith(af)));
+      if (match) setSelectedFile(match.file_path);
+    }
+  }, [selectedPatch]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Update editor decorations when selected lines change
   useEffect(() => {
@@ -180,8 +265,9 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
         flexShrink: 0,
       }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <FileOutlined style={{ color: 'var(--color-text-ide)', fontSize: 13 }} />
+          {showDiffEditor ? <DiffOutlined style={{ color: 'var(--color-primary)', fontSize: 13 }} /> : <FileOutlined style={{ color: 'var(--color-text-ide)', fontSize: 13 }} />}
           <Typography.Text style={{ color: 'var(--color-text-ide)', fontSize: 13 }}>{selectedFile}</Typography.Text>
+          {showDiffEditor && <Tag color="var(--color-primary)" style={{ fontSize: 11, lineHeight: '18px', padding: '0 6px' }}>DIFF</Tag>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {completed && <Tag color="success" icon={<CheckCircleFilled />}>Completed</Tag>}
@@ -223,29 +309,49 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
           `}</style>
         </div>
 
-        {/* Monaco editor */}
+        {/* Monaco editor / Diff editor */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <Editor
-            height="100%"
-            language={getLanguage(selectedFile)}
-            value={currentFile?.content || '// No file selected'}
-            theme={isDark ? 'vs-dark' : 'vs'}
-            onMount={handleEditorMount}
-            options={{
-              readOnly: true,
-              minimap: { enabled: true, scale: 2, size: 'proportional' },
-              fontSize: 14,
-              lineNumbers: 'on',
-              scrollBeyondLastLine: false,
-              glyphMargin: phase === 'identify',
-              folding: true,
-              renderLineHighlight: 'line',
-              wordWrap: 'off',
-              automaticLayout: true,
-              contextmenu: false,
-              cursorStyle: 'line',
-            }}
-          />
+          {showDiffEditor ? (
+            <DiffEditor
+              height="100%"
+              language={getLanguage(selectedFile)}
+              original={diffData.get(selectedFile)!.original}
+              modified={diffData.get(selectedFile)!.modified}
+              theme={isDark ? 'vs-dark' : 'vs'}
+              options={{
+                readOnly: true,
+                renderSideBySide: true,
+                minimap: { enabled: false },
+                fontSize: 14,
+                lineNumbers: 'on',
+                scrollBeyondLastLine: false,
+                automaticLayout: true,
+                contextmenu: false,
+              }}
+            />
+          ) : (
+            <Editor
+              height="100%"
+              language={getLanguage(selectedFile)}
+              value={currentFile?.content || '// No file selected'}
+              theme={isDark ? 'vs-dark' : 'vs'}
+              onMount={handleEditorMount}
+              options={{
+                readOnly: true,
+                minimap: { enabled: true, scale: 2, size: 'proportional' },
+                fontSize: 14,
+                lineNumbers: 'on',
+                scrollBeyondLastLine: false,
+                glyphMargin: phase === 'identify',
+                folding: true,
+                renderLineHighlight: 'line',
+                wordWrap: 'off',
+                automaticLayout: true,
+                contextmenu: false,
+                cursorStyle: 'line',
+              }}
+            />
+          )}
         </div>
       </div>
 
