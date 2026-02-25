@@ -27,6 +27,8 @@ jobs:
 
       - run: npm ci
       - run: npm run build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
 
   backend:
     name: Backend
@@ -64,6 +66,8 @@ jobs:
           cd frontend && npm ci && npm run build
           cd ..
           rm -rf internal/ui/dist && cp -r frontend/dist internal/ui/dist
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
 
       - name: Build
         run: go build ./...
