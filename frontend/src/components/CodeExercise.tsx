@@ -241,6 +241,12 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
     } catch { /* ignore disposal errors */ }
   };
 
+  // Track if DiffEditor has ever been shown (to avoid mounting it needlessly)
+  const [diffEditorMounted, setDiffEditorMounted] = useState(false);
+  useEffect(() => {
+    if (showDiffEditor) setDiffEditorMounted(true);
+  }, [showDiffEditor]);
+
   const handleSubmitFix = async () => {
     setSubmitting(true);
     try {
@@ -336,28 +342,31 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
           `}</style>
         </div>
 
-        {/* Monaco editor / Diff editor */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          {showDiffEditor ? (
-            <DiffEditor
-              height="100%"
-              language={getLanguage(selectedFile)}
-              original={diffData.get(selectedFile)!.original}
-              modified={diffData.get(selectedFile)!.modified}
-              theme={isDark ? 'vs-dark' : 'vs'}
-              onMount={(editor) => { diffEditorRef.current = editor; }}
-              options={{
-                readOnly: true,
-                renderSideBySide: true,
-                minimap: { enabled: false },
-                fontSize: 14,
-                lineNumbers: 'on',
-                scrollBeyondLastLine: false,
-                automaticLayout: true,
-                contextmenu: false,
-              }}
-            />
-          ) : (
+        {/* Monaco editor / Diff editor — both stay mounted, toggle visibility */}
+        <div style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+          <div style={{ height: '100%', display: showDiffEditor ? 'block' : 'none' }}>
+            {diffEditorMounted && (
+              <DiffEditor
+                height="100%"
+                language={getLanguage(selectedFile)}
+                original={diffData?.get(selectedFile)?.original ?? ''}
+                modified={diffData?.get(selectedFile)?.modified ?? ''}
+                theme={isDark ? 'vs-dark' : 'vs'}
+                onMount={(editor) => { diffEditorRef.current = editor; }}
+                options={{
+                  readOnly: true,
+                  renderSideBySide: true,
+                  minimap: { enabled: false },
+                  fontSize: 14,
+                  lineNumbers: 'on',
+                  scrollBeyondLastLine: false,
+                  automaticLayout: true,
+                  contextmenu: false,
+                }}
+              />
+            )}
+          </div>
+          <div style={{ height: '100%', display: showDiffEditor ? 'none' : 'block' }}>
             <Editor
               height="100%"
               language={getLanguage(selectedFile)}
@@ -379,7 +388,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
                 cursorStyle: 'line',
               }}
             />
-          )}
+          </div>
         </div>
       </div>
 
