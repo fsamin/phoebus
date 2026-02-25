@@ -38,6 +38,18 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
 
   const step = completed ? null : steps[currentStep];
 
+  // Available (non-disabled) proposals with original indices
+  const availableProposals = step?.proposals
+    .map((p, i) => ({ ...p, origIndex: i }))
+    .filter((p) => !disabledCommands.has(p.command)) ?? [];
+
+  // Auto-select first available command when step changes or after wrong answer
+  useEffect(() => {
+    if (availableProposals.length > 0 && !selected) {
+      setSelected(availableProposals[0].command);
+    }
+  }, [currentStep, disabledCommands.size]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleSubmit = async () => {
     if (!selected || submitting) return;
     setSubmitting(true);
@@ -69,6 +81,16 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
     if (e.key === 'Enter' && selected && !submitting) {
       e.preventDefault();
       handleSubmit();
+    } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && availableProposals.length > 0 && !submitting) {
+      e.preventDefault();
+      const curIdx = availableProposals.findIndex((p) => p.command === selected);
+      let next: number;
+      if (e.key === 'ArrowDown') {
+        next = curIdx < availableProposals.length - 1 ? curIdx + 1 : 0;
+      } else {
+        next = curIdx > 0 ? curIdx - 1 : availableProposals.length - 1;
+      }
+      setSelected(availableProposals[next].command);
     }
   };
 
@@ -104,23 +126,23 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
           fontSize: 14,
           lineHeight: 1.7,
           overflow: 'hidden',
-          border: '1px solid rgba(255,255,255,0.06)',
-          boxShadow: '0 4px 24px rgba(0,0,0,0.3)',
+          border: '1px solid var(--color-terminal-border)',
+          boxShadow: 'var(--terminal-shadow)',
         }}
       >
         {/* Title bar */}
         <div style={{
-          background: 'rgba(255,255,255,0.05)',
+          background: 'var(--color-terminal-titlebar)',
           padding: '8px 16px',
           display: 'flex',
           alignItems: 'center',
           gap: 8,
-          borderBottom: '1px solid rgba(255,255,255,0.06)',
+          borderBottom: '1px solid var(--color-terminal-border)',
         }}>
           <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#ff5f57', display: 'inline-block' }} />
           <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#febc2e', display: 'inline-block' }} />
           <span style={{ width: 12, height: 12, borderRadius: '50%', background: '#28c840', display: 'inline-block' }} />
-          <span style={{ marginLeft: 'auto', color: 'rgba(255,255,255,0.35)', fontSize: 12 }}>
+          <span style={{ marginLeft: 'auto', color: 'var(--color-terminal-muted)', fontSize: 12 }}>
             {completed ? 'Exercise Complete' : 'Terminal Exercise'}
           </span>
         </div>
@@ -131,8 +153,8 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
           {history.map((h, i) => (
             <div key={i} style={{ marginBottom: 6 }}>
               <div>
-                <span style={{ color: '#6ec6ff' }}>~</span>
-                <span style={{ color: 'rgba(255,255,255,0.35)' }}> › </span>
+                <span style={{ color: 'var(--color-terminal-prompt)' }}>~</span>
+                <span style={{ color: 'var(--color-terminal-muted)' }}> › </span>
                 <span style={{ color: 'var(--color-text-terminal-cmd)' }}>{h.command}</span>
               </div>
               {h.output && (
@@ -155,12 +177,12 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
             <>
               {/* Current prompt line */}
               <div style={{ marginTop: history.length > 0 ? 4 : 0 }}>
-                <span style={{ color: '#6ec6ff' }}>~</span>
-                <span style={{ color: 'rgba(255,255,255,0.35)' }}> › </span>
+                <span style={{ color: 'var(--color-terminal-prompt)' }}>~</span>
+                <span style={{ color: 'var(--color-terminal-muted)' }}> › </span>
                 {selected ? (
                   <span style={{ color: 'var(--color-text-terminal-cmd)' }}>{selected}</span>
                 ) : (
-                  <span className="terminal-cursor" style={{ color: 'rgba(255,255,255,0.6)' }}>▌</span>
+                  <span className="terminal-cursor" style={{ color: 'var(--color-terminal-muted)' }}>▌</span>
                 )}
               </div>
 
@@ -188,11 +210,11 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
 
               {/* Command suggestions */}
               {!feedback?.is_correct && !submitting && (
-                <div style={{ marginTop: 10, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 10 }}>
-                  <div style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12, marginBottom: 6 }}>
-                    Select a command:
+                <div style={{ marginTop: 10, borderTop: '1px solid var(--color-terminal-separator)', paddingTop: 10 }}>
+                  <div style={{ color: 'var(--color-terminal-muted)', fontSize: 12, marginBottom: 6 }}>
+                    Select a command (↑↓ to navigate, Enter ⏎ to validate):
                   </div>
-                  {step.proposals.map((p) => {
+                  {step.proposals.map((p, idx) => {
                     const isDisabled = disabledCommands.has(p.command);
                     const isSelected = selected === p.command;
                     return (
@@ -209,27 +231,35 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
                           gap: 10,
                           transition: 'background 0.15s',
                           background: isSelected
-                            ? 'rgba(110, 198, 255, 0.12)'
+                            ? 'var(--color-terminal-selection)'
                             : 'transparent',
                           ...(isDisabled ? { opacity: 0.35 } : {}),
                         }}
                         onMouseEnter={(e) => {
-                          if (!isDisabled && !isSelected) e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                          if (!isDisabled && !isSelected) e.currentTarget.style.background = 'var(--color-terminal-hover)';
                         }}
                         onMouseLeave={(e) => {
                           if (!isDisabled && !isSelected) e.currentTarget.style.background = 'transparent';
                         }}
                       >
                         <span style={{
-                          color: isDisabled ? '#ff6b6b' : isSelected ? '#6ec6ff' : '#80d8ff',
+                          color: isDisabled ? '#ff6b6b' : isSelected ? 'var(--color-terminal-prompt)' : 'var(--color-terminal-muted)',
+                          fontWeight: 600,
+                          fontSize: 12,
+                          minWidth: 24,
+                        }}>
+                          [{idx + 1}]
+                        </span>
+                        <span style={{
+                          color: isDisabled ? '#ff6b6b' : isSelected ? 'var(--color-terminal-prompt)' : 'var(--color-terminal-cmd-suggestion)',
                           textDecoration: isDisabled ? 'line-through' : 'none',
                           flex: 1,
                         }}>
                           $ {p.command}
                         </span>
                         {isSelected && (
-                          <span style={{ color: 'rgba(255,255,255,0.35)', fontSize: 12 }}>
-                            press Enter ⏎
+                          <span style={{ color: 'var(--color-terminal-prompt)', fontSize: 11 }}>
+                            ◀
                           </span>
                         )}
                         {isDisabled && (

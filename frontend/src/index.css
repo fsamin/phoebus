@@ -19,6 +19,16 @@
   --color-bg-terminal: #1a1a2e;
   --color-bg-login: #f0f2f5;
 
+  --color-terminal-border: rgba(0, 0, 0, 0.12);
+  --color-terminal-titlebar: rgba(0, 0, 0, 0.06);
+  --color-terminal-muted: rgba(255, 255, 255, 0.35);
+  --color-terminal-prompt: #6ec6ff;
+  --color-terminal-separator: rgba(255, 255, 255, 0.08);
+  --color-terminal-selection: rgba(110, 198, 255, 0.12);
+  --color-terminal-hover: rgba(255, 255, 255, 0.05);
+  --color-terminal-cmd-suggestion: #80d8ff;
+  --terminal-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
+
   --color-text-primary: #213547;
   --color-text-secondary: #666666;
   --color-text-ide: #333333;
@@ -79,6 +89,16 @@
   --color-bg-ide-panel: #1e1e1e;
   --color-bg-terminal: #1a1a2e;
   --color-bg-login: #141414;
+
+  --color-terminal-border: rgba(255, 255, 255, 0.08);
+  --color-terminal-titlebar: rgba(255, 255, 255, 0.05);
+  --color-terminal-muted: rgba(255, 255, 255, 0.4);
+  --color-terminal-prompt: #6ec6ff;
+  --color-terminal-separator: rgba(255, 255, 255, 0.1);
+  --color-terminal-selection: rgba(110, 198, 255, 0.15);
+  --color-terminal-hover: rgba(255, 255, 255, 0.07);
+  --color-terminal-cmd-suggestion: #80d8ff;
+  --terminal-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
 
   --color-text-primary: rgba(255, 255, 255, 0.87);
   --color-text-secondary: rgba(255, 255, 255, 0.45);
