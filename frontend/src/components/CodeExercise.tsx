@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Button, Alert, Typography, Tag, Tree } from 'antd';
-import { FileOutlined, FolderOutlined, CheckCircleFilled, BugFilled, CloseCircleFilled, DiffOutlined, ArrowLeftOutlined, ArrowRightOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Button, Alert, Typography, Tag, Tree, Radio, Space } from 'antd';
+import { FileOutlined, FolderOutlined, CheckCircleFilled, BugFilled, DiffOutlined, ArrowLeftOutlined, ArrowRightOutlined, ReloadOutlined } from '@ant-design/icons';
 import Editor, { DiffEditor } from '@monaco-editor/react';
 import MarkdownRenderer from './MarkdownRenderer';
 import { useTheme } from '../contexts/ThemeContext';
@@ -454,44 +454,20 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
                     Select the correct fix:
                   </Typography.Text>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {patches.map((p) => {
-                    const isDisabled = disabledPatches.has(p.label);
-                    const isSelected = selectedPatch === p.label;
-                    return (
-                      <div
-                        key={p.label}
-                        onClick={() => { if (!isDisabled) setSelectedPatch(p.label); }}
-                        style={{
-                          padding: '8px 12px',
-                          borderRadius: 6,
-                          cursor: isDisabled ? 'not-allowed' : 'pointer',
-                          border: `1px solid ${isSelected ? 'var(--color-primary)' : 'var(--color-border-ide)'}`,
-                          background: isSelected ? 'var(--color-ide-patch-selected)' : 'var(--color-bg-ide-secondary)',
-                          opacity: isDisabled ? 0.4 : 1,
-                          transition: 'all 0.15s',
-                          display: 'flex',
-                          alignItems: 'flex-start',
-                          gap: 10,
-                        }}
-                      >
-                        <Typography.Text strong style={{ color: isSelected ? 'var(--color-primary)' : 'var(--color-text-ide)', fontSize: 13, whiteSpace: 'nowrap' }}>
-                          {p.label}
-                        </Typography.Text>
-                        <pre style={{
-                          margin: 0, flex: 1, fontSize: 12, lineHeight: 1.5, overflow: 'hidden',
-                          fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
-                          color: 'var(--color-text-ide-secondary)',
-                          whiteSpace: 'pre-wrap', wordBreak: 'break-all',
-                          maxHeight: 60,
-                        }}>
-                          {p.diff}
-                        </pre>
-                        {isDisabled && <CloseCircleFilled style={{ color: 'var(--color-danger)', marginTop: 2 }} />}
-                      </div>
-                    );
-                  })}
-                </div>
+                <Radio.Group onChange={(e) => setSelectedPatch(e.target.value)} value={selectedPatch} style={{ width: '100%' }}>
+                  <Space direction="vertical">
+                    {patches.map((p) => {
+                      const isDisabled = disabledPatches.has(p.label);
+                      return (
+                        <Radio key={p.label} value={p.label} disabled={isDisabled} style={{ color: 'var(--color-text-ide)' }}>
+                          <Typography.Text style={{ color: 'var(--color-text-ide)', textDecoration: isDisabled ? 'line-through' : 'none' }}>
+                            {p.label}
+                          </Typography.Text>
+                        </Radio>
+                      );
+                    })}
+                  </Space>
+                </Radio.Group>
                 <div style={{ marginTop: 10 }}>
                   <Button type="primary" size="small" onClick={handleSubmitFix} loading={submitting} disabled={!selectedPatch}>
                     Submit Fix
