@@ -14,6 +14,7 @@ import 'highlight.js/styles/github.css';
 mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'strict' });
 
 // Sanitization schema: extend default to allow hljs classes and admonition directives
+// Block dangerous protocols (file://, javascript:, data: in links)
 const sanitizeSchema = {
   ...defaultSchema,
   attributes: {
@@ -28,6 +29,13 @@ const sanitizeSchema = {
   tagNames: (defaultSchema.tagNames || []).filter(
     (tag: string) => !['script', 'style', 'iframe', 'object', 'embed', 'form', 'textarea'].includes(tag)
   ),
+  // Only allow safe URL protocols
+  protocols: {
+    ...defaultSchema.protocols,
+    href: ['http', 'https', 'mailto'],
+    src: ['http', 'https'],
+    cite: ['http', 'https'],
+  },
 };
 
 interface MarkdownRendererProps {
