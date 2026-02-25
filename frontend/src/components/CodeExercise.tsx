@@ -147,6 +147,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
   const [bottomPanelHeight, setBottomPanelHeight] = useState(200);
   const [disabledPatches, setDisabledPatches] = useState<Set<string>>(new Set());
   const editorRef = useRef<any>(null);
+  const diffEditorRef = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
   const monacoRef = useRef<any>(null);
   const resizingRef = useRef(false);
@@ -228,6 +229,18 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
     } finally { setSubmitting(false); }
   };
 
+  // Safely dispose DiffEditor models before unmounting
+  const disposeDiffEditor = () => {
+    try {
+      const editor = diffEditorRef.current;
+      if (editor) {
+        editor.getModel()?.original?.dispose();
+        editor.getModel()?.modified?.dispose();
+        diffEditorRef.current = null;
+      }
+    } catch { /* ignore disposal errors */ }
+  };
+
   const handleSubmitFix = async () => {
     setSubmitting(true);
     try {
@@ -235,16 +248,15 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
       setFeedback(result);
       setBottomPanelHeight((h) => Math.max(h, 220));
       if (result.is_correct) {
-        // Delay: first remove DiffEditor, then mark completed
         setTimeout(() => {
+          disposeDiffEditor();
           setSelectedPatch('');
           setTimeout(() => setCompleted(true), 50);
         }, 1200);
       } else {
         setDisabledPatches((prev) => new Set([...prev, selectedPatch]));
-        // Don't clear selectedPatch here — DiffEditor stays visible during feedback
-        // It will be cleared when feedback is dismissed below
         setTimeout(() => {
+          disposeDiffEditor();
           setSelectedPatch('');
           setFeedback(null);
         }, 2000);
@@ -333,6 +345,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
               original={diffData.get(selectedFile)!.original}
               modified={diffData.get(selectedFile)!.modified}
               theme={isDark ? 'vs-dark' : 'vs'}
+              onMount={(editor) => { diffEditorRef.current = editor; }}
               options={{
                 readOnly: true,
                 renderSideBySide: true,
