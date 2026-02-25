@@ -22,4 +22,11 @@ self.MonacoEnvironment = {
 
 loader.config({ monaco })
 
+// Suppress harmless Monaco DiffEditor disposal error during React re-renders
+window.addEventListener('error', (e) => {
+  if (e.message?.includes('TextModel got disposed before DiffEditorWidget')) {
+    e.preventDefault()
+  }
+})
+
 createRoot(document.getElementById('root')!).render(<App />)
