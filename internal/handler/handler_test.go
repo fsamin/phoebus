@@ -91,7 +91,7 @@ func TestMain(m *testing.M) {
 func setupTest(t *testing.T) (*httptest.Server, func()) {
 	t.Helper()
 
-	h := New(testDB, testCfg, nil, "ssh-ed25519 AAAA-test-key phoebus-instance")
+	h := New(testDB, testCfg, nil, "ssh-ed25519 AAAA-test-key phoebus-instance", nil)
 	r := chi.NewRouter()
 	h.RegisterRoutes(r)
 	srv := httptest.NewServer(r)

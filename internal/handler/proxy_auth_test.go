@@ -18,7 +18,7 @@ func setupProxyTest(t *testing.T, proxyCfg config.ProxyAuthConfig) (*httptest.Se
 		Admin:         config.AdminConfig{Username: "admin", Password: "admin"},
 		EncryptionKey: "01234567890123456789012345678901",
 	}
-	h := New(testDB, cfg, nil, "ssh-ed25519 AAAA-test-key phoebus-instance")
+	h := New(testDB, cfg, nil, "ssh-ed25519 AAAA-test-key phoebus-instance", nil)
 	r := chi.NewRouter()
 	h.RegisterRoutes(r)
 	srv := httptest.NewServer(r)
