@@ -1,101 +1,101 @@
-# Phœbus — Guide de l'Instructeur
+# Phœbus — Instructor Guide
 
-> Ce guide détaille comment créer et maintenir des parcours de formation (learning paths) sur la plateforme Phœbus. Tout le contenu est rédigé en **Markdown**, versionné dans des **dépôts Git**, et synchronisé automatiquement.
+> This guide details how to create and maintain learning paths on the Phœbus platform. All content is written in **Markdown**, version-controlled in **Git repositories**, and synchronized automatically.
 
 ---
 
-## Table des matières
+## Table of Contents
 
-1. [Principes fondamentaux](#1-principes-fondamentaux)
-2. [Structure d'un dépôt de contenu](#2-structure-dun-dépôt-de-contenu)
-3. [Le fichier `phoebus.yaml`](#3-le-fichier-phoebusyaml)
-4. [Les modules (`index.md`)](#4-les-modules-indexmd)
-5. [Les étapes (steps)](#5-les-étapes-steps)
-   - [Leçon (lesson)](#51-leçon-lesson)
+1. [Core Principles](#1-core-principles)
+2. [Content Repository Structure](#2-content-repository-structure)
+3. [The `phoebus.yaml` File](#3-the-phoebusyaml-file)
+4. [Modules (`index.md`)](#4-modules-indexmd)
+5. [Steps](#5-steps)
+   - [Lesson](#51-lesson)
    - [Quiz](#52-quiz)
-   - [Exercice terminal](#53-exercice-terminal-terminal-exercise)
-   - [Exercice de code](#54-exercice-de-code-code-exercise)
-6. [Markdown supporté](#6-markdown-supporté)
-7. [Synchronisation et mise à jour](#7-synchronisation-et-mise-à-jour)
-8. [Bonnes pratiques](#8-bonnes-pratiques)
-9. [Référence rapide](#9-référence-rapide)
+   - [Terminal Exercise](#53-terminal-exercise)
+   - [Code Exercise](#54-code-exercise)
+6. [Supported Markdown](#6-supported-markdown)
+7. [Synchronization and Updates](#7-synchronization-and-updates)
+8. [Best Practices](#8-best-practices)
+9. [Quick Reference](#9-quick-reference)
 
 ---
 
-## 1. Principes fondamentaux
+## 1. Core Principles
 
-Phœbus adopte une approche **content-as-code** : les parcours de formation sont de simples fichiers Markdown organisés dans un dépôt Git. Cette approche apporte :
+Phœbus follows a **content-as-code** approach: learning paths are simple Markdown files organized in a Git repository. This provides:
 
-- **Versionnement** — chaque modification est tracée via Git
-- **Collaboration** — les instructeurs travaillent avec des pull requests et des revues de code
-- **Agilité** — mettre à jour un contenu = modifier un fichier + push
-- **Reproductibilité** — le contenu est toujours dans un état connu
+- **Version control** — every change is tracked via Git
+- **Collaboration** — instructors work with pull requests and code reviews
+- **Agility** — updating content = editing a file + push
+- **Reproducibility** — content is always in a known state
 
-Un dépôt Git = un learning path. Chaque sous-dossier est un module, et chaque fichier `.md` est une étape (step).
+One Git repository = one learning path. Each subdirectory is a module, and each `.md` file is a step.
 
 ---
 
-## 2. Structure d'un dépôt de contenu
+## 2. Content Repository Structure
 
-Voici la structure complète attendue par Phœbus :
+Here is the complete structure expected by Phœbus:
 
 ```
-mon-learning-path/
-├── phoebus.yaml                          # ① Métadonnées du learning path
+my-learning-path/
+├── phoebus.yaml                          # ① Learning path metadata
 │
-├── 01-premier-module/                    # ② Module (préfixe numérique = ordre)
-│   ├── index.md                          #    Métadonnées du module
-│   ├── 01-introduction.md                #    Étape : leçon
-│   ├── 02-commandes-essentielles.md      #    Étape : leçon
-│   ├── 03-exercice-navigation.md         #    Étape : exercice terminal
-│   ├── 04-quiz.md                        #    Étape : quiz
-│   └── 05-fix-config/                    #    Étape : exercice de code (dossier)
+├── 01-first-module/                      # ② Module (numeric prefix = order)
+│   ├── index.md                          #    Module metadata
+│   ├── 01-introduction.md                #    Step: lesson
+│   ├── 02-essential-commands.md          #    Step: lesson
+│   ├── 03-navigation-exercise.md         #    Step: terminal exercise
+│   ├── 04-quiz.md                        #    Step: quiz
+│   └── 05-fix-config/                    #    Step: code exercise (directory)
 │       ├── instructions.md               #        Instructions + patches
-│       └── codebase/                     #        Fichiers de code à analyser
+│       └── codebase/                     #        Code files to review
 │           ├── config.yaml
 │           └── main.go
 │
-├── 02-deuxieme-module/
+├── 02-second-module/
 │   ├── index.md
-│   ├── 01-theorie.md
+│   ├── 01-theory.md
 │   └── 02-quiz.md
 │
-└── 03-troisieme-module/
+└── 03-third-module/
     ├── index.md
     └── ...
 ```
 
-### Règles d'ordonnancement
+### Ordering Rules
 
-L'ordre des modules et des étapes est déterminé par le **préfixe numérique** du nom de fichier ou dossier :
+The order of modules and steps is determined by the **numeric prefix** of the file or directory name:
 
-- `01-introduction.md` sera affiché avant `02-commandes.md`
-- `01-basics/` sera affiché avant `02-advanced/`
-- Les fichiers sans préfixe numérique sont triés alphabétiquement après les fichiers numérotés
-- Le préfixe numérique est **retiré** du nom affiché dans la plateforme
+- `01-introduction.md` will be displayed before `02-commands.md`
+- `01-basics/` will be displayed before `02-advanced/`
+- Files without a numeric prefix are sorted alphabetically after numbered files
+- The numeric prefix is **stripped** from the name displayed in the platform
 
-> 💡 **Convention recommandée** : utilisez des préfixes à deux chiffres (`01-`, `02-`, ..., `99-`) pour garder un ordonnancement clair.
+> 💡 **Recommended convention**: use two-digit prefixes (`01-`, `02-`, ..., `99-`) for clear ordering.
 
 ---
 
-## 3. Le fichier `phoebus.yaml`
+## 3. The `phoebus.yaml` File
 
-Le fichier `phoebus.yaml` à la racine du dépôt décrit les métadonnées du learning path. C'est le point d'entrée que Phœbus utilise pour identifier et indexer le parcours.
+The `phoebus.yaml` file at the repository root describes the learning path metadata. It is the entry point Phœbus uses to identify and index the path.
 
-### Champs disponibles
+### Available Fields
 
-| Champ | Type | Obligatoire | Description |
-|-------|------|:-----------:|-------------|
-| `title` | string | ✅ | Titre du learning path |
-| `description` | string | | Description affichée sur la carte du parcours |
-| `icon` | string | | Icône (emoji ou identifiant) |
-| `tags` | string[] | | Tags pour le filtrage et la recherche |
-| `estimated_duration` | string | | Durée estimée (ex : `"12h"`, `"2h30m"`) |
-| `prerequisites` | string[] | | Titres des learning paths prérequis |
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `title` | string | ✅ | Learning path title |
+| `description` | string | | Description displayed on the path card |
+| `icon` | string | | Icon (emoji or identifier) |
+| `tags` | string[] | | Tags for filtering and search |
+| `estimated_duration` | string | | Estimated duration (e.g., `"12h"`, `"2h30m"`) |
+| `prerequisites` | string[] | | Titles of prerequisite learning paths |
 
-### Exemple complet
+### Full Example
 
-Tiré du parcours [Linux Fundamentals](https://github.com/fsamin/phoebus-content-samples) :
+From the [Linux Fundamentals](https://github.com/fsamin/phoebus-content-samples) path:
 
 ```yaml
 title: "Linux Fundamentals"
@@ -106,7 +106,7 @@ estimated_duration: "12h"
 prerequisites: []
 ```
 
-Autre exemple, avec des prérequis :
+Another example, with prerequisites:
 
 ```yaml
 title: "Containerization with Docker & Helm"
@@ -121,19 +121,19 @@ prerequisites:
 
 ---
 
-## 4. Les modules (`index.md`)
+## 4. Modules (`index.md`)
 
-Chaque dossier de module **doit** contenir un fichier `index.md` qui décrit le module. Les métadonnées sont écrites en **front matter YAML** (délimité par `---`).
+Each module directory **must** contain an `index.md` file that describes the module. Metadata is written in **YAML front matter** (delimited by `---`).
 
-### Champs disponibles
+### Available Fields
 
-| Champ | Type | Obligatoire | Description |
-|-------|------|:-----------:|-------------|
-| `title` | string | ✅ | Titre du module |
-| `description` | string | | Description du module |
-| `competencies` | string[] | | Compétences couvertes par le module |
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `title` | string | ✅ | Module title |
+| `description` | string | | Module description |
+| `competencies` | string[] | | Competencies covered by the module |
 
-### Exemple
+### Example
 
 ```markdown
 ---
@@ -152,29 +152,29 @@ navigating the filesystem, manipulating files, and understanding permissions.
 By the end of this module, you will be comfortable working in a Linux terminal.
 ```
 
-Le contenu Markdown après le front matter est affiché comme introduction du module.
+The Markdown content after the front matter is displayed as the module introduction.
 
 ---
 
-## 5. Les étapes (steps)
+## 5. Steps
 
-Chaque étape est un fichier `.md` dans un dossier de module. Le front matter définit le type d'étape.
+Each step is a `.md` file inside a module directory. The front matter defines the step type.
 
-### Front matter commun à toutes les étapes
+### Common Front Matter for All Steps
 
-| Champ | Type | Obligatoire | Description |
-|-------|------|:-----------:|-------------|
-| `title` | string | ✅ | Titre de l'étape |
-| `type` | string | ✅ | Type : `lesson`, `quiz`, `terminal-exercise`, `code-exercise` |
-| `estimated_duration` | string | | Durée estimée (ex : `"15m"`, `"1h"`) |
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `title` | string | ✅ | Step title |
+| `type` | string | ✅ | Type: `lesson`, `quiz`, `terminal-exercise`, `code-exercise` |
+| `estimated_duration` | string | | Estimated duration (e.g., `"15m"`, `"1h"`) |
 
 ---
 
-### 5.1 Leçon (`lesson`)
+### 5.1 Lesson
 
-La leçon est le type le plus simple : du contenu Markdown pur, affiché tel quel au learner.
+A lesson is the simplest type: pure Markdown content, displayed as-is to the learner.
 
-#### Exemple : `01-filesystem.md`
+#### Example: `01-filesystem.md`
 
 ```markdown
 ---
@@ -209,45 +209,45 @@ cd /etc      # Change directory
 \`\`\`
 ```
 
-#### Ce qui est supporté dans les leçons
+#### What Is Supported in Lessons
 
-- Tout le Markdown standard (titres, listes, tableaux, emphase, liens, images)
-- Blocs de code avec coloration syntaxique (spécifiez le langage : ` ```bash`, ` ```yaml`, etc.)
-- Liens vers des images (URLs `http://` et `https://` uniquement)
+- All standard Markdown (headings, lists, tables, emphasis, links, images)
+- Code blocks with syntax highlighting (specify the language: ` ```bash`, ` ```yaml`, etc.)
+- Image links (`http://` and `https://` URLs only)
 
-> ⚠️ **Sécurité** : les URLs `file://` et `javascript:` sont bloquées. Seuls les protocoles `http`, `https` et `mailto` sont autorisés dans les liens.
+> ⚠️ **Security**: `file://` and `javascript:` URLs are blocked. Only `http`, `https`, and `mailto` protocols are allowed in links.
 
 ---
 
 ### 5.2 Quiz
 
-Le quiz permet d'évaluer la compréhension du learner avec des questions à choix multiples ou à réponse courte.
+Quizzes assess learner understanding with multiple-choice or short-answer questions.
 
-#### Syntaxe
+#### Syntax
 
-Le corps du fichier Markdown utilise une syntaxe spéciale :
+The Markdown body uses a special syntax:
 
 ```
-## [type-de-question] Texte de la question
+## [question-type] Question text
 
-(options ou pattern)
+(choices or pattern)
 
-> Explication affichée après soumission.
+> Explanation displayed after submission.
 ```
 
-#### Types de questions
+#### Question Types
 
-| Type | Syntaxe du heading | Description |
-|------|-------------------|-------------|
-| Choix multiple | `## [multiple-choice]` | Le learner sélectionne une ou plusieurs réponses |
-| Réponse courte | `## [short-answer]` | Le learner tape une réponse libre |
+| Type | Heading Syntax | Description |
+|------|---------------|-------------|
+| Multiple choice | `## [multiple-choice]` | Learner selects one or more answers |
+| Short answer | `## [short-answer]` | Learner types a free-form answer |
 
-#### Question à choix multiple
+#### Multiple-Choice Question
 
-Les réponses sont des listes à puces avec des cases à cocher :
+Answers are bullet lists with checkboxes:
 
-- `- [x]` = réponse **correcte**
-- `- [ ]` = réponse **incorrecte**
+- `- [x]` = **correct** answer
+- `- [ ]` = **incorrect** answer
 
 ```markdown
 ## [multiple-choice] What does the `/etc` directory contain?
@@ -261,11 +261,11 @@ Les réponses sont des listes à puces avec des cases à cocher :
 > Examples include `/etc/ssh/sshd_config` and `/etc/hosts`.
 ```
 
-> 💡 Vous pouvez mettre **plusieurs** `[x]` pour créer une question à sélection multiple (le learner devra cocher toutes les bonnes réponses).
+> 💡 You can mark **multiple** `[x]` checkboxes to create a multi-select question (the learner must check all correct answers).
 
-#### Question à réponse courte
+#### Short-Answer Question
 
-La réponse attendue est un **pattern regex** écrit dans un bloc de code indenté (4 espaces) :
+The expected answer is a **regex pattern** written in an indented code block (4 spaces):
 
 ```markdown
 ## [short-answer] Which command follows a log file in real-time?
@@ -276,17 +276,17 @@ La réponse attendue est un **pattern regex** écrit dans un bloc de code indent
 > as it's appended.
 ```
 
-Le pattern est évalué comme une **expression régulière** (insensible à la casse). Vous pouvez donc utiliser :
+The pattern is evaluated as a **regular expression** (case-insensitive). You can use:
 
-- `tail -f` — correspondance exacte
-- `tail\s+(-f|--follow)` — accepte `-f` ou `--follow`
-- `mkdir\s+-p\s+.*` — accepte n'importe quel chemin après `mkdir -p`
+- `tail -f` — exact match
+- `tail\s+(-f|--follow)` — accepts `-f` or `--follow`
+- `mkdir\s+-p\s+.*` — accepts any path after `mkdir -p`
 
-> ⚠️ **Le pattern regex est validé au moment de la synchronisation.** Une regex invalide fera échouer le sync.
+> ⚠️ **The regex pattern is validated at sync time.** An invalid regex will cause the sync to fail.
 
-#### Exemple complet de quiz
+#### Full Quiz Example
 
-Tiré du parcours [Linux Fundamentals](https://github.com/fsamin/phoebus-content-samples) :
+From the [Linux Fundamentals](https://github.com/fsamin/phoebus-content-samples) path:
 
 ```markdown
 ---
@@ -331,47 +331,47 @@ estimated_duration: "10m"
 
 ---
 
-### 5.3 Exercice terminal (`terminal-exercise`)
+### 5.3 Terminal Exercise
 
-L'exercice terminal simule un environnement de ligne de commande. Le learner doit sélectionner la bonne commande à chaque étape, dans un terminal interactif stylisé.
+A terminal exercise simulates a command-line environment. The learner must select the correct command at each step in a styled interactive terminal.
 
-#### Syntaxe
+#### Syntax
 
 ```
-(texte d'introduction avant le premier step)
+(introduction text before the first step)
 
-## Step N: Titre de l'étape
+## Step N: Step title
 
-Contexte et instructions.
+Context and instructions.
 
 \`\`\`console
 $ ▌
 \`\`\`
 
-- [x] `commande-correcte` — Explication de pourquoi c'est correct.
-- [ ] `commande-incorrecte` — Explication de pourquoi c'est incorrect.
-- [ ] `autre-commande-incorrecte` — Autre explication.
+- [x] `correct-command` — Explanation of why this is correct.
+- [ ] `incorrect-command` — Explanation of why this is incorrect.
+- [ ] `other-incorrect-command` — Another explanation.
 
 \`\`\`output
-sortie simulée après la bonne commande
+simulated output after the correct command
 \`\`\`
 ```
 
-#### Règles
+#### Rules
 
-| Élément | Règle |
-|---------|-------|
-| Introduction | Texte libre avant le premier `## Step` |
-| Steps | Numérotés avec `## Step N` |
-| Prompt | Bloc ` ```console ` avec `$ ▌` |
-| Propositions | `- [x]` (correcte) ou `- [ ]` (incorrecte), commande entre backticks |
-| Explication | Après ` — ` (tiret cadratin) dans chaque proposition |
-| Output | Bloc ` ```output ` affiché après la bonne réponse |
-| Exactement 1 `[x]` | ✅ **Une et une seule** réponse correcte par step |
+| Element | Rule |
+|---------|------|
+| Introduction | Free text before the first `## Step` |
+| Steps | Numbered with `## Step N` |
+| Prompt | ` ```console ` block with `$ ▌` |
+| Proposals | `- [x]` (correct) or `- [ ]` (incorrect), command in backticks |
+| Explanation | After ` — ` (em dash) in each proposal |
+| Output | ` ```output ` block displayed after the correct answer |
+| Exactly 1 `[x]` | ✅ **One and only one** correct answer per step |
 
-#### Exemple complet
+#### Full Example
 
-Tiré du parcours [Linux Fundamentals — Navigate the Filesystem](https://github.com/fsamin/phoebus-content-samples) :
+From the [Linux Fundamentals — Navigate the Filesystem](https://github.com/fsamin/phoebus-content-samples) path:
 
 ```markdown
 ---
@@ -439,61 +439,61 @@ $ ▌
 \`\`\`
 ```
 
-#### Rendu dans Phœbus
+#### How It Renders in Phœbus
 
-L'exercice terminal s'affiche comme un vrai terminal : le learner voit le prompt, les propositions de commandes, et la sortie simulée s'affiche progressivement après chaque bonne réponse.
+The terminal exercise is displayed as a real terminal: the learner sees the prompt, command proposals, and simulated output appears progressively after each correct answer.
 
 ---
 
-### 5.4 Exercice de code (`code-exercise`)
+### 5.4 Code Exercise
 
-L'exercice de code est le type le plus riche. Il présente au learner un **codebase complet** dans un éditeur Monaco (le même que VS Code), et lui demande d'**identifier un problème** puis de **sélectionner le bon correctif** parmi plusieurs patches (diffs).
+The code exercise is the richest type. It presents the learner with a **full codebase** in a Monaco editor (the same as VS Code), and asks them to **identify a problem** then **select the correct fix** from several patches (diffs).
 
-#### Structure sur le filesystem
+#### Filesystem Structure
 
-Contrairement aux autres types, l'exercice de code utilise un **dossier** au lieu d'un simple fichier :
+Unlike other types, a code exercise uses a **directory** instead of a single file:
 
 ```
 03-fix-dockerfile/
 ├── instructions.md      # Instructions, description, patches
-└── codebase/            # Fichiers de code affichés dans l'éditeur
+└── codebase/            # Code files displayed in the editor
     ├── Dockerfile
     ├── main.go
     └── go.mod
 ```
 
-> ⚠️ Phœbus détecte automatiquement qu'une étape est un exercice de code quand un **dossier** contient un fichier `instructions.md`.
+> ⚠️ Phœbus automatically detects that a step is a code exercise when a **directory** contains an `instructions.md` file.
 
-#### Front matter de `instructions.md`
+#### `instructions.md` Front Matter
 
-| Champ | Type | Obligatoire | Description |
-|-------|------|:-----------:|-------------|
-| `title` | string | ✅ | Titre de l'exercice |
-| `type` | string | ✅ | Doit être `code-exercise` |
-| `mode` | string | ✅ | Mode de l'exercice (voir ci-dessous) |
-| `estimated_duration` | string | | Durée estimée |
-| `target` | object | ✅* | Fichier et lignes contenant le problème |
-| `target.file` | string | ✅* | Chemin relatif du fichier dans `codebase/` |
-| `target.lines` | int[] | ✅* | Numéros des lignes problématiques |
+| Field | Type | Required | Description |
+|-------|------|:--------:|-------------|
+| `title` | string | ✅ | Exercise title |
+| `type` | string | ✅ | Must be `code-exercise` |
+| `mode` | string | ✅ | Exercise mode (see below) |
+| `estimated_duration` | string | | Estimated duration |
+| `target` | object | ✅* | File and lines containing the problem |
+| `target.file` | string | ✅* | Relative path of the file in `codebase/` |
+| `target.lines` | int[] | ✅* | Line numbers of the problematic lines |
 
-\* Obligatoire pour le mode `identify-and-fix`.
+\* Required for `identify-and-fix` mode.
 
-#### Modes d'exercice
+#### Exercise Modes
 
 | Mode | Phase 1 | Phase 2 | Description |
 |------|---------|---------|-------------|
-| `identify-and-fix` | Identifier les lignes problématiques | Choisir le bon patch | Le learner doit d'abord cliquer sur les bonnes lignes, puis sélectionner le diff correct |
+| `identify-and-fix` | Identify the problematic lines | Choose the correct patch | The learner must first click on the correct lines, then select the right diff |
 
-#### Syntaxe de `instructions.md`
+#### `instructions.md` Syntax
 
 ```
-(description libre du problème en Markdown)
+(free-form problem description in Markdown)
 
 ## Patches
 
-### [x] Titre du patch correct
+### [x] Correct patch title
 
-Explication de pourquoi c'est la bonne solution.
+Explanation of why this is the right solution.
 
 \`\`\`diff
 --- a/Dockerfile
@@ -504,9 +504,9 @@ Explication de pourquoi c'est la bonne solution.
  ...
 \`\`\`
 
-### [ ] Titre du patch incorrect
+### [ ] Incorrect patch title
 
-Explication de pourquoi cette approche ne fonctionne pas.
+Explanation of why this approach doesn't work.
 
 \`\`\`diff
 --- a/Dockerfile
@@ -517,21 +517,21 @@ Explication de pourquoi cette approche ne fonctionne pas.
 \`\`\`
 ```
 
-#### Règles
+#### Rules
 
-| Élément | Règle |
-|---------|-------|
-| Section Patches | Commence par `## Patches` |
-| Patches | Délimités par `### [x]` (correct) ou `### [ ]` (incorrect) |
-| Diff | Bloc ` ```diff ` au format **unified diff** |
-| Exactement 1 `[x]` | ✅ **Un et un seul** patch correct |
-| Codebase | Tous les fichiers texte dans `codebase/` (les binaires sont ignorés) |
+| Element | Rule |
+|---------|------|
+| Patches section | Starts with `## Patches` |
+| Patches | Delimited by `### [x]` (correct) or `### [ ]` (incorrect) |
+| Diff | ` ```diff ` block in **unified diff** format |
+| Exactly 1 `[x]` | ✅ **One and only one** correct patch |
+| Codebase | All text files in `codebase/` (binary files are ignored) |
 
-#### Exemple complet
+#### Full Example
 
-Tiré du parcours [Containerization — Fix the Dockerfile](https://github.com/fsamin/phoebus-content-samples) :
+From the [Containerization — Fix the Dockerfile](https://github.com/fsamin/phoebus-content-samples) path:
 
-**`03-fix-dockerfile/instructions.md`** :
+**`03-fix-dockerfile/instructions.md`**:
 
 ```markdown
 ---
@@ -619,7 +619,7 @@ including the Go toolchain in the final image.
 \`\`\`
 ```
 
-**`03-fix-dockerfile/codebase/Dockerfile`** :
+**`03-fix-dockerfile/codebase/Dockerfile`**:
 
 ```dockerfile
 FROM golang:1.22
@@ -632,35 +632,35 @@ USER root
 CMD ["./server"]
 ```
 
-#### Rendu dans Phœbus
+#### How It Renders in Phœbus
 
-1. **Phase « Identify »** — L'éditeur Monaco affiche le codebase. Le learner clique sur les lignes qu'il pense problématiques (les lignes définies dans `target.lines`).
-2. **Phase « Fix »** — Les patches proposés s'affichent en tant que diffs. Le learner sélectionne celui qu'il pense correct. Le diff s'affiche dans un éditeur de comparaison (diff viewer).
+1. **"Identify" phase** — The Monaco editor displays the codebase. The learner clicks on lines they think are problematic (the lines defined in `target.lines`).
+2. **"Fix" phase** — The proposed patches are displayed as diffs. The learner selects the one they think is correct. The diff is shown in a comparison editor (diff viewer).
 
 ---
 
-## 6. Markdown supporté
+## 6. Supported Markdown
 
-Phœbus utilise un moteur de rendu Markdown complet. Voici ce qui est supporté dans les leçons :
+Phœbus uses a full Markdown rendering engine. Here is what is supported in lessons:
 
-### Syntaxe de base
+### Basic Syntax
 
-| Élément | Syntaxe |
-|---------|---------|
-| Titres | `# H1`, `## H2`, `### H3`, etc. |
-| Gras | `**texte en gras**` |
-| Italique | `*texte en italique*` |
-| Code inline | `` `code` `` |
-| Lien | `[texte](https://url.com)` |
+| Element | Syntax |
+|---------|--------|
+| Headings | `# H1`, `## H2`, `### H3`, etc. |
+| Bold | `**bold text**` |
+| Italic | `*italic text*` |
+| Inline code | `` `code` `` |
+| Link | `[text](https://url.com)` |
 | Image | `![alt](https://url.com/image.png)` |
-| Liste non ordonnée | `- item` ou `* item` |
-| Liste ordonnée | `1. item` |
-| Blockquote | `> citation` |
-| Ligne horizontale | `---` |
+| Unordered list | `- item` or `* item` |
+| Ordered list | `1. item` |
+| Blockquote | `> quote` |
+| Horizontal rule | `---` |
 
-### Blocs de code
+### Code Blocks
 
-Utilisez les triple backticks avec le langage pour la coloration syntaxique :
+Use triple backticks with the language for syntax highlighting:
 
 ````markdown
 ```go
@@ -670,199 +670,199 @@ func main() {
 ```
 ````
 
-Langages supportés : `bash`, `sh`, `go`, `python`, `javascript`, `typescript`, `yaml`, `json`, `dockerfile`, `hcl`, `sql`, `html`, `css`, et plus.
+Supported languages: `bash`, `sh`, `go`, `python`, `javascript`, `typescript`, `yaml`, `json`, `dockerfile`, `hcl`, `sql`, `html`, `css`, and more.
 
-### Tableaux
+### Tables
 
 ```markdown
-| Colonne 1 | Colonne 2 | Colonne 3 |
-|-----------|-----------|-----------|
-| valeur    | valeur    | valeur    |
+| Column 1 | Column 2 | Column 3 |
+|----------|----------|----------|
+| value    | value    | value    |
 ```
 
-### Protocoles autorisés
+### Allowed Protocols
 
-Pour des raisons de sécurité, seuls ces protocoles sont acceptés dans les liens et images :
+For security reasons, only these protocols are accepted in links and images:
 
-| Attribut | Protocoles autorisés |
-|----------|---------------------|
-| `href` (liens) | `http`, `https`, `mailto` |
+| Attribute | Allowed Protocols |
+|-----------|-------------------|
+| `href` (links) | `http`, `https`, `mailto` |
 | `src` (images) | `http`, `https` |
 
-Les URLs `file://`, `javascript:` et `data:` sont **bloquées**.
+`file://`, `javascript:`, and `data:` URLs are **blocked**.
 
 ---
 
-## 7. Synchronisation et mise à jour
+## 7. Synchronization and Updates
 
-### Ajouter un dépôt de contenu
+### Adding a Content Repository
 
-1. Connectez-vous en tant qu'**administrateur** sur Phœbus
-2. Allez dans **Admin → Repositories**
-3. Ajoutez l'URL de votre dépôt Git (HTTPS ou SSH)
-4. Lancez la synchronisation
+1. Log in as an **administrator** on Phœbus
+2. Go to **Admin → Repositories**
+3. Add your Git repository URL (HTTPS or SSH)
+4. Trigger the synchronization
 
-### Synchronisation intelligente (hash-based)
+### Smart Synchronization (Hash-Based)
 
-Phœbus utilise un système de **hash SHA-256** pour optimiser la synchronisation :
+Phœbus uses a **SHA-256 hash** system to optimize synchronization:
 
-- Chaque étape est hashée (titre + type + durée + contenu + exercice)
-- Chaque module est hashé (métadonnées + hash des étapes)
-- Chaque learning path est hashé (métadonnées + hash des modules)
+- Each step is hashed (title + type + duration + content + exercise data)
+- Each module is hashed (metadata + step hashes)
+- Each learning path is hashed (metadata + module hashes)
 
-**Conséquences pratiques :**
+**Practical consequences:**
 
-| Situation | Comportement |
-|-----------|-------------|
-| Contenu inchangé | ⏭ Ignoré (aucune écriture en DB) |
-| Contenu modifié | ✏️ Mis à jour, progression du learner **conservée** |
-| Nouveau contenu | ✅ Ajouté |
-| Contenu supprimé | 🗑 Soft-delete (la progression des learners est préservée) |
-| Contenu réapparu | ♻️ Restauré automatiquement |
+| Situation | Behavior |
+|-----------|----------|
+| Unchanged content | ⏭ Skipped (no DB writes) |
+| Modified content | ✏️ Updated, learner progress **preserved** |
+| New content | ✅ Added |
+| Removed content | 🗑 Soft-deleted (learner progress is preserved) |
+| Reappearing content | ♻️ Automatically restored |
 
-> 💡 **La progression des apprenants n'est jamais perdue** lors d'une re-synchronisation, même si le contenu évolue.
+> 💡 **Learner progress is never lost** during a re-sync, even when content changes.
 
-### Webhook pour la synchronisation automatique
+### Webhook for Automatic Synchronization
 
-Vous pouvez configurer un webhook Git (GitHub, GitLab, Bitbucket) pour déclencher la synchronisation automatiquement à chaque push. L'URL du webhook est disponible dans l'interface d'administration.
+You can configure a Git webhook (GitHub, GitLab, Bitbucket) to trigger synchronization automatically on every push. The webhook URL is available in the admin interface.
 
 ---
 
-## 8. Bonnes pratiques
+## 8. Best Practices
 
-### Organisation du contenu
+### Content Organization
 
-- **Un dépôt = un learning path** — Ne mélangez pas plusieurs parcours dans un même dépôt
-- **Modules de 3 à 7 étapes** — Suffisamment pour couvrir un sujet, pas trop pour ne pas décourager
-- **Alterner les types** — Leçon → Exercice → Quiz pour maintenir l'engagement
-- **Terminer chaque module par un quiz** — Pour valider les acquis
+- **One repository = one learning path** — Don't mix multiple paths in the same repository
+- **3 to 7 steps per module** — Enough to cover a topic, not too many to discourage learners
+- **Alternate step types** — Lesson → Exercise → Quiz to maintain engagement
+- **End each module with a quiz** — To validate knowledge retention
 
-### Rédaction des leçons
+### Writing Lessons
 
-- Allez à l'essentiel, évitez les paragraphes trop longs
-- Utilisez des **tableaux** pour les référence rapide
-- Incluez des **blocs de code** avec le langage pour la coloration
-- Utilisez des **listes** plutôt que des paragraphes pour les séquences d'instructions
+- Get to the point, avoid overly long paragraphs
+- Use **tables** for quick reference
+- Include **code blocks** with the language for syntax highlighting
+- Use **lists** rather than paragraphs for instruction sequences
 
-### Rédaction des quiz
+### Writing Quizzes
 
-- **3 à 6 questions par quiz** est un bon équilibre
-- Mélangez `multiple-choice` et `short-answer`
-- Écrivez des **explications** pour chaque question (`>`) — c'est le moment pédagogique
-- Pour les `short-answer`, utilisez des regex souples : `mkdir\s+-p` plutôt que `mkdir -p /exact/path`
+- **3 to 6 questions per quiz** is a good balance
+- Mix `multiple-choice` and `short-answer` types
+- Write **explanations** for every question (`>`) — this is the teaching moment
+- For `short-answer`, use flexible regex patterns: `mkdir\s+-p` rather than `mkdir -p /exact/path`
 
-### Rédaction des exercices terminal
+### Writing Terminal Exercises
 
-- **3 à 5 steps** par exercice
-- Chaque step doit être **auto-suffisant** avec assez de contexte
-- Proposez **3 commandes** par step (1 correcte + 2 incorrectes)
-- Les commandes incorrectes doivent être **plausibles** (erreurs courantes de débutants)
-- Incluez toujours un bloc `output` — il aide le learner à visualiser le résultat
+- **3 to 5 steps** per exercise
+- Each step should be **self-contained** with enough context
+- Provide **3 commands** per step (1 correct + 2 incorrect)
+- Incorrect commands should be **plausible** (common beginner mistakes)
+- Always include an `output` block — it helps the learner visualize the result
 
-### Rédaction des exercices de code
+### Writing Code Exercises
 
-- Le `codebase/` doit être **minimal et réaliste** (pas de fichier inutile)
-- Le fichier `target.file` doit correspondre exactement à un fichier dans `codebase/`
-- Les `target.lines` doivent pointer les lignes réellement problématiques
-- Proposez **3 patches** (1 correct + 2 incorrects) avec des approches différentes
-- Les patches incorrects doivent représenter des **erreurs courantes** (fix partiel, mauvaise approche)
-- Les diffs doivent être au format **unified diff** valide
+- The `codebase/` should be **minimal and realistic** (no unnecessary files)
+- The `target.file` must match a file in `codebase/` exactly
+- The `target.lines` should point to actually problematic lines
+- Provide **3 patches** (1 correct + 2 incorrect) with different approaches
+- Incorrect patches should represent **common mistakes** (partial fix, wrong approach)
+- Diffs must be in valid **unified diff** format
 
-### Workflow Git recommandé
+### Recommended Git Workflow
 
 ```
 main
  └── feature/update-module-2
-      ├── Modifier le contenu
+      ├── Edit content
       ├── Commit + Push
-      ├── Pull Request + Review par un pair
-      └── Merge → Sync automatique via webhook
+      ├── Pull Request + Peer review
+      └── Merge → Automatic sync via webhook
 ```
 
 ---
 
-## 9. Référence rapide
+## 9. Quick Reference
 
-### Types d'étapes
+### Step Types
 
-| Type | Fichier | Interactif | Description |
-|------|---------|:----------:|-------------|
-| `lesson` | `*.md` | ❌ | Contenu Markdown affiché |
-| `quiz` | `*.md` | ✅ | Questions à choix multiples et réponse courte |
-| `terminal-exercise` | `*.md` | ✅ | Simulation de terminal avec choix de commandes |
-| `code-exercise` | `dossier/instructions.md` + `codebase/` | ✅ | Analyse de code + sélection de patch |
+| Type | File | Interactive | Description |
+|------|------|:-----------:|-------------|
+| `lesson` | `*.md` | ❌ | Rendered Markdown content |
+| `quiz` | `*.md` | ✅ | Multiple-choice and short-answer questions |
+| `terminal-exercise` | `*.md` | ✅ | Terminal simulation with command selection |
+| `code-exercise` | `directory/instructions.md` + `codebase/` | ✅ | Code review + patch selection |
 
-### Syntaxe des questions quiz
+### Quiz Question Syntax
 
 ```
-## [multiple-choice] Texte de la question
-- [x] Bonne réponse
-- [ ] Mauvaise réponse
-> Explication
+## [multiple-choice] Question text
+- [x] Correct answer
+- [ ] Wrong answer
+> Explanation
 
-## [short-answer] Texte de la question
+## [short-answer] Question text
     regex-pattern
-> Explication
+> Explanation
 ```
 
-### Syntaxe des exercices terminal
+### Terminal Exercise Syntax
 
 ```
-## Step N: Titre
-Contexte.
+## Step N: Title
+Context.
 \`\`\`console
 $ ▌
 \`\`\`
-- [x] `bonne-commande` — Explication
-- [ ] `mauvaise-commande` — Explication
+- [x] `correct-command` — Explanation
+- [ ] `wrong-command` — Explanation
 \`\`\`output
-résultat
+result
 \`\`\`
 ```
 
-### Syntaxe des exercices de code
+### Code Exercise Syntax
 
 ```yaml
-# Front matter de instructions.md
+# instructions.md front matter
 type: code-exercise
 mode: identify-and-fix
 target:
-  file: "chemin/fichier.go"
+  file: "path/to/file.go"
   lines: [3, 8]
 ```
 
 ```
 ## Patches
-### [x] Bon patch
-Explication.
+### [x] Correct patch
+Explanation.
 \`\`\`diff
 unified diff
 \`\`\`
-### [ ] Mauvais patch
-Explication.
+### [ ] Wrong patch
+Explanation.
 \`\`\`diff
 unified diff
 \`\`\`
 ```
 
-### Arbre de décision : quel type d'étape choisir ?
+### Decision Tree: Which Step Type to Choose?
 
 ```
-Le learner doit-il faire quelque chose ?
-├── Non → lesson
-└── Oui
-    ├── Répondre à des questions de connaissance ? → quiz
-    ├── Exécuter des commandes dans un terminal ? → terminal-exercise
-    └── Analyser et corriger du code source ? → code-exercise
+Does the learner need to do something?
+├── No → lesson
+└── Yes
+    ├── Answer knowledge questions? → quiz
+    ├── Execute commands in a terminal? → terminal-exercise
+    └── Analyze and fix source code? → code-exercise
 ```
 
 ---
 
-## Ressources
+## Resources
 
-- **Dépôt d'exemples** : [fsamin/phoebus-content-samples](https://github.com/fsamin/phoebus-content-samples)
-  - `linux-fundamentals/` — Leçons, quiz, exercices terminal
-  - `containerization/` — Exercice de code (Fix the Dockerfile)
-  - `golang-programming/` — Parcours complet avec tous les types d'exercices
-  - `kubernetes/` — Exercices terminal avancés
-  - `git-mastery/` — Exercices Git
+- **Sample repository**: [fsamin/phoebus-content-samples](https://github.com/fsamin/phoebus-content-samples)
+  - `linux-fundamentals/` — Lessons, quizzes, terminal exercises
+  - `containerization/` — Code exercise (Fix the Dockerfile)
+  - `golang-programming/` — Full path with all exercise types
+  - `kubernetes/` — Advanced terminal exercises
+  - `git-mastery/` — Git exercises
