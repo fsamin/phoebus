@@ -23,6 +23,7 @@ nav:
   - Product Specification: product-specification.md
   - Technical Architecture: technical-architecture.md
   - Detailed Specifications: detailed-specifications.md
+  - Instructor Guide: instructor-guide.md
 
 markdown_extensions:
   - tables
