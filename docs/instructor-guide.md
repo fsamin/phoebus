@@ -16,9 +16,10 @@
    - [Terminal Exercise](#53-terminal-exercise)
    - [Code Exercise](#54-code-exercise)
 6. [Supported Markdown](#6-supported-markdown)
-7. [Synchronization and Updates](#7-synchronization-and-updates)
-8. [Best Practices](#8-best-practices)
-9. [Quick Reference](#9-quick-reference)
+7. [Assets (Images, Videos, Files)](#7-assets-images-videos-files)
+8. [Synchronization and Updates](#8-synchronization-and-updates)
+9. [Best Practices](#9-best-practices)
+10. [Quick Reference](#10-quick-reference)
 
 ---
 
@@ -693,7 +694,89 @@ For security reasons, only these protocols are accepted in links and images:
 
 ---
 
-## 7. Synchronization and Updates
+## 7. Assets (Images, Videos, Files)
+
+Phœbus supports **binary assets** (images, videos, PDFs, etc.) in your lessons. Assets are automatically uploaded and served by the platform.
+
+### Directory Structure
+
+Place your assets in an `assets/` directory **next to your step files** (inside the module directory):
+
+```
+01-linux-basics/
+├── index.md
+├── 01-intro.md
+├── 02-commands.md
+├── assets/
+│   ├── terminal-screenshot.png
+│   ├── demo-video.mp4
+│   └── architecture-diagram.svg
+└── 03-exercise/
+    ├── instructions.md
+    ├── assets/
+    │   └── expected-output.png
+    └── codebase/
+        └── main.go
+```
+
+- For **regular steps** (lesson, quiz, terminal-exercise): the `assets/` directory is at the **module level**, shared by all steps in that module.
+- For **code exercises**: the `assets/` directory can be **inside the exercise directory**, specific to that exercise.
+
+### Referencing Assets in Markdown
+
+Use **relative paths** starting with `./assets/` or `assets/`:
+
+```markdown
+## Understanding the Linux Filesystem
+
+Here is an overview of the directory structure:
+
+![Filesystem hierarchy](./assets/filesystem-diagram.png)
+
+Watch this demonstration:
+
+![Terminal demo](./assets/demo-video.mp4)
+
+Listen to the explanation:
+
+![Audio guide](./assets/explanation.mp3)
+```
+
+### Supported Formats
+
+| Type | Formats | Rendering |
+|------|---------|-----------|
+| **Images** | `.png`, `.jpg`, `.jpeg`, `.gif`, `.svg`, `.webp` | `<img>` tag |
+| **Videos** | `.mp4`, `.webm`, `.ogg`, `.mov` | `<video>` player with controls |
+| **Audio** | `.mp3`, `.wav`, `.ogg`, `.flac`, `.aac` | `<audio>` player with controls |
+| **Other** | `.pdf`, etc. | Download link |
+
+> 💡 Videos and audio files referenced with `![alt](./assets/file.mp4)` syntax are automatically rendered as `<video>` or `<audio>` players in the lesson view.
+
+### How It Works
+
+During synchronization, Phœbus:
+
+1. **Detects** all files in `assets/` directories
+2. **Hashes** each file (SHA-256) for deduplication
+3. **Uploads** new files to the asset store (filesystem or S3)
+4. **Rewrites** relative URLs in your markdown to `/api/assets/{hash}`
+5. **Caches** assets with immutable headers (since hash = content, the URL never changes)
+
+This means:
+- The **same image** used in multiple steps is stored **only once**
+- Assets are served with **aggressive HTTP caching** for fast loading
+- Your markdown stays clean with **relative paths** — the rewriting is transparent
+
+### Size Limits
+
+The maximum file size per asset is **configurable** (default: **50 MB**). Files exceeding this limit are skipped with a warning in the sync logs.
+
+> ⚠️ **Tip:** Compress videos before adding them to your repository. Use modern codecs like H.264 (MP4) or VP9 (WebM) for best quality/size ratio.
+
+---
+
+## 8. Synchronization and Updates
 
 ### Adding a Content Repository
 
@@ -728,7 +811,7 @@ You can configure a Git webhook (GitHub, GitLab, Bitbucket) to trigger synchroni
 
 ---
 
-## 8. Best Practices
+## 9. Best Practices
 
 ### Content Organization
 
@@ -781,7 +864,7 @@ main
 
 ---
 
-## 9. Quick Reference
+## 10. Quick Reference
 
 ### Step Types
 

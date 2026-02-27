@@ -13,6 +13,7 @@ type Config struct {
 	JWT           JWTConfig      `yaml:"jwt"`
 	Admin         AdminConfig    `yaml:"admin"`
 	Auth          AuthConfig     `yaml:"auth"`
+	Assets        AssetsConfig   `yaml:"assets"`
 	EncryptionKey string         `yaml:"encryption_key"`
 }
 
@@ -31,6 +32,27 @@ type JWTConfig struct {
 type AdminConfig struct {
 	Username string `yaml:"username"`
 	Password string `yaml:"password"`
+}
+
+type AssetsConfig struct {
+	Backend     string               `yaml:"backend"` // "filesystem" (default) or "s3"
+	MaxFileSize int64                `yaml:"max_file_size"`
+	Filesystem  FilesystemStoreConfig `yaml:"filesystem"`
+	S3          S3StoreConfig        `yaml:"s3"`
+}
+
+type FilesystemStoreConfig struct {
+	DataDir string `yaml:"data_dir"`
+}
+
+type S3StoreConfig struct {
+	Bucket         string `yaml:"bucket"`
+	Region         string `yaml:"region"`
+	Endpoint       string `yaml:"endpoint"`
+	Prefix         string `yaml:"prefix"`
+	AccessKey      string `yaml:"access_key"`
+	SecretKey      string `yaml:"secret_key"`
+	ForcePathStyle bool   `yaml:"force_path_style"`
 }
 
 type AuthConfig struct {
@@ -90,6 +112,12 @@ func Load() (*Config, error) {
 	cfg := &Config{
 		HTTP:     HTTPConfig{Port: 8080},
 		Admin:    AdminConfig{Username: "admin", Password: "admin"},
+		Assets: AssetsConfig{
+			Backend:     "filesystem",
+			MaxFileSize: 50 * 1024 * 1024, // 50 MB
+			Filesystem:  FilesystemStoreConfig{DataDir: "./data/assets"},
+			S3:          S3StoreConfig{Prefix: "assets"},
+		},
 		Auth:     AuthConfig{
 			LocalEnabled: true,
 			OIDC: OIDCConfig{
@@ -146,6 +174,10 @@ func Load() (*Config, error) {
 	}
 	if err := unmarshalItem("encryption", &encCfg); err == nil {
 		cfg.EncryptionKey = encCfg.Key
+	}
+
+	if err := unmarshalItem("assets", &cfg.Assets); err != nil {
+		// optional, keep defaults
 	}
 
 	return cfg, nil

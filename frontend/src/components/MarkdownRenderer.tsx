@@ -24,11 +24,13 @@ const sanitizeSchema = {
     code: [...(defaultSchema.attributes?.['code'] || []), 'className'],
     span: [...(defaultSchema.attributes?.['span'] || []), 'className'],
     div: [...(defaultSchema.attributes?.['div'] || []), 'className'],
+    video: ['src', 'controls', 'width', 'height', 'poster', 'preload', 'className'],
+    audio: ['src', 'controls', 'preload', 'className'],
+    source: ['src', 'type'],
   },
-  // Block dangerous tags (script, style, iframe, object, embed, form)
-  tagNames: (defaultSchema.tagNames || []).filter(
+  tagNames: [...(defaultSchema.tagNames || []).filter(
     (tag: string) => !['script', 'style', 'iframe', 'object', 'embed', 'form', 'textarea'].includes(tag)
-  ),
+  ), 'video', 'audio', 'source'],
   // Only allow safe URL protocols
   protocols: {
     ...defaultSchema.protocols,
@@ -67,16 +69,53 @@ function Admonition({ type, children }: { type: string; children?: React.ReactNo
   );
 }
 
+const videoExtensions = ['.mp4', '.webm', '.ogg', '.mov'];
+const audioExtensions = ['.mp3', '.wav', '.ogg', '.flac', '.aac'];
+
+function getExtension(src: string): string {
+  try {
+    const path = new URL(src, window.location.href).pathname;
+    const dot = path.lastIndexOf('.');
+    return dot >= 0 ? path.substring(dot).toLowerCase() : '';
+  } catch {
+    return '';
+  }
+}
+
 const admonitionNames = Object.keys(admonitionStyles);
 
-const components: Components = Object.fromEntries(
-  admonitionNames.map((name) => [
-    name,
-    ({ children, ...props }: React.HTMLAttributes<HTMLDivElement> & { children?: React.ReactNode }) => (
-      <Admonition type={name} {...props}>{children}</Admonition>
-    ),
-  ])
-);
+const components: Components = {
+  ...Object.fromEntries(
+    admonitionNames.map((name) => [
+      name,
+      ({ children, ...props }: React.HTMLAttributes<HTMLDivElement> & { children?: React.ReactNode }) => (
+        <Admonition type={name} {...props}>{children}</Admonition>
+      ),
+    ])
+  ),
+  // Render video/audio files linked as images: ![alt](file.mp4)
+  img: ({ src, alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => {
+    if (!src) return <img src={src} alt={alt} {...props} />;
+    const ext = getExtension(src);
+    if (videoExtensions.includes(ext)) {
+      return (
+        <video controls style={{ maxWidth: '100%' }}>
+          <source src={src} />
+          {alt}
+        </video>
+      );
+    }
+    if (audioExtensions.includes(ext)) {
+      return (
+        <audio controls>
+          <source src={src} />
+          {alt}
+        </audio>
+      );
+    }
+    return <img src={src} alt={alt} {...props} />;
+  },
+};
 
 const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
   const containerRef = useRef<HTMLDivElement>(null);

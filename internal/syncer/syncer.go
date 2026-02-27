@@ -1,6 +1,7 @@
 package syncer
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
@@ -16,6 +17,9 @@ import (
 	"strings"
 	"time"
 
+	"mime"
+
+	"github.com/fsamin/phoebus/internal/assets"
 	"github.com/fsamin/phoebus/internal/crypto"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
@@ -26,14 +30,20 @@ type Syncer struct {
 	db                *sqlx.DB
 	encryptionKey     string
 	instanceSSHKeyPEM []byte // instance-level SSH private key (decrypted)
+	assetStore        assets.Store
+	maxAssetSize      int64
+	storageBackend    string
 	notify            chan struct{} // signals the worker that a new job is available
 }
 
-func New(db *sqlx.DB, encryptionKey string, instanceSSHKeyPEM []byte) *Syncer {
+func New(db *sqlx.DB, encryptionKey string, instanceSSHKeyPEM []byte, assetStore assets.Store, maxAssetSize int64, storageBackend string) *Syncer {
 	return &Syncer{
 		db:                db,
 		encryptionKey:     encryptionKey,
 		instanceSSHKeyPEM: instanceSSHKeyPEM,
+		assetStore:        assetStore,
+		maxAssetSize:      maxAssetSize,
+		storageBackend:    storageBackend,
 		notify:            make(chan struct{}, 1),
 	}
 }
@@ -556,6 +566,25 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 
 			slog.Debug("step updated", "module", modulePath, "step", sd.filePath, "hash", sd.hash[:8])
 
+			// Sync assets and rewrite URLs in content_md
+			stepDir := filepath.Dir(sd.stepPath)
+			if sd.meta.Type == "code-exercise" {
+				// For code exercises, stepPath is .../exercise-dir/instructions.md
+				// Assets dir is .../exercise-dir/assets/
+			} else {
+				// For regular steps, stepPath is .../module-dir/step.md
+				// Assets dir is .../module-dir/assets/ (shared by all steps in the module)
+				// But we want per-step assets, so we look for assets relative to the step name too
+			}
+			rewrites, err := s.syncStepAssets(ctx, tx, stepID, stepDir)
+			if err != nil {
+				return fmt.Errorf("sync assets %s/%s: %w", modulePath, sd.filePath, err)
+			}
+			if len(rewrites) > 0 {
+				rewritten := rewriteAssetURLs(sd.contentMD, rewrites)
+				tx.ExecContext(ctx, `UPDATE steps SET content_md = $1 WHERE id = $2`, rewritten, stepID)
+			}
+
 			if sd.meta.Type == "code-exercise" {
 				codebaseDir := filepath.Join(filepath.Dir(sd.stepPath), "codebase")
 				if err := s.syncCodebaseFiles(ctx, tx, stepID, codebaseDir); err != nil {
@@ -766,4 +795,99 @@ func inferLanguage(ext string) string {
 	default:
 		return ""
 	}
+}
+
+// syncStepAssets scans an assets/ directory relative to the step, uploads new assets,
+// records them in the DB, and returns a map of original_path → /api/assets/{hash} for URL rewriting.
+func (s *Syncer) syncStepAssets(ctx context.Context, tx *sqlx.Tx, stepID uuid.UUID, stepDir string) (map[string]string, error) {
+	assetsDir := filepath.Join(stepDir, "assets")
+	if _, err := os.Stat(assetsDir); os.IsNotExist(err) {
+		return nil, nil
+	}
+
+	// Clean existing step_assets for this step (we'll re-link)
+	tx.ExecContext(ctx, `DELETE FROM step_assets WHERE step_id = $1`, stepID)
+
+	rewrites := map[string]string{}
+
+	err := filepath.Walk(assetsDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return err
+		}
+
+		if info.Size() > s.maxAssetSize {
+			slog.Warn("asset exceeds max size, skipping", "path", path, "size", info.Size(), "max", s.maxAssetSize)
+			return nil
+		}
+
+		// Compute hash
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return fmt.Errorf("read asset %s: %w", path, err)
+		}
+
+		h := sha256.Sum256(data)
+		hash := hex.EncodeToString(h[:])
+
+		relPath, _ := filepath.Rel(stepDir, path)
+		fileName := filepath.Base(path)
+		contentType := mime.TypeByExtension(filepath.Ext(fileName))
+		if contentType == "" {
+			contentType = "application/octet-stream"
+		}
+
+		// Check if asset already exists in DB
+		var assetID uuid.UUID
+		err = tx.GetContext(ctx, &assetID, `SELECT id FROM content_assets WHERE content_hash = $1`, hash)
+		if err != nil {
+			// New asset — upload to store
+			exists, _ := s.assetStore.Exists(ctx, hash)
+			if !exists {
+				if err := s.assetStore.Put(ctx, hash, contentType, bytes.NewReader(data)); err != nil {
+					return fmt.Errorf("upload asset %s: %w", relPath, err)
+				}
+			}
+
+			// Insert into content_assets
+			err = tx.GetContext(ctx, &assetID, `
+				INSERT INTO content_assets (content_hash, content_type, file_name, size_bytes, storage_backend)
+				VALUES ($1, $2, $3, $4, $5)
+				ON CONFLICT (content_hash) DO UPDATE SET content_hash = EXCLUDED.content_hash
+				RETURNING id
+			`, hash, contentType, fileName, info.Size(), s.storageBackend)
+			if err != nil {
+				return fmt.Errorf("insert content_asset %s: %w", relPath, err)
+			}
+		}
+
+		// Link step → asset
+		tx.ExecContext(ctx, `
+			INSERT INTO step_assets (step_id, asset_id, original_path) VALUES ($1, $2, $3)
+			ON CONFLICT DO NOTHING
+		`, stepID, assetID, relPath)
+
+		// Build rewrite map: ./assets/img.png → /api/assets/{hash}
+		rewrites["./"+relPath] = "/api/assets/" + hash
+		rewrites[relPath] = "/api/assets/" + hash
+		// Also handle assets/img.png without ./
+		rewrites["assets/"+fileName] = "/api/assets/" + hash
+
+		return nil
+	})
+
+	return rewrites, err
+}
+
+// rewriteAssetURLs replaces relative asset paths in markdown content with API URLs.
+// Only replaces paths within markdown image/link syntax: ![...](path) or [...]( path)
+func rewriteAssetURLs(content string, rewrites map[string]string) string {
+	if len(rewrites) == 0 {
+		return content
+	}
+	// Replace longest paths first to avoid partial matches
+	for original, apiURL := range rewrites {
+		// Only replace when preceded by ]( — markdown link/image syntax
+		content = strings.ReplaceAll(content, "]("+original+")", "]("+apiURL+")")
+	}
+	return content
 }

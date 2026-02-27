@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/fsamin/phoebus/internal/assets"
 	"github.com/fsamin/phoebus/internal/auth"
 	"github.com/fsamin/phoebus/internal/config"
 	"github.com/fsamin/phoebus/internal/model"
@@ -20,14 +21,16 @@ type Handler struct {
 	cfg          *config.Config
 	syncer       *syncer.Syncer
 	sshPublicKey string
+	assetStore   assets.Store
 }
 
-func New(db *sqlx.DB, cfg *config.Config, s *syncer.Syncer, sshPublicKey string) *Handler {
+func New(db *sqlx.DB, cfg *config.Config, s *syncer.Syncer, sshPublicKey string, assetStore assets.Store) *Handler {
 	return &Handler{
 		db:           db,
 		cfg:          cfg,
 		syncer:       s,
 		sshPublicKey: sshPublicKey,
+		assetStore:   assetStore,
 	}
 }
 
@@ -59,7 +62,8 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 					"script-src 'self' blob:; "+ // blob: needed for Monaco Editor web workers
 					"worker-src 'self' blob:; "+
 					"style-src 'self' 'unsafe-inline'; "+ // Ant Design uses inline styles
-					"img-src 'self' data:; "+
+					"img-src 'self' data: blob:; "+
+					"media-src 'self'; "+
 					"font-src 'self' data:; "+
 					"connect-src 'self'; "+
 					"frame-ancestors 'none'")
@@ -76,6 +80,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 	r.Get("/api/auth/oidc/callback", h.OIDCCallback)
 	r.Get("/api/auth/providers", h.AuthProviders)
 	r.Post("/api/webhooks/{uuid}", h.Webhook)
+	r.Get("/api/assets/{hash}", h.ServeAsset)
 	r.Handle("/metrics", h.Metrics())
 
 	// Authenticated

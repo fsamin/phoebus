@@ -8,6 +8,7 @@ services:
     volumes:
       - ./config.example:/etc/phoebus/conf.d:ro
       - ~/phoebus-content:/data/phoebus-content:ro
+      - assets_data:/data/assets
     depends_on:
       db:
         condition: service_healthy
@@ -36,3 +37,4 @@ services:
 
 volumes:
   pgdata:
+  assets_data:

@@ -295,16 +295,71 @@ No exercise data to extract. The Markdown body is stored in `content_md` as-is.
 - Fenced code blocks with syntax highlighting (language-specific)
 - Mermaid diagrams (rendered in the browser)
 - Admonition blocks via `remark-directive` plugin: `:::tip`, `:::warning`, `:::danger`, `:::info`, `:::note` (Docusaurus/MkDocs convention). Rendered as styled callout components (a React component maps each directive to a visual block with icon and color)
-- Embedded images (relative paths referencing the `assets/` directory)
+- Embedded images, videos, and audio (relative paths referencing the `assets/` directory)
 - HTML inline elements (limited — no scripts)
 
 **Rendering rules:**
-- Images with relative paths are resolved against the learning path's asset directory
+- Images with relative paths are automatically rewritten to `/api/assets/{hash}` during sync
+- Video files (`.mp4`, `.webm`, `.ogg`, `.mov`) referenced with `![alt](./assets/file.mp4)` are rendered as `<video>` players
+- Audio files (`.mp3`, `.wav`, `.ogg`, `.flac`, `.aac`) referenced with `![alt](./assets/file.mp3)` are rendered as `<audio>` players
 - Code blocks with a language identifier receive syntax highlighting
 - Mermaid code blocks (`` ```mermaid ``) are rendered as SVG diagrams
 - Raw HTML is sanitized (script tags, iframes, event handlers are stripped)
 
 > **Not in v1:** LaTeX math rendering (KaTeX/MathJax). DevOps content rarely needs math formulas. Adding KaTeX later is trivial (one remark plugin, no content format change).
+
+### 2.5 Asset Pipeline
+
+**Description:** Binary assets (images, videos, PDFs) from content repositories are uploaded to the asset store and served via the API.
+
+**Storage backends:**
+- **Filesystem** (default): Assets stored in `{data_dir}/{hash[0:2]}/{hash}` with companion `.meta` JSON file
+- **S3** (production): Assets stored in `{bucket}/{prefix}/{hash}` using any S3-compatible service (AWS S3, MinIO, etc.)
+
+**Database tables:**
+
+```sql
+-- Deduplicated asset storage (one row per unique file)
+content_assets (
+    id UUID PK,
+    content_hash TEXT UNIQUE NOT NULL,  -- SHA-256 hex
+    content_type TEXT NOT NULL,         -- MIME type
+    file_name TEXT NOT NULL,            -- original filename
+    size_bytes BIGINT NOT NULL,
+    storage_backend TEXT NOT NULL,      -- 'filesystem' or 's3'
+    created_at TIMESTAMPTZ
+)
+
+-- N:N relationship between steps and assets
+step_assets (
+    step_id UUID FK → steps(id) ON DELETE CASCADE,
+    asset_id UUID FK → content_assets(id),
+    original_path TEXT NOT NULL,        -- e.g. 'assets/diagram.png'
+    PK (step_id, asset_id)
+)
+```
+
+**Sync process:**
+1. For each step, scan the `assets/` directory relative to the step's parent directory
+2. Compute SHA-256 hash for each file
+3. If the hash doesn't exist in `content_assets` → upload to the asset store
+4. Insert/update `step_assets` relationship
+5. Rewrite relative URLs in `content_md`: `./assets/img.png` → `/api/assets/{hash}`
+6. Files exceeding `max_file_size` (default 50 MB) are skipped with a warning
+
+**Deduplication:** The same file used across multiple steps is stored only once (keyed by content hash).
+
+**API endpoint:**
+
+```
+GET /api/assets/{hash}
+```
+
+- **Public** (no authentication required)
+- Returns the asset with its original `Content-Type`
+- Cache headers: `Cache-Control: public, max-age=31536000, immutable`
+- Hash validation: must match `^[a-f0-9]{64}$`
+- Returns 404 for unknown hashes
 
 ---
 

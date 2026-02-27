@@ -100,12 +100,13 @@ The backend has no code execution, no infrastructure orchestration, and no WebSo
 | `POST /api/admin/users` | Create a local user (admin only, local auth must be enabled) |
 | `GET /api/analytics/*` | Learner and instructor analytics |
 | `GET /api/users/*` | User management (admin only) |
+| `GET /api/assets/{hash}` | Serve binary assets (images, videos) by content hash. Public, immutable caching |
 
 #### 3.2.2 Internal Services
 
 | Service | Responsibility |
 |---|---|
-| **Content Syncer** | Consumes sync jobs, clones Git repos (ephemeral), parses content structure (front matter + Markdown), stores codebase files, updates database |
+| **Content Syncer** | Consumes sync jobs, clones Git repos (ephemeral), parses content structure (front matter + Markdown), syncs binary assets (images, videos) to the asset store, stores codebase files, updates database |
 | **Auth Service** | Handles OIDC/LDAP authentication (with local auth fallback), session management, RBAC |
 | **Progress Service** | Tracks learner progress, exercise attempts, competency acquisition |
 | **Analytics Service** | Aggregates progress data for instructor dashboards (completion rates, failure points, attempt distributions) |
@@ -211,6 +212,8 @@ The `content_md` column stores **raw Markdown**, consistent with client-side ren
 - **`progress.step_id`** and **`exercise_attempts.step_id`** — FK changed from `ON DELETE CASCADE` to `ON DELETE SET NULL` (step_id is nullable). Learner progress is **never** lost, even if a step is eventually purged. Migration: `007_content_hash_sync.up.sql`
 - **`exercise_attempts`** — records every attempt a learner makes on an exercise. The `answers` JSONB stores the learner's selections (which command, which patch, which quiz answers). This enables instructors to analyze how learners approach problems.
 - **`codebase_files`** — stores the file contents from code exercise `codebase/` directories inline in PostgreSQL, keyed by step and file path. Served to the frontend for Monaco Editor rendering.
+- **`content_assets`** — deduplicated binary asset storage. Each unique file is identified by its SHA-256 hash. Stores metadata (MIME type, filename, size) while the actual binary data lives in the asset store (filesystem or S3). Assets are served via `GET /api/assets/{hash}` with immutable caching.
+- **`step_assets`** — N:N relationship between steps and content_assets. Tracks which assets are used by each step, with the original relative path for reference.
 - **`progress`** — tracks step-level completion status. `status` enum: `not_started`, `in_progress`, `completed`
 - **`sync_jobs`** — PostgreSQL-based job queue for content sync. Webhook inserts a row; a worker goroutine consumes via `SELECT FOR UPDATE SKIP LOCKED`. Tracks status (`pending`, `running`, `completed`, `failed`), attempt count, and error messages. Provides retry semantics, sync history for the admin UI, and multi-replica coordination.
 
@@ -218,7 +221,16 @@ The `content_md` column stores **raw Markdown**, consistent with client-side ren
 
 The Content Syncer is responsible for keeping the database in sync with Git repositories. It runs as a worker goroutine that consumes jobs from the `sync_jobs` table.
 
-Git repos are cloned into **`/tmp` (ephemeral)**, parsed, their content stored in PostgreSQL, and then the clone is deleted. There is no persistent disk state, no shared filesystem, and no PVC needed. A full clone of a pedagogical content repo (few MB) takes 5–15 seconds — acceptable for occasional syncs.
+Git repos are cloned into **`/tmp` (ephemeral)**, parsed, their content stored in PostgreSQL, and then the clone is deleted. There is no persistent disk state for content text, no shared filesystem, and no PVC needed. A full clone of a pedagogical content repo (few MB) takes 5–15 seconds — acceptable for occasional syncs.
+
+Binary assets (images, videos, PDFs) discovered in `assets/` directories are uploaded to the **Asset Store** — a pluggable storage backend implementing the `assets.Store` interface:
+
+| Backend | Use case | Storage path |
+|---------|----------|--------------|
+| **Filesystem** (default) | Development, small deployments | `{data_dir}/{hash[0:2]}/{hash}` |
+| **S3** | Production, cloud deployments | `{bucket}/{prefix}/{hash}` (any S3-compatible: AWS, MinIO, etc.) |
+
+Assets are deduplicated by SHA-256 hash: the same image used in 10 steps is stored once. Relative URLs in markdown (`./assets/img.png`) are rewritten to `/api/assets/{hash}` during sync, enabling immutable HTTP caching (`Cache-Control: public, max-age=31536000, immutable`).
 
 Steps removed from the repo are **soft-deleted** with a `deleted_at` timestamp rather than physically deleted, preserving learner progress and exercise attempts. If a step file reappears at the same path, it is automatically restored (`deleted_at = NULL`).
 

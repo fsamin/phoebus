@@ -100,7 +100,7 @@ A **Step** is the atomic unit of content. It can be one of the following types:
 
 | Step Type | Description |
 |---|---|
-| **Lesson** | A Markdown document with text, diagrams, and embedded media. Read-only instructional content. |
+| **Lesson** | A Markdown document with text, diagrams, embedded images, videos, and audio. Rich instructional content with media assets served from the platform's asset store. |
 | **Quiz** | A set of questions (multiple choice, short answer) to validate understanding of concepts. |
 | **Terminal Exercise** | An interactive, simulated terminal scenario. The learner is presented with a context (system state, command output) and must choose the correct command at each step from a set of proposals. The exercise progresses as a guided sequence — no real VM is involved. |
 | **Code Exercise** | A code review / debugging challenge presented in a read-only code viewer (with syntax highlighting and file tree). The learner must identify problematic code sections, choose the correct fix from proposed patches (diffs), or both. No free-form code editing — the exercise is about understanding and analysis. |
@@ -180,8 +180,10 @@ learning-path-kubernetes/
 │   ├── index.md
 │   └── ...
 └── assets/
-    └── diagrams/              # Shared images and diagrams
+    └── diagrams/              # Shared images, videos, and media assets
 ```
+
+**Asset management:** Binary assets (images, videos, PDFs) placed in `assets/` directories are automatically uploaded to the platform's asset store during synchronization. Relative paths in Markdown (`![](./assets/diagram.png)`) are transparently rewritten to API URLs. Assets are deduplicated by content hash and served with immutable HTTP caching. The asset store supports two backends: **filesystem** (default, for development) and **S3** (for production, compatible with any S3 service including MinIO). Maximum file size is configurable (default: 50 MB).
 
 All metadata is embedded as **YAML front matter** in Markdown files (à la Docusaurus / Hugo), eliminating the need for separate metadata files. Each module directory contains an `index.md` with module metadata in its front matter. For simple steps (lessons, quizzes, terminal exercises), the step is a single `.md` file. For code exercises that reference a codebase, the step is a directory containing `instructions.md` and a `codebase/` directory.
 

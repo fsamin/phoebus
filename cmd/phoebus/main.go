@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/fsamin/phoebus/internal/assets"
 	"github.com/fsamin/phoebus/internal/config"
 	"github.com/fsamin/phoebus/internal/database"
 	"github.com/fsamin/phoebus/internal/handler"
@@ -66,6 +67,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Initialize asset store
+	assetStore, err := assets.NewStore(cfg.Assets)
+	if err != nil {
+		slog.Error("failed to initialize asset store", "error", err)
+		os.Exit(1)
+	}
+
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
@@ -73,12 +81,12 @@ func main() {
 	r.Use(middleware.Timeout(30 * time.Second))
 
 	// Create and start the sync worker
-	syncWorker := syncer.New(db, cfg.EncryptionKey, sshKeyPair.PrivateKeyPEM)
+	syncWorker := syncer.New(db, cfg.EncryptionKey, sshKeyPair.PrivateKeyPEM, assetStore, cfg.Assets.MaxFileSize, cfg.Assets.Backend)
 	workerCtx, workerCancel := context.WithCancel(context.Background())
 	defer workerCancel()
 	go syncWorker.Start(workerCtx)
 
-	h := handler.New(db, cfg, syncWorker, sshKeyPair.PublicKey)
+	h := handler.New(db, cfg, syncWorker, sshKeyPair.PublicKey, assetStore)
 	h.RegisterRoutes(r)
 
 	// Serve embedded SPA for all non-API routes
