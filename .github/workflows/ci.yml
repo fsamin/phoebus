@@ -48,6 +48,18 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
+      minio:
+        image: bitnami/minio:latest
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd "curl -f http://localhost:9000/minio/health/live || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
 
@@ -69,6 +81,13 @@ jobs:
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
+      - name: Create MinIO test bucket
+        run: |
+          curl -sS https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc
+          chmod +x /usr/local/bin/mc
+          mc alias set local http://localhost:9000 minioadmin minioadmin
+          mc mb local/phoebus-test-assets
+
       - name: Build
         run: go build ./...
 
@@ -76,6 +95,7 @@ jobs:
         run: go test -race -coverprofile=coverage.out ./...
         env:
           PHOEBUS_TEST_DB: postgres://phoebus:phoebus@localhost:5432/phoebus_test?sslmode=disable
+          PHOEBUS_TEST_S3_ENDPOINT: http://localhost:9000
 
       - name: Coverage summary
         run: go tool cover -func=coverage.out | tail -1
