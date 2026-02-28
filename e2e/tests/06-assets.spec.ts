@@ -10,12 +10,9 @@ test.describe('Assets', () => {
     test.skip(!synced, 'Content not synced — skipping asset tests');
   });
 
-  test('asset endpoint returns image with correct headers', async ({ request }) => {
-    // Login as admin
-    const loginRes = await request.post(`${BASE_URL}/api/auth/login`, {
-      data: { username: 'admin', password: 'admin' },
-    });
-    expect(loginRes.status()).toBe(200);
+  test('asset endpoint returns image with correct headers', async ({ page }) => {
+    // Use page.request which inherits the authenticated storageState
+    const request = page.context().request;
 
     // Get catalog to find a learning path with assets
     const catalogRes = await request.get(`${BASE_URL}/api/catalog`);
@@ -60,7 +57,7 @@ test.describe('Assets', () => {
 
     test.skip(!assetHash, 'No asset references found in step content');
 
-    // Fetch the asset
+    // Fetch the asset (public endpoint, no auth needed)
     const assetRes = await request.get(`${BASE_URL}/api/assets/${assetHash}`);
     expect(assetRes.status()).toBe(200);
 
