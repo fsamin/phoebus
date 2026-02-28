@@ -18,13 +18,14 @@ services:
       MINIO_ROOT_PASSWORD: minioadmin
     command: server /data
     healthcheck:
-      test: ["CMD-SHELL", "mc ready local || curl -f http://localhost:9000/minio/health/live"]
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 5
 
   minio-init:
     image: minio/mc:latest
+    profiles: ["init"]
     depends_on:
       minio-e2e:
         condition: service_healthy
@@ -46,8 +47,8 @@ services:
     depends_on:
       db-e2e:
         condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
+      minio-e2e:
+        condition: service_healthy
 
   playwright:
     image: mcr.microsoft.com/playwright:v1.50.0-noble

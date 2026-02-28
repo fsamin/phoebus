@@ -44,7 +44,9 @@ docker:
 
 ## Run E2E tests (Playwright in Docker)
 e2e:
-	docker compose -p phoebus-e2e -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from playwright
+	docker compose -p phoebus-e2e -f docker-compose.e2e.yml up -d --build db-e2e minio-e2e
+	docker compose -p phoebus-e2e -f docker-compose.e2e.yml --profile init run --rm minio-init
+	docker compose -p phoebus-e2e -f docker-compose.e2e.yml up --build --abort-on-container-exit --exit-code-from playwright phoebus-e2e playwright
 	@docker compose -p phoebus-e2e -f docker-compose.e2e.yml down -v 2>/dev/null || true
 
 ## Stop E2E environment
