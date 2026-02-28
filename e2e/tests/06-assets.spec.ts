@@ -10,49 +10,63 @@ test.describe('Assets', () => {
     test.skip(!synced, 'Content not synced — skipping asset tests');
   });
 
-  test('asset endpoint returns image with correct headers', async ({ page }) => {
-    // Use page.request which inherits the authenticated storageState
-    const request = page.context().request;
+  test('asset endpoint returns image with correct headers', async ({ page, context }) => {
+    // Navigate to trigger cookie loading from storageState
+    await page.goto('/');
 
-    // Get catalog to find a learning path with assets
-    const catalogRes = await request.get(`${BASE_URL}/api/catalog`);
-    expect(catalogRes.ok()).toBeTruthy();
-    const catalog = await catalogRes.json();
+    // Use the context's request which carries the auth cookies
+    const request = context.request;
+
+    // Get learning paths
+    const pathsRes = await request.get(`${BASE_URL}/api/learning-paths`);
+    expect(pathsRes.ok()).toBeTruthy();
+    const paths = await pathsRes.json();
 
     // Find the containerization path (has assets in docker-fundamentals)
-    const containerPath = catalog.find((lp: { slug: string }) =>
+    const containerPath = paths.find((lp: { slug: string }) =>
       lp.slug.includes('containerization')
     );
     test.skip(!containerPath, 'Containerization learning path not found');
 
-    // Get modules for this learning path
-    const pathRes = await request.get(`${BASE_URL}/api/catalog/${containerPath.id}`);
+    // Get learning path detail with modules and steps
+    const pathRes = await request.get(`${BASE_URL}/api/learning-paths/${containerPath.id}`);
     expect(pathRes.ok()).toBeTruthy();
     const pathData = await pathRes.json();
 
-    // Find the first module with steps
-    const firstModule = pathData.modules?.[0];
-    test.skip(!firstModule, 'No modules found');
-
-    // Get steps for this module
-    const moduleRes = await request.get(
-      `${BASE_URL}/api/catalog/${containerPath.id}/modules/${firstModule.id}`
-    );
-    expect(moduleRes.ok()).toBeTruthy();
-    const moduleData = await moduleRes.json();
-
-    // Look for asset references in step content (pattern: /api/assets/{hash})
+    // Find steps across all modules
     const assetPattern = /\/api\/assets\/([a-f0-9]{64})/;
     let assetHash: string | null = null;
 
-    for (const step of moduleData.steps || []) {
-      if (step.content_md) {
-        const match = step.content_md.match(assetPattern);
-        if (match) {
-          assetHash = match[1];
-          break;
+    const modules = pathData.modules || [];
+    for (const mod of modules) {
+      const steps = mod.steps || [];
+      for (const step of steps) {
+        // Try to get step content if not inline
+        if (step.content_md) {
+          const match = step.content_md.match(assetPattern);
+          if (match) {
+            assetHash = match[1];
+            break;
+          }
+        }
+        // Try fetching step detail
+        if (!assetHash && step.id) {
+          const stepRes = await request.get(
+            `${BASE_URL}/api/learning-paths/${containerPath.id}/steps/${step.id}`
+          );
+          if (stepRes.ok()) {
+            const stepData = await stepRes.json();
+            if (stepData.content_md) {
+              const match = stepData.content_md.match(assetPattern);
+              if (match) {
+                assetHash = match[1];
+                break;
+              }
+            }
+          }
         }
       }
+      if (assetHash) break;
     }
 
     test.skip(!assetHash, 'No asset references found in step content');
