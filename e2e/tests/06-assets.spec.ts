@@ -10,30 +10,24 @@ test.describe('Assets', () => {
     test.skip(!synced, 'Content not synced — skipping asset tests');
   });
 
-  test('asset endpoint returns image with correct headers', async ({ page, context }) => {
-    // Navigate to trigger cookie loading from storageState
-    await page.goto('/');
-
-    // Use the context's request which carries the auth cookies
-    const request = context.request;
-
-    // Get learning paths
-    const pathsRes = await request.get(`${BASE_URL}/api/learning-paths`);
+  test('asset endpoint returns image with correct headers', async ({ request }) => {
+    // Get learning paths (uses storageState cookies via relative URL + baseURL)
+    const pathsRes = await request.get('/api/learning-paths');
     expect(pathsRes.ok()).toBeTruthy();
     const paths = await pathsRes.json();
 
     // Find the containerization path (has assets in docker-fundamentals)
-    const containerPath = paths.find((lp: { slug: string }) =>
-      lp.slug.includes('containerization')
+    const containerPath = paths.find((lp: { title: string }) =>
+      lp.title?.toLowerCase().includes('container')
     );
     test.skip(!containerPath, 'Containerization learning path not found');
 
     // Get learning path detail with modules and steps
-    const pathRes = await request.get(`${BASE_URL}/api/learning-paths/${containerPath.id}`);
+    const pathRes = await request.get(`/api/learning-paths/${containerPath.id}`);
     expect(pathRes.ok()).toBeTruthy();
     const pathData = await pathRes.json();
 
-    // Find steps across all modules
+    // Find asset references in step content
     const assetPattern = /\/api\/assets\/([a-f0-9]{64})/;
     let assetHash: string | null = null;
 
@@ -41,18 +35,10 @@ test.describe('Assets', () => {
     for (const mod of modules) {
       const steps = mod.steps || [];
       for (const step of steps) {
-        // Try to get step content if not inline
-        if (step.content_md) {
-          const match = step.content_md.match(assetPattern);
-          if (match) {
-            assetHash = match[1];
-            break;
-          }
-        }
-        // Try fetching step detail
-        if (!assetHash && step.id) {
+        // Steps in the listing only have summary — fetch full content
+        if (step.id) {
           const stepRes = await request.get(
-            `${BASE_URL}/api/learning-paths/${containerPath.id}/steps/${step.id}`
+            `/api/learning-paths/${containerPath.id}/steps/${step.id}`
           );
           if (stepRes.ok()) {
             const stepData = await stepRes.json();
@@ -72,7 +58,7 @@ test.describe('Assets', () => {
     test.skip(!assetHash, 'No asset references found in step content');
 
     // Fetch the asset (public endpoint, no auth needed)
-    const assetRes = await request.get(`${BASE_URL}/api/assets/${assetHash}`);
+    const assetRes = await request.get(`/api/assets/${assetHash}`);
     expect(assetRes.status()).toBe(200);
 
     // Verify headers
