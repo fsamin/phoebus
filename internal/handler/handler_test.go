@@ -515,3 +515,208 @@ func TestSSHPublicKeyEndpoint(t *testing.T) {
 		t.Errorf("public_key should start with ssh-ed25519, got: %s", key[:20])
 	}
 }
+
+// --- Competencies & Prerequisites ---
+
+// seedContentForCompetencyTests creates two learning paths with modules and competencies.
+// Path A ("Linux Fundamentals") provides competencies: linux-cli, linux-fs
+// Path B ("Docker Fundamentals") provides competencies: docker-basics, and has prerequisite: linux-cli
+// Returns (pathA_id, pathB_id, repoID)
+func seedContentForCompetencyTests(t *testing.T) (string, string, string) {
+	t.Helper()
+	repoID := uuid.New()
+	pathAID := uuid.New()
+	pathBID := uuid.New()
+	modAID := uuid.New()
+	modBID := uuid.New()
+	stepA1 := uuid.New()
+	stepA2 := uuid.New()
+	stepB1 := uuid.New()
+
+	testDB.MustExec(`INSERT INTO git_repositories (id, clone_url, branch, auth_type, webhook_uuid, sync_status, created_at, updated_at)
+		VALUES ($1, 'https://github.com/test/comp.git', 'main', 'none', $2, 'synced', now(), now())`, repoID, uuid.New())
+
+	testDB.MustExec(`INSERT INTO learning_paths (id, repo_id, title, description, tags, prerequisites, file_path, created_at, updated_at)
+		VALUES ($1, $2, 'Linux Fundamentals', 'Learn Linux', '{linux,cli}', '{}', 'linux/', now(), now())`, pathAID, repoID)
+	testDB.MustExec(`INSERT INTO learning_paths (id, repo_id, title, description, tags, prerequisites, file_path, created_at, updated_at)
+		VALUES ($1, $2, 'Docker Fundamentals', 'Learn Docker', '{docker,containers}', '{linux-cli}', 'docker/', now(), now())`, pathBID, repoID)
+
+	testDB.MustExec(`INSERT INTO modules (id, learning_path_id, title, description, competencies, position, file_path, created_at, updated_at)
+		VALUES ($1, $2, 'CLI Basics', 'Learn the CLI', '{linux-cli,linux-fs}', 0, 'cli/', now(), now())`, modAID, pathAID)
+	testDB.MustExec(`INSERT INTO modules (id, learning_path_id, title, description, competencies, position, file_path, created_at, updated_at)
+		VALUES ($1, $2, 'Docker Basics', 'Learn Docker', '{docker-basics}', 0, 'docker/', now(), now())`, modBID, pathBID)
+
+	testDB.MustExec(`INSERT INTO steps (id, module_id, title, type, content_md, position, file_path, created_at, updated_at)
+		VALUES ($1, $2, 'Intro to CLI', 'lesson', '# CLI', 0, 'cli/01.md', now(), now())`, stepA1, modAID)
+	testDB.MustExec(`INSERT INTO steps (id, module_id, title, type, content_md, position, file_path, created_at, updated_at)
+		VALUES ($1, $2, 'File System', 'lesson', '# FS', 1, 'cli/02.md', now(), now())`, stepA2, modAID)
+	testDB.MustExec(`INSERT INTO steps (id, module_id, title, type, content_md, position, file_path, created_at, updated_at)
+		VALUES ($1, $2, 'Docker Intro', 'lesson', '# Docker', 0, 'docker/01.md', now(), now())`, stepB1, modBID)
+
+	return pathAID.String(), pathBID.String(), repoID.String()
+}
+
+func TestListCompetencies(t *testing.T) {
+	srv, cleanup := setupTest(t)
+	defer cleanup()
+
+	seedContentForCompetencyTests(t)
+
+	cookie := loginAs(t, model.RoleLearner)
+	resp := doRequest(t, srv, "GET", "/api/competencies", nil, cookie)
+	if resp.StatusCode != 200 {
+		t.Fatalf("ListCompetencies: status = %d, want 200", resp.StatusCode)
+	}
+	defer resp.Body.Close()
+
+	var comps []map[string]any
+	json.NewDecoder(resp.Body).Decode(&comps)
+
+	if len(comps) < 3 {
+		t.Fatalf("expected at least 3 competencies (linux-cli, linux-fs, docker-basics), got %d", len(comps))
+	}
+
+	// Check that each competency has name and learning_path_ids
+	compNames := map[string]bool{}
+	for _, c := range comps {
+		name, _ := c["name"].(string)
+		compNames[name] = true
+		ids, _ := c["learning_path_ids"].([]any)
+		if len(ids) == 0 {
+			t.Errorf("competency %q has no learning_path_ids", name)
+		}
+	}
+	for _, expected := range []string{"linux-cli", "linux-fs", "docker-basics"} {
+		if !compNames[expected] {
+			t.Errorf("expected competency %q not found", expected)
+		}
+	}
+}
+
+func TestListLearningPathsCompetenciesProvided(t *testing.T) {
+	srv, cleanup := setupTest(t)
+	defer cleanup()
+
+	pathAID, pathBID, _ := seedContentForCompetencyTests(t)
+
+	cookie := loginAs(t, model.RoleLearner)
+	resp := doRequest(t, srv, "GET", "/api/learning-paths", nil, cookie)
+	if resp.StatusCode != 200 {
+		t.Fatalf("ListLearningPaths: status = %d, want 200", resp.StatusCode)
+	}
+	defer resp.Body.Close()
+
+	var paths []map[string]any
+	json.NewDecoder(resp.Body).Decode(&paths)
+
+	// Find our paths
+	var pathA, pathB map[string]any
+	for _, p := range paths {
+		id, _ := p["id"].(string)
+		if id == pathAID {
+			pathA = p
+		} else if id == pathBID {
+			pathB = p
+		}
+	}
+
+	if pathA == nil {
+		t.Fatal("Linux Fundamentals path not found in response")
+	}
+	if pathB == nil {
+		t.Fatal("Docker Fundamentals path not found in response")
+	}
+
+	// Path A should provide linux-cli, linux-fs
+	compsA, _ := pathA["competencies_provided"].([]any)
+	compsANames := map[string]bool{}
+	for _, c := range compsA {
+		compsANames[c.(string)] = true
+	}
+	if !compsANames["linux-cli"] || !compsANames["linux-fs"] {
+		t.Errorf("Path A competencies_provided = %v, want linux-cli + linux-fs", compsA)
+	}
+
+	// Path B should provide docker-basics
+	compsB, _ := pathB["competencies_provided"].([]any)
+	if len(compsB) != 1 || compsB[0].(string) != "docker-basics" {
+		t.Errorf("Path B competencies_provided = %v, want [docker-basics]", compsB)
+	}
+}
+
+func TestPrerequisitesMetFalseWhenNotCompleted(t *testing.T) {
+	srv, cleanup := setupTest(t)
+	defer cleanup()
+
+	_, pathBID, _ := seedContentForCompetencyTests(t)
+
+	cookie := loginAs(t, model.RoleLearner)
+	resp := doRequest(t, srv, "GET", "/api/learning-paths", nil, cookie)
+	if resp.StatusCode != 200 {
+		t.Fatalf("ListLearningPaths: status = %d", resp.StatusCode)
+	}
+	defer resp.Body.Close()
+
+	var paths []map[string]any
+	json.NewDecoder(resp.Body).Decode(&paths)
+
+	for _, p := range paths {
+		if p["id"].(string) == pathBID {
+			met, _ := p["prerequisites_met"].(bool)
+			if met {
+				t.Error("Docker path prerequisites_met should be false (linux-cli not completed)")
+			}
+			return
+		}
+	}
+	t.Fatal("Docker path not found")
+}
+
+func TestPrerequisitesMetTrueAfterCompletion(t *testing.T) {
+	srv, cleanup := setupTest(t)
+	defer cleanup()
+
+	pathAID, pathBID, _ := seedContentForCompetencyTests(t)
+
+	cookie := loginAs(t, model.RoleLearner)
+
+	// Get user ID from cookie claims
+	claims, _ := auth.ValidateToken(cookie.Value, testCfg.JWT.Secret)
+	userID := claims.UserID
+
+	// Complete all steps in Path A (Linux Fundamentals)
+	var stepIDs []string
+	testDB.Select(&stepIDs, `
+		SELECT s.id::text FROM steps s
+		JOIN modules m ON m.id = s.module_id
+		WHERE m.learning_path_id = $1 AND s.deleted_at IS NULL
+	`, pathAID)
+
+	for _, sid := range stepIDs {
+		testDB.Exec(`INSERT INTO progress (id, user_id, step_id, status, completed_at, created_at, updated_at)
+			VALUES ($1, $2, $3, 'completed', now(), now(), now())
+			ON CONFLICT (user_id, step_id) DO UPDATE SET status = 'completed', completed_at = now()`,
+			uuid.New(), userID, sid)
+	}
+
+	// Now check prerequisites_met for Docker path
+	resp := doRequest(t, srv, "GET", "/api/learning-paths", nil, cookie)
+	if resp.StatusCode != 200 {
+		t.Fatalf("ListLearningPaths: status = %d", resp.StatusCode)
+	}
+	defer resp.Body.Close()
+
+	var paths []map[string]any
+	json.NewDecoder(resp.Body).Decode(&paths)
+
+	for _, p := range paths {
+		if p["id"].(string) == pathBID {
+			met, _ := p["prerequisites_met"].(bool)
+			if !met {
+				t.Error("Docker path prerequisites_met should be true after completing Linux path")
+			}
+			return
+		}
+	}
+	t.Fatal("Docker path not found")
+}
