@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Card, Row, Col, Typography, Tag, Input, Empty, Spin, Select, Progress as AntProgress } from 'antd';
-import { SearchOutlined } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { SearchOutlined, CheckCircleOutlined, WarningOutlined } from '@ant-design/icons';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
+import type { Competency } from '../api/client';
 
 interface CatalogPath {
   id: string;
@@ -12,6 +13,8 @@ interface CatalogPath {
   tags: string[];
   estimated_duration?: string;
   prerequisites?: string[];
+  competencies_provided: string[];
+  prerequisites_met: boolean;
   module_count: number;
   step_count: number;
   progress_total?: number;
@@ -20,13 +23,20 @@ interface CatalogPath {
 
 const Catalog: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [paths, setPaths] = useState<CatalogPath[]>([]);
+  const [competencies, setCompetencies] = useState<Competency[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
   const [tagFilter, setTagFilter] = useState<string[]>([]);
+  const [competencyFilter, setCompetencyFilter] = useState<string[]>(
+    searchParams.get('competencies')?.split(',').filter(Boolean) || []
+  );
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<string>('az');
+  const [sortBy, setSortBy] = useState<string>(
+    searchParams.get('competencies') ? 'competency' : 'az'
+  );
 
   // Debounce search 300ms
   useEffect(() => {
@@ -35,17 +45,65 @@ const Catalog: React.FC = () => {
   }, [searchInput]);
 
   useEffect(() => {
-    api.listPaths()
-      .then((p) => setPaths(p as unknown as CatalogPath[]))
+    Promise.all([api.listPaths(), api.listCompetencies()])
+      .then(([p, c]) => {
+        setPaths(p as unknown as CatalogPath[]);
+        setCompetencies(c);
+      })
       .finally(() => setLoading(false));
   }, []);
 
   const allTags = [...new Set(paths.flatMap((p) => p.tags || []))].sort();
+  const allCompetencies = [...new Set(competencies.map((c) => c.name))].sort();
 
   const getPathStatus = (p: CatalogPath): string => {
     if (!p.progress_total) return 'not_started';
     if (p.progress_completed === p.progress_total) return 'completed';
     return 'in_progress';
+  };
+
+  // Topological sort by competency dependencies
+  const topoSort = (items: CatalogPath[]): CatalogPath[] => {
+    // Build a map: competency -> paths that provide it
+    const providedBy = new Map<string, Set<string>>();
+    for (const p of items) {
+      for (const c of p.competencies_provided || []) {
+        if (!providedBy.has(c)) providedBy.set(c, new Set());
+        providedBy.get(c)!.add(p.id);
+      }
+    }
+
+    const sorted: CatalogPath[] = [];
+    const visited = new Set<string>();
+    const resolvedCompetencies = new Set<string>();
+
+    // Iteratively pick paths whose prerequisites are all resolved
+    let remaining = [...items];
+    while (remaining.length > 0) {
+      const batch = remaining.filter((p) => {
+        if (!p.prerequisites || p.prerequisites.length === 0) return true;
+        return p.prerequisites.every((pr) => resolvedCompetencies.has(pr));
+      });
+
+      if (batch.length === 0) {
+        // Cycle detected — add remaining paths alphabetically
+        remaining.sort((a, b) => a.title.localeCompare(b.title));
+        sorted.push(...remaining);
+        break;
+      }
+
+      // Sort batch alphabetically for determinism
+      batch.sort((a, b) => a.title.localeCompare(b.title));
+      for (const p of batch) {
+        sorted.push(p);
+        visited.add(p.id);
+        for (const c of p.competencies_provided || []) {
+          resolvedCompetencies.add(c);
+        }
+      }
+      remaining = remaining.filter((p) => !visited.has(p.id));
+    }
+    return sorted;
   };
 
   const filtered = useMemo(() => {
@@ -56,9 +114,12 @@ const Catalog: React.FC = () => {
         p.description.toLowerCase().includes(search.toLowerCase());
       const matchesTags =
         tagFilter.length === 0 || tagFilter.every((t) => p.tags?.includes(t));
+      const matchesCompetency =
+        competencyFilter.length === 0 ||
+        competencyFilter.some((c) => p.competencies_provided?.includes(c));
       const matchesStatus =
         statusFilter === 'all' || getPathStatus(p) === statusFilter;
-      return matchesSearch && matchesTags && matchesStatus;
+      return matchesSearch && matchesTags && matchesCompetency && matchesStatus;
     });
     if (sortBy === 'az') result = [...result].sort((a, b) => a.title.localeCompare(b.title));
     else if (sortBy === 'za') result = [...result].sort((a, b) => b.title.localeCompare(a.title));
@@ -67,8 +128,9 @@ const Catalog: React.FC = () => {
       const pb = b.progress_total ? (b.progress_completed ?? 0) / b.progress_total : -1;
       return pb - pa;
     });
+    else if (sortBy === 'competency') result = topoSort(result);
     return result;
-  }, [paths, search, tagFilter, sortBy, statusFilter]);
+  }, [paths, search, tagFilter, competencyFilter, sortBy, statusFilter]);
 
   if (loading) return <Spin size="large" style={{ display: 'block', marginTop: 100 }} />;
 
@@ -76,7 +138,7 @@ const Catalog: React.FC = () => {
     <div>
       <Typography.Title level={2}>Catalog</Typography.Title>
       <Row gutter={16} style={{ marginBottom: 24 }}>
-        <Col xs={24} sm={6}>
+        <Col xs={24} sm={5}>
           <Input
             prefix={<SearchOutlined />}
             placeholder="Search learning paths..."
@@ -85,7 +147,7 @@ const Catalog: React.FC = () => {
             allowClear
           />
         </Col>
-        <Col xs={24} sm={6}>
+        <Col xs={24} sm={5}>
           <Select
             mode="multiple"
             placeholder="Filter by tags"
@@ -96,7 +158,18 @@ const Catalog: React.FC = () => {
             allowClear
           />
         </Col>
-        <Col xs={24} sm={6}>
+        <Col xs={24} sm={5}>
+          <Select
+            mode="multiple"
+            placeholder="Filter by competency"
+            value={competencyFilter}
+            onChange={setCompetencyFilter}
+            options={allCompetencies.map((c) => ({ label: c, value: c }))}
+            style={{ width: '100%' }}
+            allowClear
+          />
+        </Col>
+        <Col xs={24} sm={4}>
           <Select
             style={{ width: '100%' }}
             value={statusFilter}
@@ -109,7 +182,7 @@ const Catalog: React.FC = () => {
             ]}
           />
         </Col>
-        <Col xs={24} sm={6}>
+        <Col xs={24} sm={5}>
           <Select
             style={{ width: '100%' }}
             value={sortBy}
@@ -118,6 +191,7 @@ const Catalog: React.FC = () => {
               { label: 'A → Z', value: 'az' },
               { label: 'Z → A', value: 'za' },
               { label: 'Progress ↓', value: 'progress' },
+              { label: 'Competency Path', value: 'competency' },
             ]}
           />
         </Col>
@@ -151,6 +225,14 @@ const Catalog: React.FC = () => {
                   <div style={{ marginTop: 12 }}>
                     {path.tags?.map((tag) => <Tag key={tag}>{tag}</Tag>)}
                   </div>
+                  {path.competencies_provided?.length > 0 && (
+                    <div style={{ marginTop: 8 }}>
+                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>Provides: </Typography.Text>
+                      {path.competencies_provided.map((c) => (
+                        <Tag key={c} color="geekblue" style={{ fontSize: 11 }}>{c}</Tag>
+                      ))}
+                    </div>
+                  )}
                   <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between' }}>
                     <Typography.Text type="secondary">
                       {path.module_count} modules · {path.step_count} steps
@@ -168,9 +250,11 @@ const Catalog: React.FC = () => {
                   )}
                   {path.prerequisites && path.prerequisites.length > 0 && (
                     <div style={{ marginTop: 8 }}>
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                        Prerequisites: {path.prerequisites.join(', ')}
-                      </Typography.Text>
+                      {path.prerequisites_met ? (
+                        <Tag icon={<CheckCircleOutlined />} color="success">Prerequisites met</Tag>
+                      ) : (
+                        <Tag icon={<WarningOutlined />} color="warning">Prerequisites not met</Tag>
+                      )}
                     </div>
                   )}
                 </Card>

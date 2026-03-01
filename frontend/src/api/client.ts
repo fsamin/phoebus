@@ -39,6 +39,7 @@ export const api = {
   getPath: (id: string) => request<LearningPathDetail>(`/learning-paths/${id}`),
   getStep: (pathId: string, stepId: string) =>
     request<StepDetail>(`/learning-paths/${pathId}/steps/${stepId}`),
+  listCompetencies: () => request<Competency[]>('/competencies'),
 
   // Progress
   getProgress: (pathId?: string) =>
@@ -110,8 +111,12 @@ export interface LearningPathSummary {
   tags: string[];
   estimated_duration?: string;
   prerequisites?: string[];
+  competencies_provided: string[];
+  prerequisites_met: boolean;
   module_count: number;
   step_count: number;
+  progress_total?: number;
+  progress_completed?: number;
 }
 
 export interface LearningPathDetail {
@@ -205,4 +210,9 @@ export interface SyncLog {
   started_at: string | null;
   completed_at: string | null;
   created_at: string;
+}
+
+export interface Competency {
+  name: string;
+  learning_path_ids: string[];
 }

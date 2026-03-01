@@ -12,8 +12,56 @@ import (
 
 type learningPathResponse struct {
 	model.LearningPath
-	ModuleCount int `json:"module_count" db:"module_count"`
-	StepCount   int `json:"step_count" db:"step_count"`
+	ModuleCount            int      `json:"module_count" db:"module_count"`
+	StepCount              int      `json:"step_count" db:"step_count"`
+	CompetenciesProvided   []string `json:"competencies_provided"`
+}
+
+func (h *Handler) ListCompetencies(w http.ResponseWriter, r *http.Request) {
+	type competencyRow struct {
+		Name           string `json:"name" db:"name"`
+		LearningPathID string `json:"learning_path_id" db:"learning_path_id"`
+	}
+	var rows []competencyRow
+	err := h.db.SelectContext(r.Context(), &rows, `
+		SELECT DISTINCT unnest(m.competencies) AS name, m.learning_path_id::text AS learning_path_id
+		FROM modules m
+		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL
+		WHERE m.deleted_at IS NULL AND array_length(m.competencies, 1) > 0
+		ORDER BY name
+	`)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list competencies"})
+		return
+	}
+
+	type competencyResponse struct {
+		Name            string   `json:"name"`
+		LearningPathIDs []string `json:"learning_path_ids"`
+	}
+	compMap := map[string]*competencyResponse{}
+	for _, row := range rows {
+		if c, ok := compMap[row.Name]; ok {
+			// Deduplicate
+			found := false
+			for _, id := range c.LearningPathIDs {
+				if id == row.LearningPathID {
+					found = true
+					break
+				}
+			}
+			if !found {
+				c.LearningPathIDs = append(c.LearningPathIDs, row.LearningPathID)
+			}
+		} else {
+			compMap[row.Name] = &competencyResponse{Name: row.Name, LearningPathIDs: []string{row.LearningPathID}}
+		}
+	}
+	out := make([]competencyResponse, 0, len(compMap))
+	for _, c := range compMap {
+		out = append(out, *c)
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (h *Handler) ListLearningPaths(w http.ResponseWriter, r *http.Request) {
@@ -36,6 +84,40 @@ func (h *Handler) ListLearningPaths(w http.ResponseWriter, r *http.Request) {
 	}
 	if paths == nil {
 		paths = []learningPathResponse{}
+	}
+
+	// Fetch competencies provided by each path (aggregated from modules)
+	type compRow struct {
+		LearningPathID string `db:"learning_path_id"`
+		Competency     string `db:"competency"`
+	}
+	var compRows []compRow
+	h.db.SelectContext(r.Context(), &compRows, `
+		SELECT m.learning_path_id::text AS learning_path_id, unnest(m.competencies) AS competency
+		FROM modules m
+		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL
+		WHERE m.deleted_at IS NULL AND array_length(m.competencies, 1) > 0
+	`)
+	compByPath := map[string][]string{}
+	for _, cr := range compRows {
+		// Deduplicate
+		found := false
+		for _, c := range compByPath[cr.LearningPathID] {
+			if c == cr.Competency {
+				found = true
+				break
+			}
+		}
+		if !found {
+			compByPath[cr.LearningPathID] = append(compByPath[cr.LearningPathID], cr.Competency)
+		}
+	}
+	for i := range paths {
+		if comps, ok := compByPath[paths[i].ID.String()]; ok {
+			paths[i].CompetenciesProvided = comps
+		} else {
+			paths[i].CompetenciesProvided = []string{}
+		}
 	}
 
 	// Enrich with user progress if authenticated
@@ -67,17 +149,40 @@ func (h *Handler) ListLearningPaths(w http.ResponseWriter, r *http.Request) {
 		progMap[pp.PathID] = pp
 	}
 
+	// Build set of acquired competencies (from fully completed paths)
+	acquiredCompetencies := map[string]bool{}
+	for _, pp := range userProgress {
+		if pp.Total > 0 && pp.Completed == pp.Total {
+			// This path is completed — all its competencies are acquired
+			if comps, ok := compByPath[pp.PathID]; ok {
+				for _, c := range comps {
+					acquiredCompetencies[c] = true
+				}
+			}
+		}
+	}
+
 	type enrichedPath struct {
 		learningPathResponse
 		ProgressTotal     *int `json:"progress_total,omitempty"`
 		ProgressCompleted *int `json:"progress_completed,omitempty"`
+		PrerequisitesMet  bool `json:"prerequisites_met"`
 	}
 	out := make([]enrichedPath, len(paths))
 	for i, p := range paths {
-		out[i] = enrichedPath{learningPathResponse: p}
+		out[i] = enrichedPath{learningPathResponse: p, PrerequisitesMet: true}
 		if pp, ok := progMap[p.ID.String()]; ok {
 			out[i].ProgressTotal = &pp.Total
 			out[i].ProgressCompleted = &pp.Completed
+		}
+		// Check prerequisites
+		if len(p.Prerequisites) > 0 && claims != nil {
+			for _, prereq := range p.Prerequisites {
+				if !acquiredCompetencies[prereq] {
+					out[i].PrerequisitesMet = false
+					break
+				}
+			}
 		}
 	}
 	writeJSON(w, http.StatusOK, out)

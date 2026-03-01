@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Typography, Spin, Card, Collapse, List, Tag, Progress as AntProgress, Button, Breadcrumb,
+  Typography, Spin, Card, Collapse, List, Tag, Progress as AntProgress, Button, Breadcrumb, Modal,
 } from 'antd';
 import {
   CheckCircleOutlined, PlayCircleOutlined,
   FileTextOutlined, QuestionCircleOutlined, CodeOutlined, DesktopOutlined,
-  WarningOutlined,
+  WarningOutlined, ExclamationCircleOutlined,
 } from '@ant-design/icons';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api/client';
-import type { LearningPathDetail, Progress, StepSummary } from '../api/client';
+import type { LearningPathDetail, Progress, StepSummary, LearningPathSummary } from '../api/client';
 
 const stepIcon = (type: string) => {
   switch (type) {
@@ -32,14 +32,59 @@ const PathOverview: React.FC = () => {
   const navigate = useNavigate();
   const [path, setPath] = useState<LearningPathDetail | null>(null);
   const [progress, setProgress] = useState<Progress[]>([]);
+  const [allPaths, setAllPaths] = useState<LearningPathSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [prereqModalOpen, setPrereqModalOpen] = useState(false);
+  const [pendingStepId, setPendingStepId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!pathId) return;
-    Promise.all([api.getPath(pathId), api.getProgress(pathId)])
-      .then(([p, pr]) => { setPath(p); setProgress(pr); })
+    Promise.all([api.getPath(pathId), api.getProgress(pathId), api.listPaths()])
+      .then(([p, pr, ap]) => { setPath(p); setProgress(pr); setAllPaths(ap); })
       .finally(() => setLoading(false));
   }, [pathId]);
+
+  if (loading || !path) return <Spin size="large" style={{ display: 'block', marginTop: 100 }} />;
+
+  // Find current path in allPaths to get prerequisites_met
+  const currentPathSummary = allPaths.find((p) => p.id === pathId);
+  const prerequisitesMet = currentPathSummary?.prerequisites_met ?? true;
+  const dismissedKey = `prereq-dismissed-${pathId}`;
+  const isDismissed = () => sessionStorage.getItem(dismissedKey) === 'true';
+
+  // Compute unmet prerequisites with their provider paths
+  const unmetPrereqs = (path.prerequisites || []).map((prereq) => {
+    const provider = allPaths.find(
+      (p) => p.competencies_provided?.includes(prereq)
+    );
+    const providerCompleted = provider
+      ? provider.progress_total && provider.progress_completed === provider.progress_total
+      : false;
+    return { competency: prereq, provider, met: !!providerCompleted };
+  });
+
+  const handleStartLearning = (stepId: string) => {
+    if (!prerequisitesMet && !isDismissed()) {
+      setPendingStepId(stepId);
+      setPrereqModalOpen(true);
+    } else {
+      navigate(`/paths/${pathId}/steps/${stepId}`);
+    }
+  };
+
+  const handleContinueAnyway = () => {
+    sessionStorage.setItem(dismissedKey, 'true');
+    setPrereqModalOpen(false);
+    if (pendingStepId) {
+      navigate(`/paths/${pathId}/steps/${pendingStepId}`);
+    }
+  };
+
+  const handleBrowsePrereqs = () => {
+    setPrereqModalOpen(false);
+    const unmetCompetencies = unmetPrereqs.filter((p) => !p.met).map((p) => p.competency);
+    navigate(`/catalog?competencies=${unmetCompetencies.join(',')}`);
+  };
 
   if (loading || !path) return <Spin size="large" style={{ display: 'block', marginTop: 100 }} />;
 
@@ -74,7 +119,7 @@ const PathOverview: React.FC = () => {
             </Typography.Text>
           </div>
           {!isPathCompleted && nextStep && (
-            <Button type="primary" onClick={() => navigate(`/paths/${pathId}/steps/${nextStep.id}`)}>
+            <Button type="primary" onClick={() => handleStartLearning(nextStep.id)}>
               {completedSteps > 0 ? 'Continue Learning' : 'Start Learning'}
             </Button>
           )}
@@ -86,8 +131,19 @@ const PathOverview: React.FC = () => {
         {path.prerequisites && path.prerequisites.length > 0 && (
           <div style={{ marginTop: 12 }}>
             <Typography.Text type="secondary">Prerequisites: </Typography.Text>
-            {path.prerequisites.map((p) => (
-              <Tag key={p} icon={<WarningOutlined />} color="orange">{p}</Tag>
+            {unmetPrereqs.map((p) => (
+              <Tag
+                key={p.competency}
+                icon={p.met ? <CheckCircleOutlined /> : <WarningOutlined />}
+                color={p.met ? 'success' : 'warning'}
+              >
+                {p.competency}
+                {p.provider && (
+                  <Typography.Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>
+                    ({p.provider.title})
+                  </Typography.Text>
+                )}
+              </Tag>
             ))}
           </div>
         )}
@@ -120,7 +176,7 @@ const PathOverview: React.FC = () => {
                   return (
                     <List.Item
                       style={{ cursor: 'pointer' }}
-                      onClick={() => navigate(`/paths/${pathId}/steps/${step.id}`)}
+                      onClick={() => handleStartLearning(step.id)}
                       extra={
                         <>
                           {status === 'completed' ? (
@@ -153,6 +209,58 @@ const PathOverview: React.FC = () => {
           };
         })}
       />
+
+      <Modal
+        title={
+          <span>
+            <ExclamationCircleOutlined style={{ color: '#faad14', marginRight: 8 }} />
+            Prerequisites Not Met
+          </span>
+        }
+        open={prereqModalOpen}
+        onCancel={() => setPrereqModalOpen(false)}
+        footer={[
+          <Button key="browse" onClick={handleBrowsePrereqs}>
+            Browse Prerequisite Paths
+          </Button>,
+          <Button key="continue" type="primary" onClick={handleContinueAnyway}>
+            Continue Anyway
+          </Button>,
+        ]}
+      >
+        <Typography.Paragraph>
+          This learning path requires knowledge of the following competencies:
+        </Typography.Paragraph>
+        <List
+          size="small"
+          dataSource={unmetPrereqs}
+          renderItem={(item) => (
+            <List.Item>
+              <span>
+                {item.met ? (
+                  <CheckCircleOutlined style={{ color: 'var(--color-success)', marginRight: 8 }} />
+                ) : (
+                  <WarningOutlined style={{ color: '#faad14', marginRight: 8 }} />
+                )}
+                <strong>{item.competency}</strong>
+                {item.provider && (
+                  <Typography.Text type="secondary" style={{ marginLeft: 8 }}>
+                    (provided by "{item.provider.title}")
+                  </Typography.Text>
+                )}
+                {item.met ? (
+                  <Tag color="success" style={{ marginLeft: 8 }}>Completed</Tag>
+                ) : (
+                  <Tag color="warning" style={{ marginLeft: 8 }}>Not completed</Tag>
+                )}
+              </span>
+            </List.Item>
+          )}
+        />
+        <Typography.Paragraph type="secondary" style={{ marginTop: 16 }}>
+          You may continue, but the content assumes familiarity with these topics.
+        </Typography.Paragraph>
+      </Modal>
     </div>
   );
 };

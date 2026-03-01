@@ -96,6 +96,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 		r.Get("/api/learning-paths", h.ListLearningPaths)
 		r.Get("/api/learning-paths/{pathId}", h.GetLearningPath)
 		r.Get("/api/learning-paths/{pathId}/steps/{stepId}", h.GetStep)
+		r.Get("/api/competencies", h.ListCompetencies)
 
 		// Progress & exercises (all authenticated users)
 		r.Get("/api/progress", h.GetProgress)
