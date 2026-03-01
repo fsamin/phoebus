@@ -87,8 +87,10 @@ The backend has no code execution, no infrastructure orchestration, and no WebSo
 
 | Endpoint Group | Description |
 |---|---|
-| `GET /api/learning-paths` | List, search, and retrieve learning paths, modules, steps |
+| `GET /api/learning-paths` | List learning paths with metadata, aggregated competencies (`competencies_provided`), and `prerequisites_met` status for the authenticated learner. Supports `?sort=competency-path` for topological ordering |
+| `GET /api/learning-paths/{id}` | Retrieve learning path detail with modules (including competencies) and step summaries |
 | `GET /api/learning-paths/{id}/steps/{id}` | Retrieve step content including exercise data (proposals, patches, codebase files) |
+| `GET /api/competencies` | List all distinct competencies across all modules (for catalog filter). Returns `[{ name, learning_path_ids }]` |
 | `POST /api/auth/login` | Local/LDAP authentication (sets httpOnly JWT cookie) |
 | `POST /api/auth/register` | Self-registration for local auth (creates learner, sets JWT cookie) |
 | `POST /api/webhooks/{uuid}` | Git-provider-agnostic webhook endpoint to trigger content sync |

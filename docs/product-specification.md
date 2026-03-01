@@ -153,6 +153,16 @@ In all modes:
 
 A **Competency** is a skill or knowledge area that can be tracked across modules and learning paths. Competencies enable instructors to define what a learner should be able to do after completing specific content.
 
+**Key definitions:**
+
+- **Competencies provided by a Learning Path** = the union of all `competencies` declared across its modules.
+- **Acquired competency** = a learner has acquired a competency when they have **completed** (100% progress) a Learning Path whose modules cover that competency.
+- **Prerequisites met** = all competencies listed in a Learning Path's `prerequisites` field have been acquired by the learner.
+
+Competencies serve two purposes:
+1. **Prerequisite enforcement** — When a learner starts a path with unmet prerequisites, a confirmation popup warns them and offers navigation to paths that provide the missing competencies.
+2. **Catalog discovery** — Learners can filter the catalog by competency and sort learning paths by competency dependency order (topological sort: paths with no prerequisites first, then paths whose prerequisites are covered by earlier paths).
+
 ---
 
 ## 4. Content Model (Content-as-Code)
@@ -508,9 +518,21 @@ Never use panic for control flow — it will crash the server.
 ### UC-8: Learner Tracks Competencies
 
 1. Learner views their competency dashboard
-2. Dashboard shows acquired competencies mapped from completed modules
+2. Dashboard shows acquired competencies mapped from completed learning paths (a competency is acquired when the learning path covering it is 100% completed)
 3. Learner identifies skill gaps and discovers relevant Learning Paths
 4. Progress is visible to the learner and optionally to their manager
+
+### UC-9: Prerequisite Enforcement with Guided Navigation
+
+1. Learner opens a Learning Path that has prerequisites (competencies the learner has not yet acquired)
+2. When the learner clicks "Start Learning" or navigates to a step, a **confirmation popup** appears:
+   - Lists the unmet prerequisite competencies
+   - Warns that the content may assume prior knowledge
+   - Offers two actions:
+     - **"Continue anyway"** — dismisses the popup and lets the learner proceed (non-blocking)
+     - **"Browse prerequisite paths"** — redirects to the Catalog page pre-filtered with the missing competencies, so the learner can find and complete the relevant paths first
+3. The popup is shown only once per learning path per session (dismissed state stored client-side)
+4. If all prerequisites are met, no popup is shown
 
 ---
 
@@ -534,6 +556,8 @@ Never use panic for control flow — it will crash the server.
 | Sequential progression | Learners progress through steps in order | Must Have |
 | Progress tracking | Track completion of steps, modules, and learning paths | Must Have |
 | Personal dashboard | Learner sees their enrolled paths, progress, and competencies | Must Have |
+| Competency-based catalog | Filter catalog by competency, sort by competency dependency order (topological) | Must Have |
+| Prerequisite enforcement | Confirmation popup when starting a path with unmet prerequisites; link to prerequisite paths | Must Have |
 | Light/Dark mode | Theme follows system preference by default; toggle in header to override. Preference persisted in `localStorage` | Must Have |
 | Bookmarks & notes | Learners can bookmark steps and take personal notes | Should Have |
 | Exercise reset | Learners can reset any exercise and start over, unlimited resets | Must Have |

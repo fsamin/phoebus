@@ -377,14 +377,60 @@ GET /api/assets/{hash}
    - Tags (filterable)
    - Estimated duration
    - Prerequisites (other learning paths)
+   - Competencies provided (aggregated from modules)
    - Learner's progress (if enrolled): percentage bar, current step
-3. Filtering: by tag, by enrollment status (enrolled, not enrolled, completed)
-4. Sorting: alphabetical, by progress, by most recently accessed
+3. Filtering: by tag, by enrollment status (enrolled, not enrolled, completed), **by competency** (multi-select)
+4. Sorting: alphabetical, by progress, by most recently accessed, **by competency path** (topological order)
 5. Search: full-text search on title, description, tags
 
+**Competency path sorting (topological order):**
+Learning paths are ordered based on their competency dependencies:
+1. Paths with no prerequisites appear first
+2. Then paths whose prerequisites are provided by earlier paths in the list
+3. Cycles (if any) are broken arbitrarily — paths involved in cycles are grouped together
+4. Within the same dependency level, paths are sorted alphabetically
+
+**Competency filter:**
+- A multi-select dropdown lists all competencies found across all modules
+- Selecting a competency filters to show only paths whose modules provide that competency
+- Multiple competencies selected = OR (show paths providing any of the selected competencies)
+- Competency filter can be pre-set via URL query parameter: `/catalog?competencies=docker-basics,k8s-pods` — used by the prerequisite enforcement popup to redirect learners
+
 **Edge Cases:**
-- Learning path with unmet prerequisites: displayed with a warning, not blocked (self-assessment philosophy — learner decides)
+- Learning path with unmet prerequisites: displayed with a warning badge; clicking "Start Learning" triggers a prerequisite confirmation popup (see §3.1.1)
 - Empty learning path (no modules after sync): displayed with a "coming soon" indicator
+- Competency filter with no results: display "No learning paths match the selected competencies"
+
+### 3.1.1 Prerequisite Enforcement Popup
+
+**Description:** When a learner starts a learning path with unmet prerequisites, a confirmation modal warns them.
+
+**Trigger:** The popup is shown when:
+- The learner clicks "Start Learning" or "Continue Learning" on a path overview page
+- OR the learner navigates directly to a step of a path
+- AND the path has prerequisites that the learner has not yet acquired
+
+**Prerequisite resolution:** A prerequisite competency is considered "met" when the learner has completed (100% progress) **any** learning path whose modules declare that competency.
+
+**Popup content:**
+```
+⚠ Prerequisites Not Met
+
+This learning path requires knowledge of:
+  • docker-basics (provided by "Docker Fundamentals") — ✅ Completed
+  • k8s-pods (provided by "Kubernetes Basics") — ❌ Not completed
+  • linux-cli (provided by "Linux Fundamentals") — ❌ Not completed
+
+You may continue, but the content assumes familiarity with these topics.
+
+[Browse Prerequisite Paths]    [Continue Anyway]
+```
+
+**Behavior:**
+- **"Continue Anyway"** — dismisses the popup; the learner proceeds normally. The dismissal is stored in the browser session (sessionStorage) so the popup is not shown again for this path during the same session.
+- **"Browse Prerequisite Paths"** — navigates to `/catalog?competencies=k8s-pods,linux-cli` (only unmet competencies), where the catalog is pre-filtered to show paths that provide the missing competencies.
+- Each prerequisite line shows which learning path provides it and whether it's already completed.
+- If all prerequisites are met, the popup is never shown.
 
 ### 3.2 Learning Path Navigation
 
@@ -1245,17 +1291,20 @@ All authenticated views share a common shell layout:
 │                                                                      │
 │  [🔍 Search learning paths...                               ]       │
 │                                                                      │
-│  Filters:  [All ▾]  [Tag: kubernetes ✕]  [Sort: A-Z ▾]             │
+│  Filters:  [All ▾]  [Tag: kubernetes ✕]  [Sort: Competency Path ▾]  │
+│            [Competency: docker-basics ✕] [linux-cli ✕]              │
 │                                                                      │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐   │
-│  │ 🎯 Kubernetes    │  │ 🔄 GitOps with   │  │ 🏗 Terraform     │   │
-│  │ Fundamentals     │  │ ArgoCD           │  │ Advanced         │   │
+│  │ 🐧 Linux         │  │ 🐳 Docker        │  │ 🎯 Kubernetes    │   │
+│  │ Fundamentals     │  │ Fundamentals     │  │ Fundamentals     │   │
 │  │                  │  │                  │  │                  │   │
-│  │ 5 modules · 3h   │  │ 3 modules · 2h   │  │ 4 modules · 4h   │   │
-│  │ #kubernetes      │  │ #gitops #argocd  │  │ #terraform #iac  │   │
-│  │ #containers      │  │                  │  │                  │   │
-│  │                  │  │                  │  │                  │   │
-│  │ ████████░░ 72%   │  │ ███░░░░░░░ 20%   │  │ Not started      │   │
+│  │ 3 modules · 2h   │  │ 4 modules · 3h   │  │ 5 modules · 3h   │   │
+│  │ #linux #cli      │  │ #docker          │  │ #kubernetes      │   │
+│  │                  │  │ #containers      │  │ #containers      │   │
+│  │ Provides:        │  │ Provides:        │  │ Provides:        │   │
+│  │  linux-cli       │  │  docker-basics   │  │  k8s-pods        │   │
+│  │                  │  │ Prereqs: ✅      │  │ Prereqs: ⚠ 1/2  │   │
+│  │ ██████████ 100%  │  │ ████████░░ 72%   │  │ Not started      │   │
 │  └──────────────────┘  └──────────────────┘  └──────────────────┘   │
 │                                                                      │
 └──────────────────────────────────────────────────────────────────────┘
@@ -1270,7 +1319,8 @@ All authenticated views share a common shell layout:
 | Description | `phoebus.yaml` → `description` (truncated to ~100 chars) |
 | Module count + duration | Computed from modules and `estimated_duration` |
 | Tags | `phoebus.yaml` → `tags` (clickable — toggles filter) |
-| Prerequisites | Shown as warning badge if unmet |
+| Competencies provided | Aggregated from modules' `competencies` fields. Displayed as colored badges on each card |
+| Prerequisites status | ✅ all met, ⚠ N/M met (with count), or hidden if no prerequisites. Shown as warning badge if unmet |
 | Progress | From `progress` table. "Not started" if no progress |
 
 **Filters & Search:**
@@ -1279,15 +1329,17 @@ All authenticated views share a common shell layout:
 |---|---|
 | Search input | Client-side full-text filter on title, description, tags. Debounced (300ms) |
 | Tag filter | Click a tag on a card or in the filter bar to toggle. Multiple tags = AND. Shown as removable chips |
+| Competency filter | Multi-select dropdown listing all competencies. Multiple = OR. Pre-settable via URL `?competencies=a,b`. Shown as removable chips |
 | Status filter | Dropdown: All, Not Started, In Progress, Completed |
-| Sort | Dropdown: Alphabetical (A-Z), Most Recent, Progress (desc) |
+| Sort | Dropdown: Alphabetical (A-Z), Alphabetical (Z-A), Progress (desc), **Competency Path** (topological order based on competency dependencies) |
 
 **API Calls:**
-- `GET /api/learning-paths` — returns all learning paths with metadata
-- `GET /api/me/progress` — returns the learner's progress for all paths (to overlay on cards)
+- `GET /api/learning-paths` — returns all learning paths with metadata, `competencies_provided` (aggregated), and `prerequisites_met` (boolean)
+- `GET /api/competencies` — returns the list of all competencies across all modules (for the filter dropdown)
 
 **Navigation targets:**
 - Click a card → `/paths/:pathId`
+- "Browse Prerequisite Paths" (from popup) → `/catalog?competencies=...`
 
 ### 10.6 Learning Path Overview (`/paths/:pathId`)
 
@@ -1345,9 +1397,9 @@ All authenticated views share a common shell layout:
 |---|---|
 | ← Back to Catalog | Navigates to `/catalog` |
 | Path metadata | Title, description, tags, duration, prerequisites, module/step count |
-| Prerequisite status | ✅ if completed, ⚠ if not (with link to the prerequisite path). Not blocking — advisory only |
+| Prerequisite status | ✅ if completed, ⚠ if not (with link to the prerequisite path). Not blocking — advisory only. Clicking "Start Learning" with unmet prerequisites triggers a confirmation popup (see §3.1.1) |
 | Progress bar + percentage | Overall learning path completion |
-| Continue Learning button | Navigates to the next incomplete step. Becomes "Start Learning" if not started. Hidden if completed |
+| Continue Learning button | Navigates to the next incomplete step. Becomes "Start Learning" if not started. Hidden if completed. If prerequisites are unmet, shows the prerequisite enforcement popup first (§3.1.1) |
 | Module list | Expandable/collapsible (Ant Design Collapse). Shows step list with type icons and completion |
 | Current step indicator | "← current" on the last in-progress step |
 
