@@ -34,9 +34,7 @@ const Catalog: React.FC = () => {
     searchParams.get('competencies')?.split(',').filter(Boolean) || []
   );
   const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<string>(
-    searchParams.get('competencies') ? 'competency' : 'az'
-  );
+  const [sortBy, setSortBy] = useState<string>('competency');
 
   // Debounce search 300ms
   useEffect(() => {

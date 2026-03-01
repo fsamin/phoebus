@@ -380,7 +380,7 @@ GET /api/assets/{hash}
    - Competencies provided (aggregated from modules)
    - Learner's progress (if enrolled): percentage bar, current step
 3. Filtering: by tag, by enrollment status (enrolled, not enrolled, completed), **by competency** (multi-select)
-4. Sorting: alphabetical, by progress, by most recently accessed, **by competency path** (topological order)
+4. Sorting: alphabetical, by progress, by most recently accessed, **by competency path** (topological order — **default**)
 5. Search: full-text search on title, description, tags
 
 **Competency path sorting (topological order):**
@@ -1331,7 +1331,7 @@ All authenticated views share a common shell layout:
 | Tag filter | Click a tag on a card or in the filter bar to toggle. Multiple tags = AND. Shown as removable chips |
 | Competency filter | Multi-select dropdown listing all competencies. Multiple = OR. Pre-settable via URL `?competencies=a,b`. Shown as removable chips |
 | Status filter | Dropdown: All, Not Started, In Progress, Completed |
-| Sort | Dropdown: Alphabetical (A-Z), Alphabetical (Z-A), Progress (desc), **Competency Path** (topological order based on competency dependencies) |
+| Sort | Dropdown: Alphabetical (A-Z), Alphabetical (Z-A), Progress (desc), **Competency Path** (topological order based on competency dependencies — **default**) |
 
 **API Calls:**
 - `GET /api/learning-paths` — returns all learning paths with metadata, `competencies_provided` (aggregated), and `prerequisites_met` (boolean)
