@@ -8,7 +8,7 @@
 
 Phœbus follows a **content-as-code** philosophy: learning paths are authored in Markdown, stored in Git repositories, and synced automatically. The platform handles content parsing, progress tracking, exercise validation, and analytics — all from a single self-hosted binary.
 
-![Go](https://img.shields.io/badge/Go-1.24-00ADD8?logo=go&logoColor=white)
+![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)
 ![License](https://img.shields.io/badge/License-Apache%202.0-blue)
@@ -187,8 +187,8 @@ For local development with MinIO, use `endpoint: http://localhost:9000` and `for
 
 ### Prerequisites
 
-- Go 1.24+
-- Node.js 22+
+- Go 1.26+
+- Node.js 24+ (LTS)
 - Docker (for PostgreSQL)
 
 ### Backend

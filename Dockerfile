@@ -1,11 +1,11 @@
-FROM node:22-alpine AS frontend
+FROM node:24-alpine AS frontend
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm ci --no-audit
 COPY frontend/ .
 RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build
 
-FROM golang:1.24-alpine AS builder
+FROM golang:1.26-alpine AS builder
 ARG VERSION=dev
 ARG COMMIT=none
 WORKDIR /app
