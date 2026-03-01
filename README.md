@@ -20,10 +20,12 @@ Phœbus follows a **content-as-code** philosophy: learning paths are authored in
 - 📚 **Content as Code** — Author learning paths in Markdown with YAML front matter (Docusaurus-style)
 - 🔄 **Git Sync** — Register Git repositories, auto-sync via webhooks or manual triggers
 - 🧩 **4 Exercise Types** — Lessons, quizzes (multiple-choice & short-answer), terminal exercises, code exercises (identify-and-fix / choose-the-fix)
+- 🧭 **Competency-Based Navigation** — Prerequisites & competencies on modules, topological sort in catalog, prerequisite enforcement popup
+- 🖼️ **Asset Management** — Attach images, videos, and files to lessons with pluggable storage (local filesystem or S3/MinIO)
 - 📊 **Progress Tracking** — Per-step completion, exercise attempts with server-side validation
 - 📈 **Analytics** — Enrollment, completion rates, failure points, learner activity
-- 🔐 **Authentication** — Local accounts, OIDC, LDAP with role-based access (learner / instructor / admin)
-- 🎨 **Modern UI** — React 19 + Ant Design SPA with syntax highlighting, Mermaid diagrams, and admonitions
+- 🔐 **Authentication** — Local accounts, OIDC, LDAP, proxy auth with role-based access (learner / instructor / admin)
+- 🎨 **Modern UI** — React 19 + Ant Design SPA with dark/light mode, syntax highlighting, Mermaid diagrams, and admonitions
 - 📦 **Single Binary** — Frontend embedded via `go:embed`, deploy with Docker Compose
 
 ## Quick Start
@@ -50,8 +52,9 @@ https://github.com/fsamin/phoebus-content-samples.git
 ├─────────────────────────────────────────────┤
 │  Go HTTP Server (Chi router, go:embed)      │
 │  ├── REST API (/api/*)                      │
-│  ├── Auth (JWT, OIDC, LDAP)                 │
+│  ├── Auth (JWT, OIDC, LDAP, Proxy)          │
 │  ├── Content Syncer (git clone + parser)    │
+│  ├── Asset Store (Filesystem or S3/MinIO)   │
 │  └── Prometheus metrics (/metrics)          │
 ├─────────────────────────────────────────────┤
 │  PostgreSQL 17                              │
@@ -64,9 +67,11 @@ Learning content lives in a Git repository with this structure:
 
 ```
 my-learning-path/
-├── phoebus.yaml              # Learning path metadata
+├── phoebus.yaml              # Learning path metadata & prerequisites
+├── assets/                   # Images, videos, and other files
+│   └── diagram.png
 ├── 01-getting-started/
-│   ├── index.md              # Module metadata (front matter)
+│   ├── index.md              # Module metadata (front matter + competencies)
 │   ├── 01-introduction.md    # Lesson
 │   ├── 02-quiz.md            # Quiz
 │   └── 03-exercise/
@@ -76,6 +81,30 @@ my-learning-path/
 └── 02-advanced/
     ├── index.md
     └── ...
+```
+
+The `phoebus.yaml` file defines path-level metadata and prerequisite competencies:
+
+```yaml
+title: "Containerization with Docker & Helm"
+description: "Master containers from basics to Helm charts"
+icon: "🐳"
+tags: [docker, devops, containers]
+estimated_duration: "12h"
+prerequisites:
+  - "linux-cli"
+```
+
+Each module `index.md` uses front matter to declare competencies:
+
+```markdown
+---
+title: "Docker Fundamentals"
+competencies:
+  - "docker"
+---
+
+Module overview...
 ```
 
 Each step file uses YAML front matter:
@@ -110,6 +139,7 @@ Phœbus uses [configstore](https://github.com/ovh/configstore) for configuration
 | `admin` | `username: admin` / `password: admin` | `admin:admin` |
 | `auth` | `local_enabled: true` | `true` |
 | `encryption` | `key: "32-byte-AES-key"` | — (optional) |
+| `assets` | `backend: filesystem` or `s3` | `filesystem` |
 
 ### OIDC Authentication
 
@@ -135,6 +165,23 @@ ldap:
   bind_dn: cn=admin,dc=example,dc=com
   bind_password: secret
 ```
+
+### S3 Asset Storage
+
+```yaml
+# config/assets
+backend: s3
+max_file_size: 52428800
+s3:
+  bucket: phoebus-assets
+  region: us-east-1
+  endpoint: https://s3.amazonaws.com
+  access_key: AKIAIOSFODNN7EXAMPLE
+  secret_key: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+  force_path_style: false
+```
+
+For local development with MinIO, use `endpoint: http://localhost:9000` and `force_path_style: true`.
 
 ## Development
 
@@ -182,14 +229,35 @@ go build -o phoebus ./cmd/phoebus
 | `GET` | `/api/health` | — | Health check |
 | `POST` | `/api/auth/login` | — | Local login |
 | `POST` | `/api/auth/register` | — | Self-registration |
-| `GET` | `/api/learning-paths` | ✅ | List learning paths |
-| `GET` | `/api/learning-paths/:id` | ✅ | Path detail with modules & steps |
-| `GET` | `/api/learning-paths/:id/steps/:stepId` | ✅ | Step content & exercise data |
-| `POST` | `/api/exercises/:stepId/attempt` | ✅ | Submit exercise attempt |
+| `POST` | `/api/auth/ldap/login` | — | LDAP login |
+| `GET` | `/api/auth/oidc/redirect` | — | OIDC redirect |
+| `GET` | `/api/auth/oidc/callback` | — | OIDC callback |
+| `GET` | `/api/auth/providers` | — | List auth providers |
+| `POST` | `/api/webhooks/{uuid}` | — | Webhook trigger |
+| `GET` | `/api/assets/{hash}` | — | Serve lesson asset |
+| `GET` | `/api/me` | ✅ | Current user info |
+| `GET` | `/api/me/dashboard` | ✅ | User dashboard |
+| `POST` | `/api/auth/logout` | ✅ | Logout |
+| `POST` | `/api/auth/refresh` | ✅ | Refresh JWT token |
+| `GET` | `/api/learning-paths` | ✅ | List learning paths (with competencies & prereqs) |
+| `GET` | `/api/learning-paths/{id}` | ✅ | Path detail with modules & steps |
+| `GET` | `/api/learning-paths/{id}/steps/{stepId}` | ✅ | Step content & exercise data |
+| `GET` | `/api/competencies` | ✅ | List all competencies |
 | `GET` | `/api/progress` | ✅ | User progress |
+| `POST` | `/api/progress` | ✅ | Update progress |
+| `POST` | `/api/exercises/{stepId}/attempt` | ✅ | Submit exercise attempt |
+| `POST` | `/api/exercises/{stepId}/reset` | ✅ | Reset exercise |
+| `GET` | `/api/exercises/{stepId}/attempts` | ✅ | Get step attempts |
 | `GET` | `/api/analytics/overview` | 👨‍🏫 | Platform analytics |
-| `POST` | `/api/admin/repos` | 🔑 | Register Git repository |
-| `POST` | `/api/webhooks/:uuid` | — | Webhook trigger (provider-agnostic) |
+| `GET` | `/api/analytics/activity` | 👨‍🏫 | Activity timeline |
+| `GET` | `/api/analytics/paths/{pathId}` | 👨‍🏫 | Path analytics |
+| `GET` | `/api/analytics/learners/{learnerId}` | 👨‍🏫 | Learner analytics |
+| `GET/POST` | `/api/admin/users` | 🔑 | List / create users |
+| `PATCH` | `/api/admin/users/{userId}` | 🔑 | Update user role |
+| `GET/POST` | `/api/admin/repos` | 🔑 | List / register Git repos |
+| `GET/PUT/DELETE` | `/api/admin/repos/{repoId}` | 🔑 | Manage Git repository |
+| `POST` | `/api/admin/repos/{repoId}/sync` | 🔑 | Trigger sync |
+| `GET` | `/api/admin/repos/{repoId}/sync-logs` | 🔑 | Sync job history |
 
 Roles: ✅ = any authenticated user, 👨‍🏫 = instructor+, 🔑 = admin only
 
@@ -205,6 +273,7 @@ mkdocs serve
 - [Product Specification](docs/product-specification.md) — Vision, personas, use cases
 - [Technical Architecture](docs/technical-architecture.md) — Stack, schema, deployment
 - [Detailed Specifications](docs/detailed-specifications.md) — Functional specs, UI wireframes, content format
+- [Instructor Guide](docs/instructor-guide.md) — Content authoring guide for instructors
 
 ## License
 
