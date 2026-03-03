@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Table, Tag, Typography, Tooltip, Button, Space } from 'antd';
-import { ArrowLeftOutlined, SyncOutlined } from '@ant-design/icons';
+import { Table, Tag, Typography, Tooltip, Button, Space, Drawer, Spin, Empty } from 'antd';
+import { ArrowLeftOutlined, SyncOutlined, FileTextOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { api } from '../../api/client';
 import type { SyncLog, SyncJobLogEntry, GitRepository } from '../../api/client';
@@ -36,18 +36,80 @@ const statusColors: Record<string, string> = {
   pending: 'default',
 };
 
-const levelColors: Record<string, string> = {
-  debug: 'default',
-  info: 'blue',
-  warn: 'orange',
-  error: 'red',
+const levelStyles: Record<string, { color: string; bg: string }> = {
+  debug: { color: '#8c8c8c', bg: 'transparent' },
+  info:  { color: '#1677ff', bg: 'transparent' },
+  warn:  { color: '#fa8c16', bg: 'rgba(250,140,22,0.06)' },
+  error: { color: '#ff4d4f', bg: 'rgba(255,77,79,0.06)' },
 };
+
+function formatFieldValue(v: unknown): string {
+  if (v === null || v === undefined) return '';
+  if (typeof v === 'object') return JSON.stringify(v);
+  return String(v);
+}
+
+function LogLine({ entry }: { entry: SyncJobLogEntry }) {
+  const style = levelStyles[entry.level] || levelStyles.info;
+  const fields = entry.fields
+    ? Object.entries(entry.fields).filter(([k]) => !['repo_id', 'job_id'].includes(k))
+    : [];
+  const ts = new Date(entry.timestamp).toLocaleTimeString(undefined, {
+    hour12: false,
+    fractionalSecondDigits: 3,
+  } as Intl.DateTimeFormatOptions);
+
+  return (
+    <div
+      style={{
+        display: 'flex',
+        gap: 8,
+        padding: '3px 8px',
+        fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+        fontSize: 12,
+        lineHeight: '20px',
+        backgroundColor: style.bg,
+        borderLeft: `3px solid ${style.color}`,
+        alignItems: 'baseline',
+      }}
+    >
+      <span style={{ color: '#8c8c8c', flexShrink: 0 }}>{ts}</span>
+      <span
+        style={{
+          color: style.color,
+          fontWeight: 600,
+          width: 40,
+          textAlign: 'right',
+          flexShrink: 0,
+          textTransform: 'uppercase',
+        }}
+      >
+        {entry.level}
+      </span>
+      <span style={{ color: '#262626', flexGrow: 1, wordBreak: 'break-word' }}>
+        {entry.message}
+        {fields.length > 0 && (
+          <span style={{ color: '#8c8c8c', marginLeft: 8 }}>
+            {fields.map(([k, v]) => (
+              <span key={k} style={{ marginRight: 8 }}>
+                <span style={{ color: '#595959' }}>{k}</span>
+                <span style={{ color: '#8c8c8c' }}>=</span>
+                <span style={{ color: '#1677ff' }}>{formatFieldValue(v)}</span>
+              </span>
+            ))}
+          </span>
+        )}
+      </span>
+    </div>
+  );
+}
 
 export default function SyncLogs() {
   const { repoId } = useParams<{ repoId: string }>();
   const [logs, setLogs] = useState<SyncLog[]>([]);
   const [repo, setRepo] = useState<GitRepository | null>(null);
   const [loading, setLoading] = useState(true);
+  const [drawerJob, setDrawerJob] = useState<SyncLog | null>(null);
   const [jobLogs, setJobLogs] = useState<Record<string, SyncJobLogEntry[]>>({});
   const [jobLogsLoading, setJobLogsLoading] = useState<Record<string, boolean>>({});
 
@@ -63,56 +125,19 @@ export default function SyncLogs() {
     }).finally(() => setLoading(false));
   }, [repoId]);
 
-  const loadJobLogs = async (jobId: string) => {
-    if (jobLogs[jobId] || !repoId) return;
-    setJobLogsLoading((prev) => ({ ...prev, [jobId]: true }));
+  const openDrawer = async (record: SyncLog) => {
+    setDrawerJob(record);
+    if (jobLogs[record.id] || !repoId) return;
+    setJobLogsLoading((prev) => ({ ...prev, [record.id]: true }));
     try {
-      const entries = await api.syncJobLogs(repoId, jobId);
-      setJobLogs((prev) => ({ ...prev, [jobId]: entries }));
+      const entries = await api.syncJobLogs(repoId, record.id);
+      setJobLogs((prev) => ({ ...prev, [record.id]: entries }));
     } catch {
-      setJobLogs((prev) => ({ ...prev, [jobId]: [] }));
+      setJobLogs((prev) => ({ ...prev, [record.id]: [] }));
     } finally {
-      setJobLogsLoading((prev) => ({ ...prev, [jobId]: false }));
+      setJobLogsLoading((prev) => ({ ...prev, [record.id]: false }));
     }
   };
-
-  const logEntryColumns: ColumnsType<SyncJobLogEntry> = [
-    {
-      title: 'Time',
-      dataIndex: 'timestamp',
-      width: 180,
-      render: (v: string) => new Date(v).toLocaleTimeString(undefined, { hour12: false, fractionalSecondDigits: 3 } as Intl.DateTimeFormatOptions),
-    },
-    {
-      title: 'Level',
-      dataIndex: 'level',
-      width: 80,
-      render: (level: string) => <Tag color={levelColors[level] || 'default'}>{level}</Tag>,
-    },
-    {
-      title: 'Message',
-      dataIndex: 'message',
-      ellipsis: true,
-    },
-    {
-      title: 'Details',
-      dataIndex: 'fields',
-      width: 300,
-      ellipsis: true,
-      render: (fields: Record<string, unknown> | undefined) => {
-        if (!fields || Object.keys(fields).length === 0) return <Text type="secondary">—</Text>;
-        // Filter out repo_id and job_id (already shown in parent row)
-        const filtered = Object.entries(fields).filter(([k]) => !['repo_id', 'job_id'].includes(k));
-        if (filtered.length === 0) return <Text type="secondary">—</Text>;
-        const text = filtered.map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`).join(' ');
-        return (
-          <Tooltip title={text} overlayStyle={{ maxWidth: 600 }}>
-            <Text type="secondary" style={{ fontSize: 12 }}>{text.length > 50 ? text.slice(0, 50) + '…' : text}</Text>
-          </Tooltip>
-        );
-      },
-    },
-  ];
 
   const columns: ColumnsType<SyncLog> = [
     {
@@ -174,7 +199,26 @@ export default function SyncLogs() {
           <Text type="secondary">—</Text>
         ),
     },
+    {
+      title: '',
+      key: 'actions',
+      width: 50,
+      render: (_v: unknown, record: SyncLog) => (
+        <Button
+          type="text"
+          size="small"
+          icon={<FileTextOutlined />}
+          onClick={() => openDrawer(record)}
+        />
+      ),
+    },
   ];
+
+  const drawerEntries = drawerJob ? jobLogs[drawerJob.id] : undefined;
+  const drawerLoading = drawerJob ? jobLogsLoading[drawerJob.id] : false;
+  const drawerTitle = drawerJob
+    ? `Sync Job — ${new Date(drawerJob.started_at || drawerJob.created_at).toLocaleString()}`
+    : 'Sync Job Logs';
 
   return (
     <div style={{ padding: 24 }}>
@@ -197,32 +241,72 @@ export default function SyncLogs() {
           pagination={{ pageSize: 20, showSizeChanger: false }}
           size="middle"
           locale={{ emptyText: 'No sync jobs found for this repository' }}
-          expandable={{
-            expandedRowRender: (record) => {
-              const entries = jobLogs[record.id];
-              if (jobLogsLoading[record.id]) {
-                return <Text type="secondary">Loading logs...</Text>;
-              }
-              if (!entries || entries.length === 0) {
-                return <Text type="secondary">No detailed logs available</Text>;
-              }
-              return (
-                <Table
-                  dataSource={entries}
-                  columns={logEntryColumns}
-                  rowKey={(_, i) => String(i)}
-                  pagination={false}
-                  size="small"
-                  style={{ margin: 0 }}
-                />
-              );
-            },
-            onExpand: (expanded, record) => {
-              if (expanded) loadJobLogs(record.id);
-            },
-          }}
+          onRow={(record) => ({
+            onClick: () => openDrawer(record),
+            style: { cursor: 'pointer' },
+          })}
         />
       </Space>
+
+      <Drawer
+        title={drawerTitle}
+        placement="right"
+        width={720}
+        open={!!drawerJob}
+        onClose={() => setDrawerJob(null)}
+        extra={
+          drawerJob && (
+            <Space>
+              <Tag color={statusColors[drawerJob.status] || 'default'}>{drawerJob.status}</Tag>
+              <Text type="secondary">{formatDuration(drawerJob.started_at, drawerJob.completed_at)}</Text>
+            </Space>
+          )
+        }
+      >
+        {drawerJob?.error && (
+          <div
+            style={{
+              padding: '8px 12px',
+              marginBottom: 12,
+              backgroundColor: 'rgba(255,77,79,0.06)',
+              border: '1px solid #ffccc7',
+              borderRadius: 6,
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+              fontSize: 12,
+              color: '#cf1322',
+              wordBreak: 'break-word',
+            }}
+          >
+            {drawerJob.error}
+          </div>
+        )}
+
+        {drawerLoading && (
+          <div style={{ textAlign: 'center', padding: 48 }}>
+            <Spin tip="Loading logs..." />
+          </div>
+        )}
+
+        {!drawerLoading && (!drawerEntries || drawerEntries.length === 0) && (
+          <Empty description="No detailed logs available" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+        )}
+
+        {!drawerLoading && drawerEntries && drawerEntries.length > 0 && (
+          <div
+            style={{
+              backgroundColor: '#fafafa',
+              border: '1px solid #f0f0f0',
+              borderRadius: 6,
+              overflow: 'auto',
+              maxHeight: 'calc(100vh - 200px)',
+            }}
+          >
+            {drawerEntries.map((entry, i) => (
+              <LogLine key={i} entry={entry} />
+            ))}
+          </div>
+        )}
+      </Drawer>
     </div>
   );
 }
