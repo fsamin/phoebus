@@ -1956,8 +1956,20 @@ The instance SSH public key is always displayed above the repository table. It i
 
 **Error detail:** Clicking on a truncated error message or expanding the row reveals the full error text in a code block for easy reading.
 
+**Expandable rows — Detailed sync logs:** Each sync job row is expandable. Clicking the expand arrow loads the detailed log entries for that job via `GET /api/admin/repos/:repoId/sync-logs/:jobId`. The expanded section shows a sub-table with columns:
+
+| Column | Description |
+|---|---|
+| Time | Timestamp of the log entry (HH:MM:SS.mmm) |
+| Level | Tag colored by severity: `debug` (grey), `info` (blue), `warn` (orange), `error` (red) |
+| Message | Log message text |
+| Details | Structured fields (key=value pairs), excluding repo_id and job_id |
+
+Log entries are captured during sync by a dual-write collector: they are emitted to stdout in the configured format AND accumulated in memory. At the end of the sync job (success or failure), the accumulated entries are persisted as JSONB in the `sync_jobs.logs` column.
+
 **API Calls:**
 - `GET /api/admin/repos/:repoId/sync-logs` — returns array of sync jobs for this repository, ordered by `created_at DESC`
+- `GET /api/admin/repos/:repoId/sync-logs/:jobId` — returns array of detailed log entries for a specific sync job
 
 **Response format:**
 ```json
@@ -2111,6 +2123,53 @@ The instance SSH public key is always displayed above the repository table. It i
 **Auto-refresh:** The health page polls `GET /api/admin/health` every 30 seconds to keep metrics current.
 
 **Note:** Detailed Prometheus metrics are available at `/metrics` for external monitoring tools (Grafana). This page is a lightweight summary for quick admin checks.
+
+### 10.17 Structured Logging
+
+**Purpose:** Provide comprehensive, structured logging for all backend components to facilitate debugging, monitoring, and auditing.
+
+**Configuration (via `config/log`):**
+
+| Setting | Description | Default |
+|---|---|---|
+| `format` | Output format: `json`, `text`, or `gelf` | `json` |
+| `level` | Minimum log level: `debug`, `info`, `warn`, `error` | `info` |
+| `request_id_header` | HTTP header for upstream request ID (e.g., `X-Request-Id`) | — (auto-generate UUID) |
+
+**Log formats:**
+
+- **json** — Standard Go `slog.JSONHandler` output. Fields: `time`, `level`, `msg`, plus structured attributes.
+- **text** — Human-readable `slog.TextHandler` output. Suitable for local development.
+- **gelf** — GELF 1.1 spec-compliant JSON. Fields: `version` (1.1), `host`, `short_message`, `timestamp` (epoch float), `level` (syslog severity). Additional fields prefixed with `_`. Compatible with Graylog, Loki, and other GELF consumers.
+
+**HTTP request logging middleware:**
+
+Every HTTP request is logged with the following fields:
+
+| Field | Description |
+|---|---|
+| `method` | HTTP method (GET, POST, etc.) |
+| `path` | Request URL path |
+| `status` | Response status code |
+| `duration_ms` | Request duration in milliseconds |
+| `request_id` | Unique request ID (from upstream header or auto-generated UUID) |
+| `user_agent` | Client User-Agent header |
+| `remote_addr` | Client IP address |
+| `user_id` | Authenticated user ID (added by auth middleware) |
+| `role` | Authenticated user role (added by auth middleware) |
+| `bytes_written` | Response body size in bytes |
+
+Log level is determined by status code: `info` for 2xx/3xx, `warn` for 4xx, `error` for 5xx.
+
+**Context propagation:** The logger is injected into `context.Context` by the HTTP middleware and enriched by the auth middleware with `user_id` and `role`. All downstream components access the logger via `logging.FromContext(ctx)`, ensuring structured fields are preserved across the call chain.
+
+**Sync & parser logging:** The syncer and parser emit structured logs at each stage:
+- `info`: sync started, repo details fetched, clone succeeded, paths discovered (count), path/module/step upserted, sync completed (with duration)
+- `warn`: missing optional fields (description, tags, duration, explanation), empty modules/steps, assets exceeding max size
+- `debug`: hash comparisons, unchanged steps skipped, individual parse results
+- `error`: clone failures, parse errors (with file name and error detail), DB errors
+
+**Sync log persistence:** A dual-write `SyncCollector` handler captures all log records during a sync job in memory while forwarding them to the standard output handler. At job completion (success or failure), the accumulated log entries are persisted as JSONB in the `sync_jobs.logs` column, accessible via the admin UI.
 
 ### 10.16 Navigation Graph
 

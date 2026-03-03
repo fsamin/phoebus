@@ -14,7 +14,14 @@ type Config struct {
 	Admin         AdminConfig    `yaml:"admin"`
 	Auth          AuthConfig     `yaml:"auth"`
 	Assets        AssetsConfig   `yaml:"assets"`
+	Log           LogConfig      `yaml:"log"`
 	EncryptionKey string         `yaml:"encryption_key"`
+}
+
+type LogConfig struct {
+	Format          string `yaml:"format"`           // "json" (default), "text", "gelf"
+	Level           string `yaml:"level"`             // "debug", "info" (default), "warn", "error"
+	RequestIDHeader string `yaml:"request_id_header"` // header name for upstream request ID (e.g. "X-Request-Id")
 }
 
 type HTTPConfig struct {
@@ -112,6 +119,7 @@ func Load() (*Config, error) {
 	cfg := &Config{
 		HTTP:     HTTPConfig{Port: 8080},
 		Admin:    AdminConfig{Username: "admin", Password: "admin"},
+		Log:      LogConfig{Format: "json", Level: "info"},
 		Assets: AssetsConfig{
 			Backend:     "filesystem",
 			MaxFileSize: 50 * 1024 * 1024, // 50 MB
@@ -177,6 +185,10 @@ func Load() (*Config, error) {
 	}
 
 	if err := unmarshalItem("assets", &cfg.Assets); err != nil {
+		// optional, keep defaults
+	}
+
+	if err := unmarshalItem("log", &cfg.Log); err != nil {
 		// optional, keep defaults
 	}
 

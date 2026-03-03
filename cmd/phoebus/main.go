@@ -14,6 +14,7 @@ import (
 	"github.com/fsamin/phoebus/internal/config"
 	"github.com/fsamin/phoebus/internal/database"
 	"github.com/fsamin/phoebus/internal/handler"
+	"github.com/fsamin/phoebus/internal/logging"
 	"github.com/fsamin/phoebus/internal/syncer"
 	"github.com/fsamin/phoebus/internal/ui"
 	"github.com/fsamin/phoebus/internal/version"
@@ -42,6 +43,10 @@ func main() {
 		slog.Error("failed to load configuration", "error", err)
 		os.Exit(1)
 	}
+
+	// Re-initialize logger with configured format and level
+	logger = logging.New(cfg.Log.Format, cfg.Log.Level)
+	slog.SetDefault(logger)
 
 	db, err := database.Connect(cfg.Database.URL)
 	if err != nil {
@@ -75,7 +80,7 @@ func main() {
 	}
 
 	r := chi.NewRouter()
-	r.Use(middleware.RequestID)
+	r.Use(logging.Middleware(cfg.Log.RequestIDHeader))
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(30 * time.Second))

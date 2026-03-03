@@ -1,6 +1,7 @@
 package syncer
 
 import (
+	"context"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -19,7 +20,7 @@ tags: ["go", "testing"]
 estimated_duration: "2h"
 `), 0644)
 
-	meta, err := parsePhoebus(dir)
+	meta, err := parsePhoebus(context.Background(), dir)
 	if err != nil {
 		t.Fatalf("parsePhoebus: %v", err)
 	}
@@ -38,7 +39,7 @@ func TestParsePhoebusInvalid(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "phoebus.yaml"), []byte(`[not valid yaml`), 0644)
 
-	_, err := parsePhoebus(dir)
+	_, err := parsePhoebus(context.Background(), dir)
 	if err == nil {
 		t.Fatal("expected error for invalid YAML")
 	}
@@ -46,7 +47,7 @@ func TestParsePhoebusInvalid(t *testing.T) {
 
 func TestParsePhoebusMissing(t *testing.T) {
 	dir := t.TempDir()
-	_, err := parsePhoebus(dir)
+	_, err := parsePhoebus(context.Background(), dir)
 	if err == nil {
 		t.Fatal("expected error for missing file")
 	}
@@ -56,7 +57,7 @@ func TestParsePhoebusMissingTitle(t *testing.T) {
 	dir := t.TempDir()
 	os.WriteFile(filepath.Join(dir, "phoebus.yaml"), []byte(`description: "no title"`), 0644)
 
-	_, err := parsePhoebus(dir)
+	_, err := parsePhoebus(context.Background(), dir)
 	if err == nil {
 		t.Fatal("expected error for missing title")
 	}
@@ -75,7 +76,7 @@ competencies: ["basics", "intro"]
 Some content here.
 `), 0644)
 
-	meta, err := parseModuleIndex(dir)
+	meta, err := parseModuleIndex(context.Background(), dir)
 	if err != nil {
 		t.Fatalf("parseModuleIndex: %v", err)
 	}
@@ -89,7 +90,7 @@ Some content here.
 
 func TestParseModuleIndexMissing(t *testing.T) {
 	dir := t.TempDir()
-	_, err := parseModuleIndex(dir)
+	_, err := parseModuleIndex(context.Background(), dir)
 	if err == nil {
 		t.Fatal("expected error for missing index.md")
 	}
@@ -102,7 +103,7 @@ description: "no title here"
 ---
 `), 0644)
 
-	_, err := parseModuleIndex(dir)
+	_, err := parseModuleIndex(context.Background(), dir)
 	if err == nil {
 		t.Fatal("expected error for missing title")
 	}
@@ -162,7 +163,7 @@ estimated_duration: "15m"
 This is a lesson about testing.
 `), 0644)
 
-	meta, body, exerciseData, err := parseStep(filepath.Join(dir, "01-intro.md"))
+	meta, body, exerciseData, err := parseStep(context.Background(), filepath.Join(dir, "01-intro.md"))
 	if err != nil {
 		t.Fatalf("parseStep: %v", err)
 	}
@@ -199,7 +200,7 @@ estimated_duration: "10m"
 > Go is a programming language created at Google.
 `), 0644)
 
-	meta, _, exerciseData, err := parseStep(filepath.Join(dir, "01-quiz.md"))
+	meta, _, exerciseData, err := parseStep(context.Background(), filepath.Join(dir, "01-quiz.md"))
 	if err != nil {
 		t.Fatalf("parseStep: %v", err)
 	}
@@ -241,7 +242,7 @@ estimated_duration: "5m"
     go build
 `), 0644)
 
-	_, _, exerciseData, err := parseStep(filepath.Join(dir, "02-quiz.md"))
+	_, _, exerciseData, err := parseStep(context.Background(), filepath.Join(dir, "02-quiz.md"))
 	if err != nil {
 		t.Fatalf("parseStep: %v", err)
 	}
@@ -268,7 +269,7 @@ estimated_duration: "5m"
     [invalid(regex
 `), 0644)
 
-	_, _, _, err := parseStep(filepath.Join(dir, "03-quiz.md"))
+	_, _, _, err := parseStep(context.Background(), filepath.Join(dir, "03-quiz.md"))
 	if err == nil {
 		t.Fatal("expected error for invalid regex pattern")
 	}
@@ -281,7 +282,7 @@ func TestParseStepTerminalExercise(t *testing.T) {
 	content := "---\ntitle: \"Terminal Test\"\ntype: terminal-exercise\nestimated_duration: \"10m\"\n---\n\nIntro text here.\n\n## Step 1\n\nRun the following:\n\n```console\necho hello\n```\n\nExpected output:\n\n```output\nhello\n```\n\n- [x] `echo hello` — prints hello\n- [ ] `echo world` — prints world\n"
 	os.WriteFile(filepath.Join(dir, "01-terminal.md"), []byte(content), 0644)
 
-	meta, _, exerciseData, err := parseStep(filepath.Join(dir, "01-terminal.md"))
+	meta, _, exerciseData, err := parseStep(context.Background(), filepath.Join(dir, "01-terminal.md"))
 	if err != nil {
 		t.Fatalf("parseStep: %v", err)
 	}
@@ -309,7 +310,7 @@ type: lesson
 ---
 `), 0644)
 
-	_, _, _, err := parseStep(filepath.Join(dir, "01-bad.md"))
+	_, _, _, err := parseStep(context.Background(), filepath.Join(dir, "01-bad.md"))
 	if err == nil {
 		t.Fatal("expected error for missing title")
 	}
@@ -323,7 +324,7 @@ type: unknown-type
 ---
 `), 0644)
 
-	_, _, _, err := parseStep(filepath.Join(dir, "01-bad.md"))
+	_, _, _, err := parseStep(context.Background(), filepath.Join(dir, "01-bad.md"))
 	if err == nil {
 		t.Fatal("expected error for unknown type")
 	}
