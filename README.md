@@ -152,6 +152,11 @@ oidc:
   client_id: your-client-id
   client_secret: your-client-secret
   redirect_url: https://phoebus.example.com/api/auth/oidc/callback
+  scopes: [openid, profile, email]
+  claim_mapping:
+    display_name: name
+    email: email
+    external_id: sub
 ```
 
 ### LDAP Authentication
@@ -164,6 +169,30 @@ ldap:
   base_dn: dc=example,dc=com
   bind_dn: cn=admin,dc=example,dc=com
   bind_password: secret
+  user_search_filter: "(uid=%s)"
+  group_search_base: ou=groups,dc=example,dc=com
+  group_search_filter: "(member=%s)"
+  group_to_role:
+    cn=admins,ou=groups,dc=example,dc=com: admin
+    cn=instructors,ou=groups,dc=example,dc=com: instructor
+```
+
+### Proxy Authentication
+
+For deployment behind a reverse proxy (e.g., Traefik, OAuth2 Proxy):
+
+```yaml
+# config/auth
+proxy_auth:
+  enabled: true
+  header_user: X-Remote-User
+  header_groups: X-Remote-Groups
+  header_email: X-Remote-Email
+  header_display_name: X-Remote-Display-Name
+  default_role: learner
+  group_to_role:
+    admins: admin
+    trainers: instructor
 ```
 
 ### S3 Asset Storage
@@ -172,12 +201,15 @@ ldap:
 # config/assets
 backend: s3
 max_file_size: 52428800
+filesystem:
+  data_dir: /data/assets
 s3:
   bucket: phoebus-assets
   region: us-east-1
   endpoint: https://s3.amazonaws.com
   access_key: AKIAIOSFODNN7EXAMPLE
   secret_key: wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+  prefix: ""
   force_path_style: false
 ```
 
@@ -251,6 +283,7 @@ go build -o phoebus ./cmd/phoebus
 | `GET` | `/api/analytics/overview` | 👨‍🏫 | Platform analytics |
 | `GET` | `/api/analytics/activity` | 👨‍🏫 | Activity timeline |
 | `GET` | `/api/analytics/paths/{pathId}` | 👨‍🏫 | Path analytics |
+| `GET` | `/api/analytics/paths/{pathId}/steps/{stepId}` | 👨‍🏫 | Step-level analytics |
 | `GET` | `/api/analytics/learners/{learnerId}` | 👨‍🏫 | Learner analytics |
 | `GET/POST` | `/api/admin/users` | 🔑 | List / create users |
 | `PATCH` | `/api/admin/users/{userId}` | 🔑 | Update user role |
@@ -258,6 +291,9 @@ go build -o phoebus ./cmd/phoebus
 | `GET/PUT/DELETE` | `/api/admin/repos/{repoId}` | 🔑 | Manage Git repository |
 | `POST` | `/api/admin/repos/{repoId}/sync` | 🔑 | Trigger sync |
 | `GET` | `/api/admin/repos/{repoId}/sync-logs` | 🔑 | Sync job history |
+| `GET` | `/api/admin/health` | 🔑 | Detailed health check |
+| `GET` | `/api/admin/ssh-public-key` | 🔑 | Instance SSH public key |
+| `GET` | `/metrics` | — | Prometheus metrics |
 
 Roles: ✅ = any authenticated user, 👨‍🏫 = instructor+, 🔑 = admin only
 
