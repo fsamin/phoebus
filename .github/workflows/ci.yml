@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main, feat/**]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  frontend:
+    name: Frontend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - run: npm ci
+      - run: npm run build
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+  backend:
+    name: Backend
+    needs: frontend
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: phoebus
+          POSTGRES_PASSWORD: phoebus
+          POSTGRES_DB: phoebus_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U phoebus"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend (needed for go:embed)
+        run: |
+          cd frontend && npm ci && npm run build
+          cd ..
+          rm -rf internal/ui/dist && cp -r frontend/dist internal/ui/dist
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio \
+            -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:latest server /data
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:9000/minio/health/live && break
+            sleep 2
+          done
+
+      - name: Create MinIO test bucket
+        run: |
+          curl -sS https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc
+          chmod +x /usr/local/bin/mc
+          mc alias set local http://localhost:9000 minioadmin minioadmin
+          mc mb local/phoebus-test-assets
+
+      - name: Build
+        run: go build ./...
+
+      - name: Test
+        run: go test -race -coverprofile=coverage.out ./...
+        env:
+          PHOEBUS_TEST_DB: postgres://phoebus:phoebus@localhost:5432/phoebus_test?sslmode=disable
+          PHOEBUS_TEST_S3_ENDPOINT: http://localhost:9000
+
+      - name: Coverage summary
+        run: go tool cover -func=coverage.out | tail -1
