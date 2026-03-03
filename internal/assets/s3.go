@@ -140,8 +140,11 @@ func (s *S3Store) Exists(ctx context.Context, hash string) (bool, error) {
 		Key:    aws.String(s.key(hash)),
 	})
 	if err != nil {
-		// Check if it's a "not found" error
-		return false, nil
+		var notFound *s3types.NotFound
+		if errors.As(err, &notFound) {
+			return false, nil
+		}
+		return false, fmt.Errorf("head asset %s in S3: %w", hash, err)
 	}
 	return true, nil
 }
