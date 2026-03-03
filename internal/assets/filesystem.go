@@ -26,12 +26,21 @@ func NewFilesystemStore(dataDir string) (*FilesystemStore, error) {
 	return &FilesystemStore{dataDir: dataDir}, nil
 }
 
-func (fs *FilesystemStore) path(hash string) string {
-	return filepath.Join(fs.dataDir, hash[:2], hash)
+var ErrInvalidHash = fmt.Errorf("invalid asset hash")
+
+func (fs *FilesystemStore) path(hash string) (string, error) {
+	if len(hash) < 2 {
+		return "", ErrInvalidHash
+	}
+	return filepath.Join(fs.dataDir, hash[:2], hash), nil
 }
 
-func (fs *FilesystemStore) metaPath(hash string) string {
-	return fs.path(hash) + ".meta"
+func (fs *FilesystemStore) metaPath(hash string) (string, error) {
+	p, err := fs.path(hash)
+	if err != nil {
+		return "", err
+	}
+	return p + ".meta", nil
 }
 
 type fileMeta struct {
@@ -39,7 +48,10 @@ type fileMeta struct {
 }
 
 func (fs *FilesystemStore) Put(_ context.Context, hash string, contentType string, data io.Reader) error {
-	p := fs.path(hash)
+	p, err := fs.path(hash)
+	if err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
 		return fmt.Errorf("mkdir for asset %s: %w", hash, err)
 	}
@@ -56,8 +68,9 @@ func (fs *FilesystemStore) Put(_ context.Context, hash string, contentType strin
 	}
 
 	// Write metadata
+	mp, _ := fs.metaPath(hash)
 	meta, _ := json.Marshal(fileMeta{ContentType: contentType})
-	if err := os.WriteFile(fs.metaPath(hash), meta, 0o644); err != nil {
+	if err := os.WriteFile(mp, meta, 0o644); err != nil {
 		os.Remove(p)
 		return fmt.Errorf("write asset meta %s: %w", hash, err)
 	}
@@ -66,12 +79,17 @@ func (fs *FilesystemStore) Put(_ context.Context, hash string, contentType strin
 }
 
 func (fs *FilesystemStore) Get(_ context.Context, hash string) (io.ReadCloser, string, error) {
-	f, err := os.Open(fs.path(hash))
+	p, err := fs.path(hash)
+	if err != nil {
+		return nil, "", err
+	}
+	f, err := os.Open(p)
 	if err != nil {
 		return nil, "", fmt.Errorf("open asset %s: %w", hash, err)
 	}
 
-	metaBytes, err := os.ReadFile(fs.metaPath(hash))
+	mp, _ := fs.metaPath(hash)
+	metaBytes, err := os.ReadFile(mp)
 	if err != nil {
 		f.Close()
 		return nil, "", fmt.Errorf("read asset meta %s: %w", hash, err)
@@ -87,15 +105,24 @@ func (fs *FilesystemStore) Get(_ context.Context, hash string) (io.ReadCloser, s
 }
 
 func (fs *FilesystemStore) Delete(_ context.Context, hash string) error {
-	os.Remove(fs.metaPath(hash))
-	if err := os.Remove(fs.path(hash)); err != nil && !os.IsNotExist(err) {
+	mp, err := fs.metaPath(hash)
+	if err != nil {
+		return err
+	}
+	os.Remove(mp)
+	p, _ := fs.path(hash)
+	if err := os.Remove(p); err != nil && !os.IsNotExist(err) {
 		return fmt.Errorf("delete asset %s: %w", hash, err)
 	}
 	return nil
 }
 
 func (fs *FilesystemStore) Exists(_ context.Context, hash string) (bool, error) {
-	_, err := os.Stat(fs.path(hash))
+	p, err := fs.path(hash)
+	if err != nil {
+		return false, err
+	}
+	_, err = os.Stat(p)
 	if err == nil {
 		return true, nil
 	}
