@@ -1,0 +1,254 @@
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* ── Light theme (default) ── */
+  --color-bg-page: #ffffff;
+  --color-bg-container: #ffffff;
+  --color-bg-elevated: #fafafa;
+  --color-bg-header: #001529;
+  --color-bg-sidebar: #ffffff;
+  --color-bg-ide: #ffffff;
+  --color-bg-ide-secondary: #f3f3f3;
+  --color-bg-ide-panel: #f8f8f8;
+  --color-bg-terminal: #1a1a2e;
+  --color-bg-login: #f0f2f5;
+
+  --color-terminal-border: rgba(0, 0, 0, 0.12);
+  --color-terminal-titlebar: rgba(0, 0, 0, 0.06);
+  --color-terminal-muted: rgba(255, 255, 255, 0.35);
+  --color-terminal-prompt: #6ec6ff;
+  --color-terminal-separator: rgba(255, 255, 255, 0.08);
+  --color-terminal-selection: rgba(110, 198, 255, 0.12);
+  --color-terminal-hover: rgba(255, 255, 255, 0.05);
+  --color-terminal-cmd-suggestion: #80d8ff;
+  --terminal-shadow: 0 4px 24px rgba(0, 0, 0, 0.18);
+
+  --color-text-primary: #213547;
+  --color-text-secondary: #666666;
+  --color-text-ide: #333333;
+  --color-text-ide-secondary: #666666;
+  --color-text-ide-explorer: #333333;
+  --color-text-terminal: #e0e0e0;
+  --color-text-terminal-cmd: #00ff41;
+  --color-text-terminal-output: #ccc;
+  --color-text-header: #ffffff;
+
+  --color-border: #f0f0f0;
+  --color-border-ide: #e0e0e0;
+  --color-border-input: #d9d9d9;
+  --color-border-resize: #d9d9d9;
+
+  --color-primary: #ff7a45;
+  --color-link: #1890ff;
+  --color-success: #52c41a;
+  --color-warning: #faad14;
+  --color-danger: #ff4d4f;
+  --color-info: #1890ff;
+  --color-note: #722ed1;
+
+  --color-choice-selected-bg: #e6f7ff;
+  --color-choice-selected-border: #1890ff;
+  --color-choice-correct-bg: #f6ffed;
+  --color-choice-correct-border: #52c41a;
+  --color-choice-wrong-bg: #fff2f0;
+  --color-choice-wrong-border: #ff4d4f;
+
+  --color-ide-line-selected: rgba(30, 136, 229, 0.15);
+  --color-ide-glyph-selected: #1890ff;
+  --color-ide-line-target: rgba(82, 196, 26, 0.12);
+  --color-ide-glyph-target: #52c41a;
+  --color-ide-patch-selected: rgba(255, 122, 69, 0.08);
+
+  --color-ide-tree-hover: #e8e8e8;
+  --color-ide-tree-selected: #d0d0d0;
+
+  --color-ide-disabled-bg: #e8e8e8;
+  --color-ide-disabled-text: #999;
+  --color-ide-disabled-border: #d9d9d9;
+
+  --color-resize-handle-hover: #1890ff;
+
+  --monaco-theme: vs;
+  --highlight-css: github;
+}
+
+/* ── Dark theme ── */
+[data-theme="dark"] {
+  --color-bg-page: #141414;
+  --color-bg-container: #1f1f1f;
+  --color-bg-elevated: #252525;
+  --color-bg-header: #1f1f1f;
+  --color-bg-sidebar: #1f1f1f;
+  --color-bg-ide: #1e1e1e;
+  --color-bg-ide-secondary: #252526;
+  --color-bg-ide-panel: #1e1e1e;
+  --color-bg-terminal: #1c1c1c;
+  --color-bg-login: #141414;
+
+  --color-terminal-border: rgba(255, 255, 255, 0.08);
+  --color-terminal-titlebar: rgba(255, 255, 255, 0.05);
+  --color-terminal-muted: rgba(255, 255, 255, 0.4);
+  --color-terminal-prompt: #ff9a6c;
+  --color-terminal-separator: rgba(255, 255, 255, 0.1);
+  --color-terminal-selection: rgba(255, 122, 69, 0.15);
+  --color-terminal-hover: rgba(255, 255, 255, 0.07);
+  --color-terminal-cmd-suggestion: #ffb899;
+  --terminal-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+
+  --color-text-primary: rgba(255, 255, 255, 0.87);
+  --color-text-secondary: rgba(255, 255, 255, 0.45);
+  --color-text-ide: #cccccc;
+  --color-text-ide-secondary: #bbbbbb;
+  --color-text-ide-explorer: #cccccc;
+  --color-text-terminal: #e0e0e0;
+  --color-text-terminal-cmd: #00ff41;
+  --color-text-terminal-output: #ccc;
+  --color-text-header: #ffffff;
+
+  --color-border: #303030;
+  --color-border-ide: #3c3c3c;
+  --color-border-input: #434343;
+  --color-border-resize: #3c3c3c;
+
+  --color-choice-selected-bg: #111d2c;
+  --color-choice-selected-border: #1890ff;
+  --color-choice-correct-bg: #162312;
+  --color-choice-correct-border: #52c41a;
+  --color-choice-wrong-bg: #2a1215;
+  --color-choice-wrong-border: #ff4d4f;
+
+  --color-ide-tree-hover: #2a2d2e;
+  --color-ide-tree-selected: #37373d;
+  --color-ide-patch-selected: rgba(255, 122, 69, 0.12);
+
+  --color-ide-disabled-bg: #3c3c3c;
+  --color-ide-disabled-text: #666;
+  --color-ide-disabled-border: #555;
+
+  --monaco-theme: vs-dark;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--color-bg-page);
+  color: var(--color-text-primary);
+}
+
+/* Deactivated user rows */
+.deactivated-row {
+  opacity: 0.5;
+}
+[data-theme="dark"] .deactivated-row {
+  background-color: #1a1a1a;
+}
+
+/* Dark mode: override Ant Design dark menu submenu popup background */
+[data-theme="dark"] .ant-menu-dark .ant-menu-submenu-popup,
+[data-theme="dark"] .ant-menu-dark.ant-menu-submenu > .ant-menu,
+[data-theme="dark"] .ant-menu-submenu-popup .ant-menu-dark,
+[data-theme="dark"] .ant-menu-submenu-popup .ant-menu {
+  background: #1a1a1a !important;
+}
+
+/* Terminal cursor blink */
+@keyframes terminal-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+.terminal-cursor {
+  animation: terminal-blink 1s step-end infinite;
+}
+
+/* Monaco editor line decorations */
+.line-selected {
+  background: rgba(30, 136, 229, 0.15) !important;
+}
+[data-theme="dark"] .line-selected {
+  background: rgba(30, 136, 229, 0.25) !important;
+}
+.line-glyph-selected {
+  background: radial-gradient(circle at center, #1890ff 4px, transparent 4px) !important;
+}
+.line-target {
+  background: rgba(82, 196, 26, 0.12) !important;
+}
+[data-theme="dark"] .line-target {
+  background: rgba(82, 196, 26, 0.2) !important;
+}
+.line-glyph-target {
+  background: radial-gradient(circle at center, #52c41a 4px, transparent 4px) !important;
+}
+.ide-bottom-panel .ant-btn-primary:disabled {
+  background: var(--color-ide-disabled-bg) !important;
+  color: var(--color-ide-disabled-text) !important;
+  border-color: var(--color-ide-disabled-border) !important;
+}
+
+/* ── Markdown code blocks ── */
+.markdown-body pre {
+  background: #f6f8fa;
+  border-radius: 8px;
+  padding: 16px 20px;
+  overflow-x: auto;
+  border: 1px solid #e1e4e8;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.markdown-body pre code {
+  background: transparent !important;
+  padding: 0 !important;
+  border: none !important;
+}
+.markdown-body :not(pre) > code {
+  background: #eff1f3;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
+  font-size: 0.9em;
+  color: #d63384;
+}
+
+/* Dark theme: code block colors (override github.css) */
+[data-theme="dark"] .markdown-body pre {
+  background: #1c1c1c;
+  border-color: rgba(255, 255, 255, 0.08);
+}
+[data-theme="dark"] .markdown-body pre code.hljs {
+  background: transparent !important;
+  color: #adbac7 !important;
+}
+[data-theme="dark"] .hljs-keyword,
+[data-theme="dark"] .hljs-selector-tag,
+[data-theme="dark"] .hljs-literal { color: #f47067 !important; }
+[data-theme="dark"] .hljs-string,
+[data-theme="dark"] .hljs-addition { color: #96d0ff !important; }
+[data-theme="dark"] .hljs-comment,
+[data-theme="dark"] .hljs-quote { color: #768390 !important; }
+[data-theme="dark"] .hljs-number,
+[data-theme="dark"] .hljs-regexp { color: #6cb6ff !important; }
+[data-theme="dark"] .hljs-title,
+[data-theme="dark"] .hljs-function { color: #dcbdfb !important; }
+[data-theme="dark"] .hljs-built_in,
+[data-theme="dark"] .hljs-type { color: #f69d50 !important; }
+[data-theme="dark"] .hljs-attr,
+[data-theme="dark"] .hljs-variable,
+[data-theme="dark"] .hljs-name { color: #6cb6ff !important; }
+[data-theme="dark"] .hljs-symbol,
+[data-theme="dark"] .hljs-bullet { color: #f69d50 !important; }
+[data-theme="dark"] .hljs-meta { color: #768390 !important; }
+[data-theme="dark"] .hljs-deletion { color: #ff938a !important; background: rgba(255, 129, 130, 0.1) !important; }
+[data-theme="dark"] .hljs-addition { background: rgba(87, 171, 90, 0.1) !important; }
+[data-theme="dark"] .markdown-body :not(pre) > code {
+  background: #2d2d2d;
+  color: #ff9a6c;
+}
+
