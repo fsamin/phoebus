@@ -88,6 +88,13 @@ export const api = {
       body: JSON.stringify(data),
     }),
   sshPublicKey: () => request<{ public_key: string }>('/admin/ssh-public-key'),
+  listRepoPaths: (repoId: string) =>
+    request<RepoLearningPath[]>(`/admin/repos/${repoId}/paths`),
+  toggleRepoPath: (repoId: string, pathId: string, enabled: boolean) =>
+    request<{ status: string; enabled: boolean }>(`/admin/repos/${repoId}/paths/${pathId}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ enabled }),
+    }),
 };
 
 // --- Types ---
@@ -192,6 +199,15 @@ export interface GitRepository {
   sync_error?: string;
   last_synced_at?: string;
   created_at: string;
+}
+
+export interface RepoLearningPath {
+  id: string;
+  title: string;
+  description: string;
+  enabled: boolean;
+  module_count: number;
+  step_count: number;
 }
 
 export interface RepoInput {

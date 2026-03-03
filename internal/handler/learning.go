@@ -26,7 +26,7 @@ func (h *Handler) ListCompetencies(w http.ResponseWriter, r *http.Request) {
 	err := h.db.SelectContext(r.Context(), &rows, `
 		SELECT DISTINCT unnest(m.competencies) AS name, m.learning_path_id::text AS learning_path_id
 		FROM modules m
-		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL
+		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL AND lp.enabled = true
 		WHERE m.deleted_at IS NULL AND array_length(m.competencies, 1) > 0
 		ORDER BY name
 	`)
@@ -74,7 +74,7 @@ func (h *Handler) ListLearningPaths(w http.ResponseWriter, r *http.Request) {
 		FROM learning_paths lp
 		LEFT JOIN modules m ON m.learning_path_id = lp.id AND m.deleted_at IS NULL
 		LEFT JOIN steps s ON s.module_id = m.id AND s.deleted_at IS NULL
-		WHERE lp.deleted_at IS NULL
+		WHERE lp.deleted_at IS NULL AND lp.enabled = true
 		GROUP BY lp.id
 		ORDER BY lp.title
 	`)
@@ -95,7 +95,7 @@ func (h *Handler) ListLearningPaths(w http.ResponseWriter, r *http.Request) {
 	h.db.SelectContext(r.Context(), &compRows, `
 		SELECT m.learning_path_id::text AS learning_path_id, unnest(m.competencies) AS competency
 		FROM modules m
-		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL
+		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL AND lp.enabled = true
 		WHERE m.deleted_at IS NULL AND array_length(m.competencies, 1) > 0
 	`)
 	compByPath := map[string][]string{}
@@ -212,7 +212,7 @@ func (h *Handler) GetLearningPath(w http.ResponseWriter, r *http.Request) {
 	var lp model.LearningPath
 	err := h.db.GetContext(r.Context(), &lp, `
 		SELECT id, repo_id, title, description, icon, tags, estimated_duration, prerequisites, created_at, updated_at
-		FROM learning_paths WHERE id = $1 AND deleted_at IS NULL
+		FROM learning_paths WHERE id = $1 AND deleted_at IS NULL AND enabled = true
 	`, pathID)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "learning path not found"})

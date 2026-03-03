@@ -891,6 +891,25 @@ See section 2.1 (Git Repository Registration). The admin UI provides:
 - Ability to add, edit, delete repositories
 - Manual sync trigger
 - Webhook URL display and copy
+- **Learning path management per repository**: expandable section showing all learning paths with enable/disable toggle
+
+### 8.2.1 Learning Path Enable/Disable
+
+**Description:** Administrators can enable or disable individual learning paths within a repository.
+
+**Behavior:**
+- By default, all learning paths are **enabled** when a new repository is added
+- Disabled paths disappear completely from the learner catalog and API (`/api/learning-paths`)
+- Disabling is **reversible**: re-enabling restores the path with all learner progression preserved
+- Sync operations do **not** modify the enabled/disabled status (independent of `deleted_at` lifecycle)
+
+**API:**
+- `GET /api/admin/repos/{repoId}/paths` — returns all paths for a repo with `enabled` status, module count, step count
+- `PATCH /api/admin/repos/{repoId}/paths/{pathId}` — set `{"enabled": true/false}`
+
+**UI:** Expandable row in the repository table showing a sub-table of learning paths with:
+- Title, description, module/step counts
+- Toggle switch + status tag (Active / Disabled)
 
 ### 8.3 Platform Health
 
