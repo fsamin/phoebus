@@ -1,8 +1,8 @@
-# Phoebus — Detailed Specifications
+# Phœbus — Detailed Specifications
 
 ## 1. Overview
 
-This document provides detailed functional specifications for each feature area of Phoebus. It expands on the use cases and feature breakdown defined in the [Product Specification](./product-specification.md) and references the [Technical Architecture](./technical-architecture.md) for implementation context.
+This document provides detailed functional specifications for each feature area of Phœbus. It expands on the use cases and feature breakdown defined in the [Product Specification](./product-specification.md) and references the [Technical Architecture](./technical-architecture.md) for implementation context.
 
 Each section describes the detailed behavior, rules, edge cases, and UI expectations for a feature area.
 
@@ -18,11 +18,13 @@ Each section describes the detailed behavior, rules, edge cases, and UI expectat
 
 1. Administrator provides:
    - Clone URL (SSH or HTTPS)
-   - Authentication type: `none`, `ssh-key`, `http-basic`, `http-token`
+   - Authentication type: `none`, `instance-ssh-key`, `http-basic`, `http-token`
    - Credentials (private key, username/password, or token) — stored encrypted
    - Branch to track (default: `main`)
 
-2. Upon registration, Phoebus:
+> **Note:** When `instance-ssh-key` is selected, no credentials are needed — Phœbus uses the instance's auto-generated Ed25519 SSH keypair (see section 10.11). The administrator must add the instance public key as a deploy key on the Git repository.
+
+2. Upon registration, Phœbus:
    - Generates a unique webhook UUID
    - Returns the full webhook URL: `https://{phoebus-host}/api/webhooks/{uuid}`
    - Performs an initial clone and sync of the repository
@@ -65,7 +67,7 @@ Each section describes the detailed behavior, rules, edge cases, and UI expectat
 **Sync Process (detailed):**
 
 1. Set `sync_status = syncing`
-2. Execute `git pull` on the tracked branch (or `git clone` if first sync)
+2. If the clone URL uses the `file://` protocol, use the local directory path directly (no `git clone`). Otherwise, execute `git clone --depth 1` on the tracked branch.
 3. Parse directory structure:
    - Read `phoebus.yaml` → update `learning_paths` table
    - For each module directory (ordered by numeric prefix):
@@ -87,10 +89,30 @@ Each section describes the detailed behavior, rules, edge cases, and UI expectat
 - If a file/directory has no numeric prefix, it is sorted alphabetically after numbered items
 - The numeric prefix is stripped from the display title (the title from front matter is used)
 
+**Hash-Based Content Sync:**
+
+Each level of the content hierarchy carries a **SHA-256 content hash** to avoid unnecessary database writes:
+
+- **Step hash** = `SHA256(title + type + duration + content_md + exercise_data)`
+- **Module hash** = `SHA256(module metadata + concatenated step hashes)`
+- **Path hash** = `SHA256(path metadata + concatenated module hashes)`
+
+On re-sync, hashes are compared at each level. If a hash matches, the entire subtree is **skipped** (zero DB writes for unchanged content). Only modified elements are upserted. Result: re-syncing unchanged content produces **0 database writes**.
+
+Hash values are stored in a `content_hash TEXT` column on `learning_paths`, `modules`, and `steps`.
+
+**Soft-Delete Rules:**
+
+- Steps, modules, and learning paths removed from the repo are **soft-deleted** (`deleted_at = NOW()`), never physically deleted
+- If a previously deleted item reappears at the same path, it is automatically restored (`deleted_at = NULL`)
+- `progress.step_id` and `exercise_attempts.step_id` use `ON DELETE SET NULL` (step_id is nullable) — learner progress is **never** lost, even if a step is eventually purged
+- Migration: `007_content_hash_sync.up.sql`
+
 **Content Update Rules:**
 - Steps are matched by their file path (relative to repo root) — renaming a file creates a new step
 - Updated steps overwrite content and exercise data, but **never delete learner progress**
 - Deleted steps (files removed from repo): the `steps` record is soft-deleted (flagged, not removed), preserving associated progress
+- Deleted modules and learning paths are likewise soft-deleted (`deleted_at` column)
 - New steps are inserted at the position determined by their numeric prefix
 
 **Edge Cases:**
@@ -273,16 +295,71 @@ No exercise data to extract. The Markdown body is stored in `content_md` as-is.
 - Fenced code blocks with syntax highlighting (language-specific)
 - Mermaid diagrams (rendered in the browser)
 - Admonition blocks via `remark-directive` plugin: `:::tip`, `:::warning`, `:::danger`, `:::info`, `:::note` (Docusaurus/MkDocs convention). Rendered as styled callout components (a React component maps each directive to a visual block with icon and color)
-- Embedded images (relative paths referencing the `assets/` directory)
+- Embedded images, videos, and audio (relative paths referencing the `assets/` directory)
 - HTML inline elements (limited — no scripts)
 
 **Rendering rules:**
-- Images with relative paths are resolved against the learning path's asset directory
+- Images with relative paths are automatically rewritten to `/api/assets/{hash}` during sync
+- Video files (`.mp4`, `.webm`, `.ogg`, `.mov`) referenced with `![alt](./assets/file.mp4)` are rendered as `<video>` players
+- Audio files (`.mp3`, `.wav`, `.ogg`, `.flac`, `.aac`) referenced with `![alt](./assets/file.mp3)` are rendered as `<audio>` players
 - Code blocks with a language identifier receive syntax highlighting
 - Mermaid code blocks (`` ```mermaid ``) are rendered as SVG diagrams
 - Raw HTML is sanitized (script tags, iframes, event handlers are stripped)
 
 > **Not in v1:** LaTeX math rendering (KaTeX/MathJax). DevOps content rarely needs math formulas. Adding KaTeX later is trivial (one remark plugin, no content format change).
+
+### 2.5 Asset Pipeline
+
+**Description:** Binary assets (images, videos, PDFs) from content repositories are uploaded to the asset store and served via the API.
+
+**Storage backends:**
+- **Filesystem** (default): Assets stored in `{data_dir}/{hash[0:2]}/{hash}` with companion `.meta` JSON file
+- **S3** (production): Assets stored in `{bucket}/{prefix}/{hash}` using any S3-compatible service (AWS S3, MinIO, etc.)
+
+**Database tables:**
+
+```sql
+-- Deduplicated asset storage (one row per unique file)
+content_assets (
+    id UUID PK,
+    content_hash TEXT UNIQUE NOT NULL,  -- SHA-256 hex
+    content_type TEXT NOT NULL,         -- MIME type
+    file_name TEXT NOT NULL,            -- original filename
+    size_bytes BIGINT NOT NULL,
+    storage_backend TEXT NOT NULL,      -- 'filesystem' or 's3'
+    created_at TIMESTAMPTZ
+)
+
+-- N:N relationship between steps and assets
+step_assets (
+    step_id UUID FK → steps(id) ON DELETE CASCADE,
+    asset_id UUID FK → content_assets(id),
+    original_path TEXT NOT NULL,        -- e.g. 'assets/diagram.png'
+    PK (step_id, asset_id)
+)
+```
+
+**Sync process:**
+1. For each step, scan the `assets/` directory relative to the step's parent directory
+2. Compute SHA-256 hash for each file
+3. If the hash doesn't exist in `content_assets` → upload to the asset store
+4. Insert/update `step_assets` relationship
+5. Rewrite relative URLs in `content_md`: `./assets/img.png` → `/api/assets/{hash}`
+6. Files exceeding `max_file_size` (default 50 MB) are skipped with a warning
+
+**Deduplication:** The same file used across multiple steps is stored only once (keyed by content hash).
+
+**API endpoint:**
+
+```
+GET /api/assets/{hash}
+```
+
+- **Public** (no authentication required)
+- Returns the asset with its original `Content-Type`
+- Cache headers: `Cache-Control: public, max-age=31536000, immutable`
+- Hash validation: must match `^[a-f0-9]{64}$`
+- Returns 404 for unknown hashes
 
 ---
 
@@ -300,14 +377,60 @@ No exercise data to extract. The Markdown body is stored in `content_md` as-is.
    - Tags (filterable)
    - Estimated duration
    - Prerequisites (other learning paths)
+   - Competencies provided (aggregated from modules)
    - Learner's progress (if enrolled): percentage bar, current step
-3. Filtering: by tag, by enrollment status (enrolled, not enrolled, completed)
-4. Sorting: alphabetical, by progress, by most recently accessed
+3. Filtering: by tag, by enrollment status (enrolled, not enrolled, completed), **by competency** (multi-select)
+4. Sorting: alphabetical, by progress, by most recently accessed, **by competency path** (topological order — **default**)
 5. Search: full-text search on title, description, tags
 
+**Competency path sorting (topological order):**
+Learning paths are ordered based on their competency dependencies:
+1. Paths with no prerequisites appear first
+2. Then paths whose prerequisites are provided by earlier paths in the list
+3. Cycles (if any) are broken arbitrarily — paths involved in cycles are grouped together
+4. Within the same dependency level, paths are sorted alphabetically
+
+**Competency filter:**
+- A multi-select dropdown lists all competencies found across all modules
+- Selecting a competency filters to show only paths whose modules provide that competency
+- Multiple competencies selected = OR (show paths providing any of the selected competencies)
+- Competency filter can be pre-set via URL query parameter: `/catalog?competencies=docker-basics,k8s-pods` — used by the prerequisite enforcement popup to redirect learners
+
 **Edge Cases:**
-- Learning path with unmet prerequisites: displayed with a warning, not blocked (self-assessment philosophy — learner decides)
+- Learning path with unmet prerequisites: displayed with a warning badge; clicking "Start Learning" triggers a prerequisite confirmation popup (see §3.1.1)
 - Empty learning path (no modules after sync): displayed with a "coming soon" indicator
+- Competency filter with no results: display "No learning paths match the selected competencies"
+
+### 3.1.1 Prerequisite Enforcement Popup
+
+**Description:** When a learner starts a learning path with unmet prerequisites, a confirmation modal warns them.
+
+**Trigger:** The popup is shown when:
+- The learner clicks "Start Learning" or "Continue Learning" on a path overview page
+- OR the learner navigates directly to a step of a path
+- AND the path has prerequisites that the learner has not yet acquired
+
+**Prerequisite resolution:** A prerequisite competency is considered "met" when the learner has completed (100% progress) **any** learning path whose modules declare that competency.
+
+**Popup content:**
+```
+⚠ Prerequisites Not Met
+
+This learning path requires knowledge of:
+  • docker-basics (provided by "Docker Fundamentals") — ✅ Completed
+  • k8s-pods (provided by "Kubernetes Basics") — ❌ Not completed
+  • linux-cli (provided by "Linux Fundamentals") — ❌ Not completed
+
+You may continue, but the content assumes familiarity with these topics.
+
+[Browse Prerequisite Paths]    [Continue Anyway]
+```
+
+**Behavior:**
+- **"Continue Anyway"** — dismisses the popup; the learner proceeds normally. The dismissal is stored in the browser session (sessionStorage) so the popup is not shown again for this path during the same session.
+- **"Browse Prerequisite Paths"** — navigates to `/catalog?competencies=k8s-pods,linux-cli` (only unmet competencies), where the catalog is pre-filtered to show paths that provide the missing competencies.
+- Each prerequisite line shows which learning path provides it and whether it's already completed.
+- If all prerequisites are met, the popup is never shown.
 
 ### 3.2 Learning Path Navigation
 
@@ -384,53 +507,57 @@ No exercise data to extract. The Markdown body is stored in `content_md` as-is.
 **UI Layout:**
 
 ```
-┌──────────────────────────────────────────────────────┐
-│ ● Set Up a Local Cluster                    Step 1/3 │
-├──────────────────────────────────────────────────────┤
-│                                                      │
-│  You are logged into a fresh Ubuntu 22.04 server.    │
-│  You need to install the container runtime first.    │
-│                                                      │
-│  ┌────────────────────────────────────────────────┐  │
-│  │ $ ▌                                            │  │
-│  └────────────────────────────────────────────────┘  │
-│                                                      │
-│  Choose the correct command:                         │
-│                                                      │
-│  ┌────────────────────────────────────────────────┐  │
-│  │ ○  apt install docker.io                       │  │
-│  │ ○  apt install containerd                      │  │
-│  │ ○  snap install microk8s                       │  │
-│  └────────────────────────────────────────────────┘  │
-│                                                      │
-│                          [Submit]                     │
-└──────────────────────────────────────────────────────┘
+  You are logged into a fresh Ubuntu 22.04 server.
+  You need to install the container runtime first.
+
+  [Step 1/3]
+
+  ┌─── ● ● ● ──────────── Terminal Exercise ───┐
+  │                                             │
+  │  ~ › apt update                             │
+  │  Hit:1 http://archive.ubuntu.com/ubuntu ... │
+  │                                             │
+  │  ~ › ▌                                      │
+  │                                             │
+  │  ─── Select a command: ─────────────────    │
+  │                                             │
+  │    $ apt install docker.io                  │
+  │    $ apt install containerd                 │
+  │    $ snap install microk8s                  │
+  │                                             │
+  └─────────────────────────────────────────────┘
 ```
 
 **UI Elements:**
-- Header: exercise title + step counter (Step N/M)
-- Context area: introduction text + per-step context text (Markdown-rendered)
-- Prompt area: styled as a terminal (monospace font, dark background). The prompt area renders the instructor-defined `` ```console `` block content as-is. The instructor writes realistic prompts (`root@k8s-master:~# ▌` or `$ ▌`) depending on the scenario context — the prompt is part of the pedagogical exercise
-- Command proposals: radio button list (single selection)
-- Submit button: validates the selected command
+- Context area: introduction text + per-step context text (Markdown-rendered), displayed **above** the terminal
+- Step counter: badge showing current step (Step N/M), displayed above the terminal
+- **Immersive terminal design** (no Card wrapper): full dark theme with a fire orange palette (`#ff9a6c`, `#ffb899`) on a neutral gray background (`#1c1c1c`), monospace font
+  - Numbered badges `[1]`, `[2]` displayed before each command choice
+  - **Arrow key navigation** (↑↓) to move between commands + Enter to validate the selection
+  - Auto-focus on mount, no visible focus outline
+  - Auto-select first available (non-eliminated) command
+  - Command history: previous steps' commands and outputs scroll upward
+  - Active prompt line: `~ ›` prefix with blinking cursor `▌`; when a command is selected, it appears on the prompt line
+  - Feedback: success (green ✓) and error messages (red ✗ with explanation) appear inline in the terminal
+  - Incorrect commands are struck-through and grayed out
+- Validation: selecting a suggestion (click or arrow keys) fills the prompt; pressing Enter submits the command (no separate Submit button)
 
 ### 4.2 Step-by-Step Flow
 
 **Behavior:**
 
-1. Exercise loads with Step 1 displayed
-2. Learner reads the context and selects a command
-3. On submit:
+1. Exercise loads with Step 1 displayed; context text appears above the terminal
+2. Learner clicks a command suggestion inside the terminal; the command appears on the active prompt line
+3. Learner presses Enter (keyboard) or the suggestion is submitted on click:
    - **Correct**: 
-     - The selected command is appended to the prompt area (typed in)
-     - The simulated output is displayed below the prompt (terminal-style)
-     - A brief success indicator is shown (green check, "Correct!")
-     - After a short delay (or user click), the exercise advances to the next step
-     - The prompt area accumulates: previous commands and outputs remain visible (scroll up)
+     - A green "Correct!" message appears inline in the terminal
+     - After a short delay, the command and its simulated output are added to the terminal history
+     - The exercise advances to the next step; the terminal scrolls down
+     - Previous commands and outputs remain visible (scrollable history)
    - **Incorrect**:
-     - The explanation for the incorrect choice is displayed (inline, below the proposals)
-     - The incorrect choice is visually marked (red, strike-through) and disabled
-     - The learner selects another command and re-submits
+     - The explanation for the incorrect choice is displayed inline in the terminal (red)
+     - The incorrect suggestion is struck-through, grayed out, and disabled
+     - The prompt is cleared; the learner selects another command
      - Number of retries is unlimited
 4. When the last step is answered correctly:
    - The exercise is marked as completed
@@ -505,11 +632,12 @@ A new attempt record is created for every submission. The `answers` JSONB stores
 
 **UI Elements:**
 - **File tree** (left panel): navigable file tree from the `codebase/` directory. The target file is highlighted (★)
-- **Code viewer** (right panel): Monaco Editor in read-only mode. Line numbers, syntax highlighting. Clickable lines (for modes A/C)
-- **Problem description**: Markdown-rendered text below the code viewer
+- **Code viewer** (right panel): Monaco Editor in read-only mode. Line numbers, syntax highlighting. Clickable lines (for modes A/C). Uses `monaco-editor` local bundle (no CDN) via `loader.config({ monaco })` with Vite worker imports for all Monaco workers (editor, json, css, html, ts) and `self.MonacoEnvironment.getWorker()` configuration for CSP compliance. `manualChunks` in `vite.config.ts` splits Monaco into a separate ~3.7 MB chunk
+- **Problem description / Feedback panel**: Markdown-rendered text below the code viewer. When feedback is available (after an attempt), the feedback **replaces** the description panel and auto-expands to 220 px
 - **Phase indicator**: shows current phase (Phase 1: Identify, Phase 2: Fix) for modes A/C
 - **Selected lines display**: shows the lines the learner has clicked on
-- **Patch proposals** (Phase 2): displayed as inline unified diffs (Monaco inline diff view). The familiar `git diff` / PR format fits the constrained layout and matches the authoring format. Side-by-side diff can be added later if needed
+- **Patch proposals** (Phase 2): displayed as radio buttons. Each patch shows its label and a **DiffEditor preview** (Monaco side-by-side diff view) when selected. The DiffEditor remains visible after exercise completion. Incorrect patches are displayed with disabled radio buttons and strikethrough text
+- **Navigation buttons**: Previous / Reset / Next buttons displayed in the completed state
 
 ### 5.2 Mode A — Identify & Fix
 
@@ -722,7 +850,7 @@ For short-answer:
 
 ### 7.3 Manager View (Optional, Could Have)
 
-Managers can view aggregated progress for their team members. Teams are derived from OIDC group claims (mapped via a configurable `group_claim` setting). No manual team management in Phoebus — the enterprise directory (AD/LDAP → OIDC) is the source of truth. Groups are refreshed on each login.
+Managers can view aggregated progress for their team members. Teams are derived from OIDC group claims (mapped via a configurable `group_claim` setting). No manual team management in Phœbus — the enterprise directory (AD/LDAP → OIDC) is the source of truth. Groups are refreshed on each login.
 
 ---
 
@@ -735,10 +863,12 @@ Managers can view aggregated progress for their team members. Teams are derived 
 **Behavior:**
 
 1. Users are created automatically upon first SSO login (OIDC/LDAP)
-2. Default role for new users: `learner`
-3. Administrators can change a user's role: `learner`, `instructor`, `admin`
-4. Administrators can deactivate users (soft-delete — they cannot log in but their data is preserved)
-5. User list displays: name, email, role, last login, number of completed paths
+2. When local auth is enabled, users can self-register via a signup form on the login page (created with role `learner`)
+3. Administrators can create local users manually from the Admin > Users view (with a chosen role and temporary password)
+4. Default role for new users: `learner`
+5. Administrators can change a user's role: `learner`, `instructor`, `admin`
+6. Administrators can deactivate users (soft-delete — they cannot log in but their data is preserved)
+7. User list displays: name, email, role, last login, number of completed paths
 
 **RBAC Matrix:**
 
@@ -784,11 +914,11 @@ See section 2.1 (Git Repository Registration). The admin UI provides:
 
 **Flow:**
 
-1. User accesses Phoebus → redirected to OIDC provider login page
+1. User accesses Phœbus → redirected to OIDC provider login page
 2. User authenticates with their corporate credentials
-3. OIDC provider redirects back to Phoebus with an authorization code
-4. Phoebus exchanges the code for an ID token and access token
-5. Phoebus creates or updates the user record (matched by `external_id` or email)
+3. OIDC provider redirects back to Phœbus with an authorization code
+4. Phœbus exchanges the code for an ID token and access token
+5. Phœbus creates or updates the user record (matched by `external_id` or email)
 6. A session token (JWT) is issued as an httpOnly cookie (see section 9.3)
 7. Subsequent API requests carry the JWT automatically via the cookie — no `Authorization` header needed
 
@@ -802,9 +932,9 @@ See section 2.1 (Git Repository Registration). The admin UI provides:
 
 **Flow:**
 
-1. User submits username/password on the Phoebus login page
-2. Phoebus performs an LDAP bind with the provided credentials
-3. If bind succeeds, Phoebus fetches user attributes (name, email, groups). LDAP group membership is synced on every login (no caching). Login happens once per session (~8h), so one extra LDAP query is negligible. Consistent with OIDC behavior (claims refreshed on auth)
+1. User submits username/password on the Phœbus login page
+2. Phœbus performs an LDAP bind with the provided credentials
+3. If bind succeeds, Phœbus fetches user attributes (name, email, groups). LDAP group membership is synced on every login (no caching). Login happens once per session (~8h), so one extra LDAP query is negligible. Consistent with OIDC behavior (claims refreshed on auth)
 4. User record is created or updated
 5. A session token (JWT) is issued
 
@@ -829,26 +959,121 @@ See section 2.1 (Git Repository Registration). The admin UI provides:
 
 **Flow:**
 
-1. User submits username/password on the Phoebus login page (same form as LDAP)
-2. Phoebus verifies the password against a bcrypt hash stored in the `users` table
+1. User submits username/password on the Phœbus login page (same form as LDAP)
+2. Phœbus verifies the password against a bcrypt hash stored in the `users` table
 3. If valid, a session token (JWT) is issued as an httpOnly cookie (same as OIDC/LDAP)
+
+**Self-Registration (Signup):**
+
+When local auth is enabled, a "Create account" link is displayed below the login form. Clicking it reveals a registration form:
+
+1. User fills in: username, display name, email (optional), password, confirm password
+2. `POST /api/auth/register` creates the user with role `learner` and `auth_provider: local`
+3. On success, the user is automatically logged in (JWT cookie set) and redirected to `/`
+
+**Constraints:**
+- Signup is only available when local auth is enabled (`local_auth.enabled: true`)
+- Username must be unique (4–32 chars, alphanumeric + hyphens)
+- Password minimum length: 8 characters
+- If username already exists → error "Username already taken"
+
+**Admin User Creation:**
+
+Administrators can create local users from the Admin > Users view:
+
+1. Admin clicks "Add User" button
+2. Modal form: username, display name, email, role (learner/instructor/admin), password
+3. `POST /api/admin/users` creates the user with `auth_provider: local`
+4. The created user can log in immediately with the provided credentials
 
 **Scope:**
 - Bcrypt-hashed passwords
 - `/api/auth/login` endpoint
+- `/api/auth/register` endpoint (self-registration)
+- `/api/admin/users` endpoint (admin creation with `POST`)
 - No password reset functionality
-- No password complexity policy
+- No password complexity policy (beyond minimum 8 chars)
 - Essential for bootstrap (first admin account), getting started (`docker compose up` → immediate login), and development
 
 **Configuration:**
 - Enabled/disabled via `local_auth.enabled` (default: `true`)
 - Disabled in production via `local_auth.enabled: false`
+- When disabled, `/api/auth/register` returns `403 Forbidden` and signup UI is hidden
+
+### 9.5 Reverse Proxy Authentication
+
+**Description:** Transparent authentication via HTTP headers injected by a reverse proxy (OAuth2 Proxy, Authelia, Traefik Forward Auth, etc.). Phœbus trusts the headers and provisions users automatically.
+
+**Flow:**
+
+1. User accesses Phœbus through a reverse proxy that handles SSO authentication
+2. The reverse proxy injects identity headers (e.g., `X-Remote-User`, `X-Remote-Groups`)
+3. Phœbus middleware detects the configured user header and provisions the user:
+   - If no user exists with `auth_provider='proxy'` and matching username → create one
+   - If user already exists → update display name, email, and role from groups
+4. A session token (JWT) is issued as an httpOnly cookie (same as other providers)
+5. Subsequent requests with a valid JWT cookie skip the upsert (performance optimization)
+
+**Configuration:**
+
+| Key | Default | Description |
+|---|---|---|
+| `proxy_auth.enabled` | `false` | Enable reverse proxy authentication |
+| `proxy_auth.header_user` | `X-Remote-User` | Header containing the username (required) |
+| `proxy_auth.header_groups` | `X-Remote-Groups` | Header containing comma-separated group names |
+| `proxy_auth.header_email` | *(empty)* | Header containing the user's email |
+| `proxy_auth.header_display_name` | *(empty)* | Header containing the user's display name |
+| `proxy_auth.default_role` | `learner` | Default role when no group matches |
+| `proxy_auth.group_to_role` | *(empty)* | Map of group name → role (`admin`, `instructor`, `learner`) |
+
+**Group-to-role resolution:** When multiple groups match, the highest-privilege role wins (admin > instructor > learner). This is consistent with LDAP group resolution (§9.2).
+
+**Coexistence:** Proxy auth works alongside other authentication methods. When both proxy headers and other providers are enabled, the proxy middleware runs first. If no proxy header is present, the request falls through to standard JWT cookie authentication.
+
+**Frontend behavior:** When proxy auth is enabled and is the only provider, the login page displays an informational message ("SSO Authentication") instead of a login form. If the user hits `/login`, the frontend tries `GET /api/me` to detect an existing session and auto-redirects to `/` if authenticated.
+
+### 9.6 Content Security
+
+**Markdown XSS Prevention:**
+
+The Markdown rendering pipeline includes `rehype-sanitize` (inserted after `rehypeRaw`) with a strict schema:
+
+- **Allowed classes:** hljs highlight classes, admonition classes, Mermaid classes
+- **Blocked elements:** `<script>`, `<style>`, `<iframe>`, `<object>`, `<embed>`, `<form>`, `<textarea>`
+- **Protocol whitelist:** `href` allows `http`, `https`, `mailto` only; `src` allows `http`, `https` only — blocks `file://`, `javascript:`, and `data:` URIs in links
+
+**Mermaid SVG Sanitization:**
+
+- Mermaid output is sanitized with **DOMPurify** using `USE_PROFILES: { svg: true }` before DOM injection
+- Mermaid is configured with `securityLevel: 'strict'`
+
+**Content Security Policy (CSP) Headers:**
+
+A backend middleware sets the following CSP headers on all responses:
+
+| Directive | Value | Rationale |
+|---|---|---|
+| `default-src` | `'self'` | Only same-origin resources by default |
+| `script-src` | `'self' blob:` | `blob:` required for Monaco Editor web workers |
+| `worker-src` | `'self' blob:` | Same — Monaco workers loaded as blobs |
+| `style-src` | `'self' 'unsafe-inline'` | Ant Design injects inline styles |
+| `img-src` | `'self' data:` | Data URIs for small inline images |
+| `font-src` | `'self' data:` | Data URIs for embedded fonts |
+| `connect-src` | `'self'` | API calls to same origin only |
+| `frame-ancestors` | `'none'` | Prevent framing (clickjacking) |
+
+**Additional Security Headers:**
+
+- `X-Frame-Options: DENY`
+- `X-Content-Type-Options: nosniff`
+- `Referrer-Policy: strict-origin-when-cross-origin`
+- `X-XSS-Protection: 0` (disabled — CSP supersedes it; the legacy header can cause issues)
 
 ---
 
 ## 10. SPA Views
 
-This section inventories every view (page) of the Phoebus single-page application. For each view it defines the route, required role, layout, data loaded, API calls, navigation targets, and detailed interactions.
+This section inventories every view (page) of the Phœbus single-page application. For each view it defines the route, required role, layout, data loaded, API calls, navigation targets, and detailed interactions.
 
 ### 10.1 Global Layout
 
@@ -856,7 +1081,7 @@ All authenticated views share a common shell layout:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  🔥 Phoebus           Catalog   Dashboard        [User ▾] [Logout] │
+│  🔥 Phœbus           Catalog   Dashboard     [🌙] [User ▾] [Logout]│
 ├─────────────────────────────────────────────────────────────────────┤
 │                                                                     │
 │                        <Page Content>                               │
@@ -868,12 +1093,24 @@ All authenticated views share a common shell layout:
 
 | Element | Behavior |
 |---|---|
-| Logo + name | Click → navigates to Dashboard (`/`) |
+| Logo + name | Click → navigates to Dashboard (`/`). **Fixed branding:** dark background (`#001529`), fire icon (`#ff7a45`), white text — does not change with theme |
 | Catalog link | Navigates to `/catalog` |
 | Dashboard link | Navigates to `/` |
 | Analytics link | Visible only for `instructor` and `admin` roles. Navigates to `/analytics` |
 | Admin link | Visible only for `admin` role. Opens a dropdown: Repositories, Users, Health |
-| User menu | Dropdown: display name, role badge, Logout |
+| Theme toggle 🌙/☀️ | Switches between light and dark mode. Icon: moon (→ dark) / sun (→ light). White icon, same branding as header |
+| User menu | Dropdown: display name, role badge, Logout. White icon, same branding as header |
+
+**Theme system:**
+
+| Aspect | Behavior |
+|---|---|
+| Default | Follows system `prefers-color-scheme` media query |
+| Toggle | User clicks moon/sun icon in header to switch mode |
+| Persistence | User preference stored in `localStorage` (`phoebus-theme`). Overrides system detection once set |
+| System follow | If no explicit preference stored, theme tracks system changes in real-time |
+| Implementation | CSS variables on `:root` (light) and `[data-theme="dark"]` (dark). Ant Design `ConfigProvider` with `darkAlgorithm`/`defaultAlgorithm`. All UI components consume CSS variables — no hardcoded colors |
+| Header exception | The header bar keeps its dark branding identity (`#001529` background) regardless of the active theme |
 
 **Unauthenticated views** (Login) render without the header — they use a centered, minimal layout.
 
@@ -894,8 +1131,9 @@ All authenticated views share a common shell layout:
 | `/admin/repositories` | Repository Management | `admin` | Global shell | 10.11 |
 | `/admin/repositories/new` | Add Repository | `admin` | Global shell | 10.12 |
 | `/admin/repositories/:repoId/edit` | Edit Repository | `admin` | Global shell | 10.12 |
-| `/admin/users` | User Management | `admin` | Global shell | 10.13 |
-| `/admin/health` | Platform Health | `admin` | Global shell | 10.14 |
+| `/admin/repositories/:repoId/sync-logs` | Sync Logs | `admin` | Global shell | 10.13 |
+| `/admin/users` | User Management | `admin` | Global shell | 10.14 |
+| `/admin/health` | Platform Health | `admin` | Global shell | 10.15 |
 
 **Access control:** The frontend checks the user's role (from the JWT payload decoded client-side — the httpOnly cookie contains the JWT but a non-sensitive role claim is also available via a `/api/me` call on page load) and hides inaccessible navigation links. The backend enforces RBAC on every API call — a direct URL access to an unauthorized route returns `403 Forbidden`.
 
@@ -906,13 +1144,13 @@ All authenticated views share a common shell layout:
 
 ### 10.3 Login (`/login`)
 
-**Purpose:** Authenticate the user via OIDC, LDAP, or local credentials.
+**Purpose:** Authenticate the user via OIDC, LDAP, or local credentials. Optionally allow self-registration.
 
 **Layout:** Centered card on a neutral background, no global header.
 
 ```
 ┌─────────────────────────────────────┐
-│           🔥 Phoebus                │
+│           🔥 Phœbus                │
 │                                     │
 │  ┌─────────────────────────────┐    │
 │  │  Sign in with SSO           │    │  ← OIDC button (if configured)
@@ -925,7 +1163,31 @@ All authenticated views share a common shell layout:
 │                                     │
 │        [Sign In]                    │
 │                                     │
+│  Don't have an account? Create one  │  ← Link (if local auth enabled)
+│                                     │
 │  ⚠ Invalid credentials             │  ← Error (conditional)
+└─────────────────────────────────────┘
+```
+
+**Registration form** (toggled via "Create one" link, replaces login form):
+
+```
+┌─────────────────────────────────────┐
+│           🔥 Phœbus                │
+│                                     │
+│  Create your account                │
+│                                     │
+│  Username      [___________________]│
+│  Display Name  [___________________]│
+│  Email         [___________________]│  ← Optional
+│  Password      [___________________]│
+│  Confirm       [___________________]│
+│                                     │
+│        [Create Account]             │
+│                                     │
+│  Already have an account? Sign in   │  ← Link back to login form
+│                                     │
+│  ⚠ Username already taken           │  ← Error (conditional)
 └─────────────────────────────────────┘
 ```
 
@@ -935,10 +1197,13 @@ All authenticated views share a common shell layout:
 |---|---|---|
 | SSO button | OIDC is configured | Redirects to OIDC provider (external redirect via `GET /api/auth/oidc/redirect`) |
 | Username/password form | LDAP or local auth enabled | `POST /api/auth/login` with credentials |
-| Error message | On failed login | "Invalid credentials" (no distinction between wrong user/wrong password for security) |
+| "Create account" link | Local auth enabled | Toggles to registration form |
+| Registration form | Local auth enabled + user clicked link | `POST /api/auth/register` with `{ username, display_name, email, password }` |
+| Error message | On failed login or registration | "Invalid credentials" or "Username already taken" (no distinction between wrong user/wrong password for security) |
 
 **API Calls:**
 - `POST /api/auth/login` — LDAP/local authentication (sets httpOnly cookie on success)
+- `POST /api/auth/register` — Local self-registration (creates user with role `learner`, sets httpOnly cookie on success)
 - `GET /api/auth/oidc/redirect` — returns OIDC provider URL for browser redirect
 
 **Navigation:**
@@ -1026,17 +1291,20 @@ All authenticated views share a common shell layout:
 │                                                                      │
 │  [🔍 Search learning paths...                               ]       │
 │                                                                      │
-│  Filters:  [All ▾]  [Tag: kubernetes ✕]  [Sort: A-Z ▾]             │
+│  Filters:  [All ▾]  [Tag: kubernetes ✕]  [Sort: Competency Path ▾]  │
+│            [Competency: docker-basics ✕] [linux-cli ✕]              │
 │                                                                      │
 │  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────┐   │
-│  │ 🎯 Kubernetes    │  │ 🔄 GitOps with   │  │ 🏗 Terraform     │   │
-│  │ Fundamentals     │  │ ArgoCD           │  │ Advanced         │   │
+│  │ 🐧 Linux         │  │ 🐳 Docker        │  │ 🎯 Kubernetes    │   │
+│  │ Fundamentals     │  │ Fundamentals     │  │ Fundamentals     │   │
 │  │                  │  │                  │  │                  │   │
-│  │ 5 modules · 3h   │  │ 3 modules · 2h   │  │ 4 modules · 4h   │   │
-│  │ #kubernetes      │  │ #gitops #argocd  │  │ #terraform #iac  │   │
-│  │ #containers      │  │                  │  │                  │   │
-│  │                  │  │                  │  │                  │   │
-│  │ ████████░░ 72%   │  │ ███░░░░░░░ 20%   │  │ Not started      │   │
+│  │ 3 modules · 2h   │  │ 4 modules · 3h   │  │ 5 modules · 3h   │   │
+│  │ #linux #cli      │  │ #docker          │  │ #kubernetes      │   │
+│  │                  │  │ #containers      │  │ #containers      │   │
+│  │ Provides:        │  │ Provides:        │  │ Provides:        │   │
+│  │  linux-cli       │  │  docker-basics   │  │  k8s-pods        │   │
+│  │                  │  │ Prereqs: ✅      │  │ Prereqs: ⚠ 1/2  │   │
+│  │ ██████████ 100%  │  │ ████████░░ 72%   │  │ Not started      │   │
 │  └──────────────────┘  └──────────────────┘  └──────────────────┘   │
 │                                                                      │
 └──────────────────────────────────────────────────────────────────────┘
@@ -1051,7 +1319,8 @@ All authenticated views share a common shell layout:
 | Description | `phoebus.yaml` → `description` (truncated to ~100 chars) |
 | Module count + duration | Computed from modules and `estimated_duration` |
 | Tags | `phoebus.yaml` → `tags` (clickable — toggles filter) |
-| Prerequisites | Shown as warning badge if unmet |
+| Competencies provided | Aggregated from modules' `competencies` fields. Displayed as colored badges on each card |
+| Prerequisites status | ✅ all met, ⚠ N/M met (with count), or hidden if no prerequisites. Shown as warning badge if unmet |
 | Progress | From `progress` table. "Not started" if no progress |
 
 **Filters & Search:**
@@ -1060,15 +1329,17 @@ All authenticated views share a common shell layout:
 |---|---|
 | Search input | Client-side full-text filter on title, description, tags. Debounced (300ms) |
 | Tag filter | Click a tag on a card or in the filter bar to toggle. Multiple tags = AND. Shown as removable chips |
+| Competency filter | Multi-select dropdown listing all competencies. Multiple = OR. Pre-settable via URL `?competencies=a,b`. Shown as removable chips |
 | Status filter | Dropdown: All, Not Started, In Progress, Completed |
-| Sort | Dropdown: Alphabetical (A-Z), Most Recent, Progress (desc) |
+| Sort | Dropdown: Alphabetical (A-Z), Alphabetical (Z-A), Progress (desc), **Competency Path** (topological order based on competency dependencies — **default**) |
 
 **API Calls:**
-- `GET /api/learning-paths` — returns all learning paths with metadata
-- `GET /api/me/progress` — returns the learner's progress for all paths (to overlay on cards)
+- `GET /api/learning-paths` — returns all learning paths with metadata, `competencies_provided` (aggregated), and `prerequisites_met` (boolean)
+- `GET /api/competencies` — returns the list of all competencies across all modules (for the filter dropdown)
 
 **Navigation targets:**
 - Click a card → `/paths/:pathId`
+- "Browse Prerequisite Paths" (from popup) → `/catalog?competencies=...`
 
 ### 10.6 Learning Path Overview (`/paths/:pathId`)
 
@@ -1126,9 +1397,9 @@ All authenticated views share a common shell layout:
 |---|---|
 | ← Back to Catalog | Navigates to `/catalog` |
 | Path metadata | Title, description, tags, duration, prerequisites, module/step count |
-| Prerequisite status | ✅ if completed, ⚠ if not (with link to the prerequisite path). Not blocking — advisory only |
+| Prerequisite status | ✅ if completed, ⚠ if not (with link to the prerequisite path). Not blocking — advisory only. Clicking "Start Learning" with unmet prerequisites triggers a confirmation popup (see §3.1.1) |
 | Progress bar + percentage | Overall learning path completion |
-| Continue Learning button | Navigates to the next incomplete step. Becomes "Start Learning" if not started. Hidden if completed |
+| Continue Learning button | Navigates to the next incomplete step. Becomes "Start Learning" if not started. Hidden if completed. If prerequisites are unmet, shows the prerequisite enforcement popup first (§3.1.1) |
 | Module list | Expandable/collapsible (Ant Design Collapse). Shows step list with type icons and completion |
 | Current step indicator | "← current" on the last in-progress step |
 
@@ -1190,6 +1461,8 @@ All authenticated views share a common shell layout:
 | Step entries | Type icon + title + completion indicator (✅ completed, 🔵 in-progress, ○ not started). Click → navigate to that step |
 | Current step | Active state (bold, accent background color) |
 | Scroll | Auto-scrolls to keep the current step visible on load |
+| Resize | Sidebar width is adjustable via a drag handle on the right edge (180px–500px range). Handle highlights blue on hover |
+| Collapse | When collapsed (48px), only the unfold button is visible — the menu is hidden entirely to avoid popup overlap |
 
 **Footer navigation:**
 
@@ -1259,20 +1532,39 @@ Renders the terminal simulator (see section 4 for detailed behavior).
 
 #### 10.7.4 Code Exercise Step
 
-Renders the code viewer with patch selection (see section 5 for detailed behavior).
+Renders a VS Code-like IDE layout with full-bleed display (no padding, no max-width). The layout adapts to the active theme (light/dark).
+
+```
+┌────────────────────────────────────────────────────────────────────┐
+│  📄 main.go                     [Phase 1: Find the bug]           │  ← Top bar
+├────────┬───────────────────────────────────────────────────────────┤
+│Explorer│  Monaco Editor (read-only)                    ┃ minimap  │
+│        │  1  package main                              ┃          │
+│ 📁 cmd │  2  import "fmt"                              ┃          │
+│ 📄 main│  3  func main() {                             ┃          │
+│ 📄 go. │  4    fmt.Println("Hello")                    ┃          │
+│        │  5  }                                         ┃          │
+├────────┴───────────────────────────────────────────────────────────┤
+│  ═══════════════════════════  (drag handle)                        │
+├────────────────────────────────────────────────────────────────────┤
+│  Description / Controls (bottom panel, resizable 100–500px)       │
+│  Click line numbers to select problematic lines.  [Validate]      │
+└────────────────────────────────────────────────────────────────────┘
+```
 
 | Element | Behavior |
 |---|---|
-| Phase indicator | "Phase 1/2" (modes A/C) or single phase (mode B) |
-| File tree | Left panel (Ant Design Tree). All `codebase/` files shown. Target file pre-selected and marked (★) |
-| Code viewer | Right panel. Monaco Editor (read-only). Syntax highlighting. Clickable lines for modes A/C |
-| Problem description | Markdown-rendered below the code panels |
-| Selected lines | "Selected lines: 12, 13" display. Click line to toggle selection |
+| Top bar | File name + phase indicator tag. Background follows IDE secondary color (`--color-bg-ide-secondary`) |
+| File tree | Left panel (Ant Design Tree, 200px). All `codebase/` files shown. Target file pre-selected. Background transparent over IDE secondary |
+| Code viewer | Center panel. Monaco Editor (read-only). Theme: `vs` (light mode) or `vs-dark` (dark mode), switches automatically. Syntax highlighting, minimap (scale 2, proportional), line numbers, folding |
+| Bottom panel | Resizable via drag handle (100–500px). Contains problem description (Markdown), controls, and feedback |
+| Phase indicator | "Phase 1/2" (modes A/C) or single phase (mode B). Displayed as colored Tag in top bar |
+| Selected lines | Click on gutter (line number / glyph margin) to toggle line selection. Blue highlight decoration. "Selected lines: 12, 13" display |
 | Validate Selection | Phase 1 button. `POST /api/exercises/:stepId/attempt` with `{ phase: "identify", selected_lines }`. Returns `{ is_correct, feedback }` with progressive hints |
-| Patch proposals | Phase 2 (or sole phase for mode B). Monaco inline diff views. Ant Design `Radio.Group` |
+| Patch proposals | Phase 2 (or sole phase for mode B). Radio group in bottom panel. Tooltip shows unified diff on hover |
 | Submit Patch | `POST /api/exercises/:stepId/attempt` with `{ phase: "fix", selected_patch }`. Returns `{ is_correct, explanation }` |
-| Target highlight | Lines stay highlighted in Phase 2 as a visual reference |
-| Reset button | Top-right. Confirmation → `POST /api/exercises/:stepId/reset` |
+| Target highlight | Green decoration on target lines in Phase 2 as visual reference |
+| Disabled button | When Validate/Submit is disabled, uses theme-aware contrast (`--color-ide-disabled-bg/text/border`) |
 
 **API Calls:**
 - `GET /api/learning-paths/:pathId/steps/:stepId` — step metadata + sanitized `exercise_data` (patches without `correct` flags, codebase files, target info) + codebase files content
@@ -1456,11 +1748,11 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 
 ### 10.11 Repository Management (`/admin/repositories`)
 
-**Purpose:** List and manage registered Git repositories.
+**Purpose:** List and manage registered Git repositories. Display the instance SSH public key for deploy key setup.
 
 **Required role:** `admin`
 
-**Layout:** Global shell. Ant Design Table with action buttons.
+**Layout:** Global shell. Ant Design Table with action buttons. SSH public key banner above the table.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -1468,6 +1760,14 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
 │  Repository Management                          [+ Add Repository]   │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │ 🔑 Instance SSH Public Key                          [Copy]    │  │
+│  │ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... phoebus-instance    │  │
+│  │                                                                │  │
+│  │ Add this key as a read-only deploy key on your Git             │  │
+│  │ repositories to use SSH clone URLs (git@…).                    │  │
+│  └────────────────────────────────────────────────────────────────┘  │
 │                                                                      │
 │  ┌────────────────────────────────────────────────────────────────┐  │
 │  │ Name             Clone URL              Branch  Status   Act. │  │
@@ -1478,6 +1778,18 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 │                                                                      │
 └──────────────────────────────────────────────────────────────────────┘
 ```
+
+**SSH Public Key Banner (Ant Design Alert, type: info):**
+
+The instance SSH public key is always displayed above the repository table. It is generated once at first startup and persists across restarts.
+
+| Element | Description |
+|---|---|
+| Key display | Full public key in `ssh-ed25519 AAAA...` format, monospace font |
+| Copy button | Copies the full public key to clipboard. Toast: "SSH public key copied" |
+| Help text | "Add this key as a read-only deploy key on your Git repositories to use SSH clone URLs (git@…)." |
+
+**API Call:** `GET /api/admin/ssh-public-key` — returns `{ "public_key": "ssh-ed25519 AAAA..." }`
 
 **Table columns (Ant Design Table):**
 
@@ -1499,6 +1811,7 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 | Sync Now | `POST /api/admin/repos/:repoId/sync`. Status changes to `syncing`. Toast notification on completion/failure |
 | Copy Webhook URL | Copies `https://{host}/api/webhooks/{uuid}` to clipboard. Toast: "Webhook URL copied" |
 | Delete | Ant Design Modal confirmation ("This will remove all content from this repository. Learner progress will be preserved."). `DELETE /api/admin/repos/:repoId` |
+| Sync Logs | Navigates to `/admin/repositories/:repoId/sync-logs`. Shows the complete sync history for this repository |
 
 **Error display:** If status is `error`, clicking the status badge opens a popover showing the error message from `sync_error`.
 
@@ -1506,10 +1819,12 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 - `GET /api/admin/repos` — returns all repositories with sync status
 - `POST /api/admin/repos/:repoId/sync` — trigger manual sync
 - `DELETE /api/admin/repos/:repoId` — delete repository
+- `GET /api/admin/repos/:repoId/sync-logs` — returns sync job history for this repository
 
 **Navigation targets:**
 - + Add Repository → `/admin/repositories/new`
 - Edit → `/admin/repositories/:repoId/edit`
+- Sync Logs → `/admin/repositories/:repoId/sync-logs`
 
 ### 10.12 Add / Edit Repository (`/admin/repositories/new`, `/admin/repositories/:repoId/edit`)
 
@@ -1530,11 +1845,17 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 │                                                                      │
 │  Branch             [main_________________________________]          │
 │                                                                      │
-│  Authentication     [None ▾]                                         │
+│  Authentication     [Instance SSH Key ▾]                              │
 │                                                                      │
-│  ── Credentials (shown when auth ≠ none) ────────────────────────   │
+│  ┌──────────────────────────────────────────────────────────────┐    │
+│  │ 🔑 Instance SSH Public Key                        [Copy]    │    │
+│  │ ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAI... phoebus-instance  │    │
+│  │ Add this key as a read-only deploy key on your Git repo.    │    │
+│  └──────────────────────────────────────────────────────────────┘    │
 │                                                                      │
-│  Token / Key        [_______________________________________]        │
+│  ── Credentials (shown when auth = http-basic or http-token) ─────  │
+│                                                                      │
+│  Token              [_______________________________________]        │
 │                                                                      │
 │                                                                      │
 │  [Cancel]                                           [Save & Sync]    │
@@ -1548,8 +1869,8 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 |---|---|---|---|
 | Clone URL | Text input | Must be valid Git URL (SSH or HTTPS) | Yes |
 | Branch | Text input | Default: `main` | No (defaults to `main`) |
-| Authentication type | Select: `none`, `ssh-key`, `http-basic`, `http-token` | — | Yes |
-| Private key | Textarea (shown if `ssh-key`) | Must be valid SSH private key format | Conditional |
+| Authentication type | Select: `none`, `instance-ssh-key`, `http-basic`, `http-token` | — | Yes |
+| | _(selecting `instance-ssh-key` displays the instance SSH public key in an info alert below, with a copy button — no credential fields shown)_ | | |
 | Username | Text input (shown if `http-basic`) | — | Conditional |
 | Password | Password input (shown if `http-basic`) | — | Conditional |
 | Token | Password input (shown if `http-token`) | — | Conditional |
@@ -1572,9 +1893,75 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 - On save → `/admin/repositories`
 - Cancel → `/admin/repositories`
 
-### 10.13 User Management (`/admin/users`)
+### 10.13 Sync Logs (`/admin/repositories/:repoId/sync-logs`)
 
-**Purpose:** List all users, change roles, deactivate accounts.
+**Purpose:** View the complete synchronization history for a specific Git repository.
+
+**Required role:** `admin`
+
+**Layout:** Global shell. Header with repository info, followed by Ant Design Table listing all sync jobs.
+
+```
+┌──────────────────────────────────────────────────────────────────────┐
+│ Header                                                               │
+├──────────────────────────────────────────────────────────────────────┤
+│                                                                      │
+│  ← Back to Repositories                                             │
+│                                                                      │
+│  Sync Logs: git@github.com/company/k8s-content.git (main)           │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │ #   Status     Started              Duration   Error          │  │
+│  │ 1   ✅ done    2025-01-15 14:32:05  3.2s       —              │  │
+│  │ 2   ✅ done    2025-01-15 12:10:44  2.8s       —              │  │
+│  │ 3   ❌ failed  2025-01-14 09:05:12  1.1s       git clone fa…  │  │
+│  │ 4   ✅ done    2025-01-13 16:48:30  4.5s       —              │  │
+│  └────────────────────────────────────────────────────────────────┘  │
+│                                                                      │
+│  Showing 4 sync jobs                            [← 1  2  3  4  →]  │
+│                                                                      │
+└──────────────────────────────────────────────────────────────────────┘
+```
+
+**Table columns (Ant Design Table):**
+
+| Column | Description |
+|---|---|
+| # | Row number (most recent first) |
+| Status | Badge: `done` (green), `failed` (red), `processing` (blue, spinning), `pending` (grey) |
+| Started | Absolute timestamp of `started_at` (or `created_at` if not yet started). Relative time in tooltip |
+| Duration | Computed from `started_at` → `completed_at` (e.g., "3.2s", "1m 12s"). Shows "—" if not completed |
+| Error | Error message (truncated to 80 chars). Full error shown in expandable row or tooltip |
+
+**Sorting:** Most recent jobs first (by `created_at DESC`).
+
+**Error detail:** Clicking on a truncated error message or expanding the row reveals the full error text in a code block for easy reading.
+
+**API Calls:**
+- `GET /api/admin/repos/:repoId/sync-logs` — returns array of sync jobs for this repository, ordered by `created_at DESC`
+
+**Response format:**
+```json
+[
+  {
+    "id": "uuid",
+    "repo_id": "uuid",
+    "status": "done",
+    "error": null,
+    "attempts": 1,
+    "started_at": "2025-01-15T14:32:05Z",
+    "completed_at": "2025-01-15T14:32:08Z",
+    "created_at": "2025-01-15T14:32:04Z"
+  }
+]
+```
+
+**Navigation:**
+- ← Back to Repositories → `/admin/repositories`
+
+### 10.14 User Management (`/admin/users`)
+
+**Purpose:** List all users, change roles, deactivate accounts, and create local users.
 
 **Required role:** `admin`
 
@@ -1585,7 +1972,7 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 │ Header                                                               │
 ├──────────────────────────────────────────────────────────────────────┤
 │                                                                      │
-│  User Management                                                     │
+│  User Management                                    [+ Add User]     │
 │                                                                      │
 │  [🔍 Search users...                    ]                            │
 │                                                                      │
@@ -1600,6 +1987,26 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 │  Showing 4 of 42 users                        [← 1  2  3  4  5 →]  │
 │                                                                      │
 └──────────────────────────────────────────────────────────────────────┘
+```
+
+**"Add User" modal** (shown when clicking the [+ Add User] button, only when local auth is enabled):
+
+```
+┌─────────────────────────────────────┐
+│  Create Local User                  │
+│                                     │
+│  Username      [___________________]│
+│  Display Name  [___________________]│
+│  Email         [___________________]│  ← Optional
+│  Role          (●) learner          │
+│                ( ) instructor       │
+│                ( ) admin            │
+│  Password      [___________________]│
+│                                     │
+│        [Cancel]  [Create User]      │
+│                                     │
+│  ⚠ Username already taken           │  ← Error (conditional)
+└─────────────────────────────────────┘
 ```
 
 **Table columns:**
@@ -1617,6 +2024,7 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 
 | Action | Behavior |
 |---|---|
+| Add User | Ant Design Modal with form (username, display name, email, role, password). `POST /api/admin/users` with `{ username, display_name, email, role, password }`. Only shown when local auth is enabled. Toast confirmation "User created" |
 | Change Role | Ant Design Modal with role selector (radio: learner, instructor, admin). `PATCH /api/users/:userId` with `{ role }`. Toast confirmation |
 | Deactivate | Confirmation modal. `PATCH /api/users/:userId` with `{ active: false }`. User cannot log in. Row is greyed out |
 | Reactivate | `PATCH /api/users/:userId` with `{ active: true }`. Row returns to normal |
@@ -1626,9 +2034,10 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 
 **API Calls:**
 - `GET /api/users?page=1&per_page=20` — paginated user list
+- `POST /api/admin/users` — create a local user (admin only, local auth must be enabled)
 - `PATCH /api/users/:userId` — update role or active status
 
-### 10.14 Platform Health (`/admin/health`)
+### 10.15 Platform Health (`/admin/health`)
 
 **Purpose:** Monitor platform health and operational metrics.
 
@@ -1684,7 +2093,7 @@ Renders the code viewer with patch selection (see section 5 for detailed behavio
 
 **Note:** Detailed Prometheus metrics are available at `/metrics` for external monitoring tools (Grafana). This page is a lightweight summary for quick admin checks.
 
-### 10.15 Navigation Graph
+### 10.16 Navigation Graph
 
 The following Mermaid diagram shows the navigation flow between all views:
 
