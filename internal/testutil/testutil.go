@@ -2,13 +2,14 @@ package testutil
 
 import (
 	"fmt"
-	"math/rand"
+	"net"
 	"os/exec"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/fsamin/phoebus/internal/database"
+	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -17,8 +18,15 @@ import (
 func SetupTestDB(t *testing.T) *sqlx.DB {
 	t.Helper()
 
-	containerName := fmt.Sprintf("phoebus-test-pg-%d", rand.Intn(100000))
-	port := 15432 + rand.Intn(1000)
+	containerName := fmt.Sprintf("phoebus-test-pg-%s", uuid.New().String()[:8])
+
+	// Find a free port
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("failed to find free port: %v", err)
+	}
+	port := l.Addr().(*net.TCPAddr).Port
+	l.Close()
 
 	// Start PostgreSQL container
 	cmd := exec.Command("docker", "run", "-d",
