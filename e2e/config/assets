@@ -1,0 +1,9 @@
+backend: s3
+max_size: 52428800
+s3:
+  bucket: phoebus-assets
+  region: us-east-1
+  endpoint: http://minio-e2e:9000
+  access_key: minioadmin
+  secret_key: minioadmin
+  force_path_style: true
