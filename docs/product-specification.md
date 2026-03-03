@@ -1,14 +1,14 @@
-# Phoebus — Product Specification
+# Phœbus — Product Specification
 
 ## 1. Vision
 
-Phoebus is an open-source e-learning platform purpose-built for **DevOps and software engineering training** in enterprise environments. It enables organizations to upskill and reskill their engineering teams through hands-on, practical learning experiences.
+Phœbus is an open-source e-learning platform purpose-built for **DevOps and software engineering training** in enterprise environments. It enables organizations to upskill and reskill their engineering teams through hands-on, practical learning experiences.
 
-Phoebus promotes **self-assessment**: learners progress at their own pace, in their own style. There is no grading, no ranking, no instructor gatekeeping. Programming exercises and terminal sessions are **practical applications** of the pedagogical content — they exist so learners can build muscle memory and validate their own understanding, not to be evaluated by others. Automated feedback (test results, validation scripts) serves the learner directly, helping them iterate until they master the skill.
+Phœbus promotes **self-assessment**: learners progress at their own pace, in their own style. There is no grading, no ranking, no instructor gatekeeping. Programming exercises and terminal sessions are **practical applications** of the pedagogical content — they exist so learners can build muscle memory and validate their own understanding, not to be evaluated by others. Automated feedback (test results, validation scripts) serves the learner directly, helping them iterate until they master the skill.
 
-What sets Phoebus apart is its **content-as-code** philosophy: all training content lives in Git repositories as Markdown files, making content creation and updates as agile as software development itself. There is no CMS, no WYSIWYG editor, no publishing pipeline — **what is in Git is what learners see**.
+What sets Phœbus apart is its **content-as-code** philosophy: all training content lives in Git repositories as Markdown files, making content creation and updates as agile as software development itself. There is no CMS, no WYSIWYG editor, no publishing pipeline — **what is in Git is what learners see**.
 
-Phoebus provides **interactive, guided exercises** — terminal command sequencing, code review challenges, and quizzes — all rendered in the browser with no infrastructure to provision. Combined with rich Markdown lessons, Phoebus bridges the gap between theoretical knowledge and real-world DevOps practice.
+Phœbus provides **interactive, guided exercises** — terminal command sequencing, code review challenges, and quizzes — all rendered in the browser with no infrastructure to provision. Combined with rich Markdown lessons, Phœbus bridges the gap between theoretical knowledge and real-world DevOps practice.
 
 ### Core Principles
 
@@ -64,10 +64,10 @@ Phoebus provides **interactive, guided exercises** — terminal command sequenci
 
 ### 2.3 Platform Administrator
 
-**Profile:** An infrastructure or platform engineer responsible for deploying, configuring, and maintaining the Phoebus instance within the enterprise.
+**Profile:** An infrastructure or platform engineer responsible for deploying, configuring, and maintaining the Phœbus instance within the enterprise.
 
 **Goals:**
-- Deploy and operate a single-tenant Phoebus instance on-premise or in the company cloud
+- Deploy and operate a single-tenant Phœbus instance on-premise or in the company cloud
 - Integrate with corporate identity providers (SSO / LDAP / OIDC)
 - Monitor platform health and resource usage
 
@@ -100,7 +100,7 @@ A **Step** is the atomic unit of content. It can be one of the following types:
 
 | Step Type | Description |
 |---|---|
-| **Lesson** | A Markdown document with text, diagrams, and embedded media. Read-only instructional content. |
+| **Lesson** | A Markdown document with text, diagrams, embedded images, videos, and audio. Rich instructional content with media assets served from the platform's asset store. |
 | **Quiz** | A set of questions (multiple choice, short answer) to validate understanding of concepts. |
 | **Terminal Exercise** | An interactive, simulated terminal scenario. The learner is presented with a context (system state, command output) and must choose the correct command at each step from a set of proposals. The exercise progresses as a guided sequence — no real VM is involved. |
 | **Code Exercise** | A code review / debugging challenge presented in a read-only code viewer (with syntax highlighting and file tree). The learner must identify problematic code sections, choose the correct fix from proposed patches (diffs), or both. No free-form code editing — the exercise is about understanding and analysis. |
@@ -153,6 +153,16 @@ In all modes:
 
 A **Competency** is a skill or knowledge area that can be tracked across modules and learning paths. Competencies enable instructors to define what a learner should be able to do after completing specific content.
 
+**Key definitions:**
+
+- **Competencies provided by a Learning Path** = the union of all `competencies` declared across its modules.
+- **Acquired competency** = a learner has acquired a competency when they have **completed** (100% progress) a Learning Path whose modules cover that competency.
+- **Prerequisites met** = all competencies listed in a Learning Path's `prerequisites` field have been acquired by the learner.
+
+Competencies serve two purposes:
+1. **Prerequisite enforcement** — When a learner starts a path with unmet prerequisites, a confirmation popup warns them and offers navigation to paths that provide the missing competencies.
+2. **Catalog discovery** — Learners can filter the catalog by competency and sort learning paths by competency dependency order (topological sort: paths with no prerequisites first, then paths whose prerequisites are covered by earlier paths).
+
 ---
 
 ## 4. Content Model (Content-as-Code)
@@ -180,8 +190,10 @@ learning-path-kubernetes/
 │   ├── index.md
 │   └── ...
 └── assets/
-    └── diagrams/              # Shared images and diagrams
+    └── diagrams/              # Shared images, videos, and media assets
 ```
+
+**Asset management:** Binary assets (images, videos, PDFs) placed in `assets/` directories are automatically uploaded to the platform's asset store during synchronization. Relative paths in Markdown (`![](./assets/diagram.png)`) are transparently rewritten to API URLs. Assets are deduplicated by content hash and served with immutable HTTP caching. The asset store supports two backends: **filesystem** (default, for development) and **S3** (for production, compatible with any S3 service including MinIO). Maximum file size is configurable (default: 50 MB).
 
 All metadata is embedded as **YAML front matter** in Markdown files (à la Docusaurus / Hugo), eliminating the need for separate metadata files. Each module directory contains an `index.md` with module metadata in its front matter. For simple steps (lessons, quizzes, terminal exercises), the step is a single `.md` file. For code exercises that reference a codebase, the step is a directory containing `instructions.md` and a `codebase/` directory.
 
@@ -423,12 +435,15 @@ Never use panic for control flow — it will crash the server.
 
 ### 4.5 Content Synchronization
 
-- Administrators register Git repositories in Phoebus and configure how they are cloned (SSH or HTTPS, with authentication if needed)
+- Administrators register Git repositories in Phœbus and configure how they are cloned (SSH or HTTPS, with authentication if needed)
 - Each registered repository is assigned a **unique webhook URL** containing a UUID (e.g., `https://phoebus.example.com/webhooks/{uuid}`). This URL is Git-provider-agnostic: any POST to it triggers a sync for the associated repository
-- When the webhook is called, Phoebus pulls the latest changes from the configured branch (e.g., `main`) and updates the content live — no build or publish step required
+- When the webhook is called, Phœbus pulls the latest changes from the configured branch (e.g., `main`) and updates the content live — no build or publish step required
 - Content versioning is inherently handled by Git history
 - Instructors can use branches and pull requests for content review before merging to `main`
-- Phoebus supports **any Git hosting platform** (GitHub, GitLab, Gitea, Bitbucket, self-hosted, etc.) since it only relies on standard Git clone (SSH/HTTPS) and a generic webhook endpoint
+- Phœbus supports **any Git hosting platform** (GitHub, GitLab, Gitea, Bitbucket, self-hosted, etc.) since it only relies on standard Git clone (SSH/HTTPS) and a generic webhook endpoint
+- **Instance SSH Key:** At first startup, Phœbus generates a unique **Ed25519 SSH keypair** for the instance. The private key is stored encrypted (AES-256-GCM) in the database, and the public key is displayed on the repository management page so administrators can add it as a **deploy key** (read-only) on their Git repositories. This enables SSH-based clone without managing per-repo credentials
+- **Synchronisation par hash de contenu (SHA-256) :** chaque niveau de la hiérarchie (learning path, module, step) possède un hash calculé à partir de son contenu et de ses métadonnées. Lors d'une re-synchronisation, Phœbus compare les hashs à chaque niveau et **ignore entièrement** les éléments inchangés (zéro écriture en base). Seuls les éléments modifiés sont mis à jour — résultat : une re-sync de contenu identique ne produit aucune écriture
+- **Soft-delete généralisé :** les modules et learning paths supprimés du dépôt reçoivent un `deleted_at = NOW()` au lieu d'être physiquement supprimés (même comportement que les steps). Un contenu réapparu est automatiquement restauré (`deleted_at = NULL`). La progression des apprenants n'est **jamais** perdue
 
 ---
 
@@ -448,9 +463,9 @@ Never use panic for control flow — it will crash the server.
 
 ### UC-2: Instructor Creates a Learning Path
 
-1. Instructor creates a new Git repository following the Phoebus content structure
+1. Instructor creates a new Git repository following the Phœbus content structure
 2. Instructor writes `phoebus.yaml`, module `index.md` files, and step Markdown files using the structured authoring conventions
-3. Instructor registers the repository in Phoebus
+3. Instructor registers the repository in Phœbus
 4. Content becomes immediately available to learners
 5. Instructor iterates on content by committing to the repository
 
@@ -458,7 +473,7 @@ Never use panic for control flow — it will crash the server.
 
 1. Instructor edits Markdown files in the Git repository
 2. Changes are pushed to `main` (directly or via PR after review)
-3. Phoebus detects the changes and updates the content live
+3. Phœbus detects the changes and updates the content live
 4. Learners see the updated content on their next page load
 5. Learners who already completed the step are unaffected in their progress
 
@@ -483,10 +498,10 @@ Never use panic for control flow — it will crash the server.
 5. Feedback is shown with explanations for correct and incorrect choices
 6. Step is marked as completed
 
-### UC-6: Administrator Deploys Phoebus
+### UC-6: Administrator Deploys Phœbus
 
 1. Administrator provisions infrastructure (servers, network)
-2. Administrator deploys Phoebus using provided Docker Compose configuration or standalone binary
+2. Administrator deploys Phœbus using provided Docker Compose configuration or standalone binary
 3. Administrator configures SSO integration (OIDC / LDAP)
 4. Administrator registers Git repositories containing learning paths (SSH or HTTPS clone URL, credentials if needed)
 5. Administrator configures the webhook URL (with UUID) on the Git hosting platform for each repository
@@ -503,9 +518,21 @@ Never use panic for control flow — it will crash the server.
 ### UC-8: Learner Tracks Competencies
 
 1. Learner views their competency dashboard
-2. Dashboard shows acquired competencies mapped from completed modules
+2. Dashboard shows acquired competencies mapped from completed learning paths (a competency is acquired when the learning path covering it is 100% completed)
 3. Learner identifies skill gaps and discovers relevant Learning Paths
 4. Progress is visible to the learner and optionally to their manager
+
+### UC-9: Prerequisite Enforcement with Guided Navigation
+
+1. Learner opens a Learning Path that has prerequisites (competencies the learner has not yet acquired)
+2. When the learner clicks "Start Learning" or navigates to a step, a **confirmation popup** appears:
+   - Lists the unmet prerequisite competencies
+   - Warns that the content may assume prior knowledge
+   - Offers two actions:
+     - **"Continue anyway"** — dismisses the popup and lets the learner proceed (non-blocking)
+     - **"Browse prerequisite paths"** — redirects to the Catalog page pre-filtered with the missing competencies, so the learner can find and complete the relevant paths first
+3. The popup is shown only once per learning path per session (dismissed state stored client-side)
+4. If all prerequisites are met, no popup is shown
 
 ---
 
@@ -529,6 +556,9 @@ Never use panic for control flow — it will crash the server.
 | Sequential progression | Learners progress through steps in order | Must Have |
 | Progress tracking | Track completion of steps, modules, and learning paths | Must Have |
 | Personal dashboard | Learner sees their enrolled paths, progress, and competencies | Must Have |
+| Competency-based catalog | Filter catalog by competency, sort by competency dependency order (topological) | Must Have |
+| Prerequisite enforcement | Confirmation popup when starting a path with unmet prerequisites; link to prerequisite paths | Must Have |
+| Light/Dark mode | Theme follows system preference by default; toggle in header to override. Preference persisted in `localStorage` | Must Have |
 | Bookmarks & notes | Learners can bookmark steps and take personal notes | Should Have |
 | Exercise reset | Learners can reset any exercise and start over, unlimited resets | Must Have |
 
@@ -578,7 +608,7 @@ Never use panic for control flow — it will crash the server.
 
 | Feature | Description | Priority |
 |---|---|---|
-| SSO integration | OIDC and LDAP support | Must Have |
+| SSO integration | OIDC, LDAP, and reverse proxy header auth | Must Have |
 | User management | Roles: learner, instructor, admin | Must Have |
 | Git repo registration | Register repos (SSH/HTTPS clone URL, credentials) and generate webhook URLs | Must Have |
 | Platform health monitoring | Dashboards for system health, resource usage | Should Have |
@@ -589,7 +619,7 @@ Never use panic for control flow — it will crash the server.
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    Phoebus Platform                      │
+│                    Phœbus Platform                      │
 │                                                         │
 │  ┌──────────┐  ┌──────────────┐  ┌───────────────────┐  │
 │  │ Frontend  │  │   Backend    │  │  Content Syncer   │  │
@@ -633,9 +663,13 @@ Never use panic for control flow — it will crash the server.
 
 ### 8.2 Security
 
-- SSO/OIDC for authentication; role-based access control for authorization
+- SSO/OIDC/LDAP for authentication; reverse proxy header auth for environments behind OAuth2 Proxy, Authelia, or Traefik Forward Auth; role-based access control for authorization
 - Content repos can be private (SSH key or token-based Git access)
 - Git credentials are encrypted at rest
+- **Prévention XSS dans le Markdown :** le pipeline de rendu utilise `rehype-sanitize` (après `rehypeRaw`) avec un schéma strict — autorise les classes hljs/admonition/mermaid, bloque `<script>`, `<style>`, `<iframe>`, `<object>`, `<embed>`, `<form>`, `<textarea>`. Liste blanche de protocoles : `href` accepte http/https/mailto uniquement ; `src` accepte http/https uniquement (bloque `file://`, `javascript:`, `data:` dans les liens)
+- **Assainissement SVG Mermaid :** DOMPurify avec `USE_PROFILES: { svg: true }` avant injection dans le DOM ; `securityLevel: 'strict'` sur Mermaid
+- **En-têtes CSP (Content Security Policy) :** middleware backend configurant `default-src 'self'`, `script-src 'self' blob:` (blob pour les workers Monaco), `worker-src 'self' blob:`, `style-src 'self' 'unsafe-inline'` (styles inline Ant Design), `img-src 'self' data:`, `font-src 'self' data:`, `connect-src 'self'`, `frame-ancestors 'none'`
+- **Autres en-têtes de sécurité :** `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-XSS-Protection: 0`
 
 ### 8.3 Reliability
 
