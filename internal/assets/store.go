@@ -16,6 +16,9 @@ type Store interface {
 	Exists(ctx context.Context, hash string) (bool, error)
 }
 
+// ErrAssetNotFound is returned when an asset does not exist.
+var ErrAssetNotFound = fmt.Errorf("asset not found")
+
 // NewStore creates an asset store based on configuration.
 func NewStore(cfg config.AssetsConfig) (Store, error) {
 	switch cfg.Backend {

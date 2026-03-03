@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"path"
@@ -12,6 +13,7 @@ import (
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/fsamin/phoebus/internal/config"
 )
 
@@ -103,6 +105,10 @@ func (s *S3Store) Get(ctx context.Context, hash string) (io.ReadCloser, string, 
 		Key:    aws.String(s.key(hash)),
 	})
 	if err != nil {
+		var nsk *s3types.NoSuchKey
+		if errors.As(err, &nsk) {
+			return nil, "", ErrAssetNotFound
+		}
 		return nil, "", fmt.Errorf("get asset %s from S3: %w", hash, err)
 	}
 

@@ -85,6 +85,9 @@ func (fs *FilesystemStore) Get(_ context.Context, hash string) (io.ReadCloser, s
 	}
 	f, err := os.Open(p)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, "", ErrAssetNotFound
+		}
 		return nil, "", fmt.Errorf("open asset %s: %w", hash, err)
 	}
 

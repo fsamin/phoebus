@@ -1,10 +1,12 @@
 package handler
 
 import (
+	"errors"
 	"io"
 	"net/http"
 	"regexp"
 
+	"github.com/fsamin/phoebus/internal/assets"
 	"github.com/go-chi/chi/v5"
 )
 
@@ -21,7 +23,11 @@ func (h *Handler) ServeAsset(w http.ResponseWriter, r *http.Request) {
 
 	reader, contentType, err := h.assetStore.Get(r.Context(), hash)
 	if err != nil {
-		http.Error(w, "asset not found", http.StatusNotFound)
+		if errors.Is(err, assets.ErrAssetNotFound) || errors.Is(err, assets.ErrInvalidHash) {
+			http.Error(w, "asset not found", http.StatusNotFound)
+		} else {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+		}
 		return
 	}
 	defer reader.Close()
