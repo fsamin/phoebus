@@ -117,7 +117,7 @@ func (h *Handler) CreateRepo(w http.ResponseWriter, r *http.Request) {
 		RETURNING id, clone_url, branch, auth_type, webhook_uuid, sync_status, sync_error, last_synced_at, created_at, updated_at
 	`, req.CloneURL, req.Branch, req.AuthType, credBytes, webhookUUID)
 	if err != nil {
-		logging.FromContext(r.Context()).Error("failed to create repository", "error", err)
+		logging.FromContext(r.Context()).Error("failed to create repository", "error", err.Error())
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create repository"})
 		return
 	}
@@ -226,7 +226,7 @@ func (h *Handler) SyncLogs(w http.ResponseWriter, r *http.Request) {
 		ORDER BY created_at DESC
 		LIMIT 100
 	`, id); err != nil {
-		logging.FromContext(r.Context()).Error("failed to fetch sync logs", "error", err)
+		logging.FromContext(r.Context()).Error("failed to fetch sync logs", "error", err.Error())
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 		return
 	}

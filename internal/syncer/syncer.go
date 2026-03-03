@@ -96,7 +96,7 @@ func (s *Syncer) pickAndProcess(ctx context.Context) bool {
 	// Pick a pending job with SELECT FOR UPDATE SKIP LOCKED
 	tx, err := s.db.BeginTxx(ctx, nil)
 	if err != nil {
-		slog.Error("failed to begin job tx", "error", err)
+		slog.Error("failed to begin job tx", "error", err.Error())
 		return false
 	}
 
@@ -116,7 +116,7 @@ func (s *Syncer) pickAndProcess(ctx context.Context) bool {
 		if err == sql.ErrNoRows {
 			return false
 		}
-		slog.Error("failed to pick sync job", "error", err)
+		slog.Error("failed to pick sync job", "error", err.Error())
 		return false
 	}
 
@@ -128,7 +128,7 @@ func (s *Syncer) pickAndProcess(ctx context.Context) bool {
 		UPDATE git_repositories SET sync_status = 'syncing', updated_at = now() WHERE id = $1
 	`, job.RepoID)
 	if err := tx.Commit(); err != nil {
-		slog.Error("failed to commit job pickup", "error", err)
+		slog.Error("failed to commit job pickup", "error", err.Error())
 		return false
 	}
 
@@ -156,7 +156,7 @@ func (s *Syncer) processJob(ctx context.Context, jobID, repoID uuid.UUID) {
 	if err := s.db.GetContext(ctx, &repo, `
 		SELECT id, clone_url, branch, auth_type, credentials FROM git_repositories WHERE id = $1
 	`, repoID); err != nil {
-		logger.Error("failed to fetch repo", "error", err)
+		logger.Error("failed to fetch repo", "error", err.Error())
 		s.failJob(ctx, collector, jobID, repoID, err)
 		return
 	}
@@ -166,7 +166,7 @@ func (s *Syncer) processJob(ctx context.Context, jobID, repoID uuid.UUID) {
 	// Clone to temp dir
 	tmpDir, err := os.MkdirTemp("", "phoebus-sync-*")
 	if err != nil {
-		logger.Error("failed to create temp dir", "error", err)
+		logger.Error("failed to create temp dir", "error", err.Error())
 		s.failJob(ctx, collector, jobID, repoID, err)
 		return
 	}
@@ -177,7 +177,7 @@ func (s *Syncer) processJob(ctx context.Context, jobID, repoID uuid.UUID) {
 	if strings.HasPrefix(repo.CloneURL, "file://") {
 		localPath := strings.TrimPrefix(repo.CloneURL, "file://")
 		if _, err := os.Stat(localPath); err != nil {
-			logger.Error("local path not accessible", "path", localPath, "error", err)
+			logger.Error("local path not accessible", "path", localPath, "error", err.Error())
 			s.failJob(ctx, collector, jobID, repoID, fmt.Errorf("local path not accessible: %w", err))
 			return
 		}
@@ -202,7 +202,7 @@ func (s *Syncer) processJob(ctx context.Context, jobID, repoID uuid.UUID) {
 		}
 
 		if err := gitClone(repo.CloneURL, repo.Branch, tmpDir, repo.AuthType, creds); err != nil {
-			logger.Error("git clone failed", "error", err)
+			logger.Error("git clone failed", "error", err.Error())
 			s.failJob(ctx, collector, jobID, repoID, fmt.Errorf("git clone failed: %w", err))
 			return
 		}
@@ -211,7 +211,7 @@ func (s *Syncer) processJob(ctx context.Context, jobID, repoID uuid.UUID) {
 
 	// Parse and sync content
 	if err := s.syncContent(ctx, repoID, repoDir); err != nil {
-		logger.Error("content sync failed", "error", err)
+		logger.Error("content sync failed", "error", err.Error())
 		s.failJob(ctx, collector, jobID, repoID, err)
 		return
 	}
