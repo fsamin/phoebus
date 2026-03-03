@@ -355,7 +355,7 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 			JOIN modules m ON m.learning_path_id = lp.id AND m.deleted_at IS NULL
 			JOIN steps s ON s.module_id = m.id AND s.deleted_at IS NULL
 			LEFT JOIN progress p ON p.step_id = s.id AND p.status = 'completed'
-			WHERE lp.deleted_at IS NULL
+			WHERE lp.deleted_at IS NULL AND lp.enabled = true
 			GROUP BY p.user_id, lp.id
 			HAVING COUNT(DISTINCT s.id) = COUNT(DISTINCT p.step_id) AND p.user_id IS NOT NULL
 		) completed

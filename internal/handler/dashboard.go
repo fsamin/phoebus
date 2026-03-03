@@ -29,7 +29,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		FROM progress p
 		JOIN steps s ON s.id = p.step_id
 		JOIN modules m ON m.id = s.module_id AND m.deleted_at IS NULL
-		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL
+		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL AND lp.enabled = true
 		WHERE p.user_id = $1 AND p.status = 'in_progress' AND s.deleted_at IS NULL
 		ORDER BY p.updated_at DESC LIMIT 1
 	`, claims.UserID)
@@ -53,7 +53,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		FROM progress p
 		JOIN steps s ON s.id = p.step_id
 		JOIN modules m ON m.id = s.module_id AND m.deleted_at IS NULL
-		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL
+		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL AND lp.enabled = true
 		WHERE p.user_id = $1 AND s.deleted_at IS NULL
 		GROUP BY lp.id, lp.title, lp.icon
 	`, claims.UserID)
@@ -72,7 +72,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	h.db.SelectContext(r.Context(), &competencies, `
 		SELECT UNNEST(m.competencies) AS name, true AS acquired, lp.title AS path_title
 		FROM modules m
-		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL
+		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL AND lp.enabled = true
 		WHERE m.deleted_at IS NULL AND NOT EXISTS (
 			SELECT 1 FROM steps s
 			WHERE s.module_id = m.id AND s.deleted_at IS NULL
@@ -88,7 +88,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	h.db.SelectContext(r.Context(), &pendingCompetencies, `
 		SELECT UNNEST(m.competencies) AS name, false AS acquired, lp.title AS path_title
 		FROM modules m
-		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL
+		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL AND lp.enabled = true
 		WHERE m.deleted_at IS NULL AND EXISTS (
 			SELECT 1 FROM progress p
 			JOIN steps s ON s.id = p.step_id
@@ -139,7 +139,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		FROM progress p
 		JOIN steps s ON s.id = p.step_id
 		JOIN modules m ON m.id = s.module_id AND m.deleted_at IS NULL
-		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL
+		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL AND lp.enabled = true
 		WHERE p.user_id = $1 AND s.deleted_at IS NULL
 		ORDER BY p.updated_at DESC LIMIT 10
 	`, claims.UserID)
