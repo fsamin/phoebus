@@ -1,0 +1,1 @@
+url: postgres://phoebus:phoebus@db:5432/phoebus?sslmode=disable
