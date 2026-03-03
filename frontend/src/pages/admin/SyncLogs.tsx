@@ -104,7 +104,7 @@ export default function SyncLogs() {
         // Filter out repo_id and job_id (already shown in parent row)
         const filtered = Object.entries(fields).filter(([k]) => !['repo_id', 'job_id'].includes(k));
         if (filtered.length === 0) return <Text type="secondary">—</Text>;
-        const text = filtered.map(([k, v]) => `${k}=${v}`).join(' ');
+        const text = filtered.map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`).join(' ');
         return (
           <Tooltip title={text} overlayStyle={{ maxWidth: 600 }}>
             <Text type="secondary" style={{ fontSize: 12 }}>{text.length > 50 ? text.slice(0, 50) + '…' : text}</Text>
