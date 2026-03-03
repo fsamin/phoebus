@@ -13,7 +13,7 @@ func (h *Handler) enqueueSync(ctx context.Context, repoID uuid.UUID) {
 		INSERT INTO sync_jobs (repo_id, status) VALUES ($1, 'pending')
 	`, repoID)
 	if err != nil {
-		logger.Error("failed to enqueue sync job", "repo_id", repoID, "error", err)
+		logger.Error("failed to enqueue sync job", "repo_id", repoID, "error", err.Error())
 		return
 	}
 
