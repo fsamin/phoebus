@@ -136,16 +136,25 @@ func (h *Handler) upsertProxyUser(r *http.Request, username, email, displayName 
 			UPDATE users SET display_name = $1, email = NULLIF($2, ''), role = $3, updated_at = now() WHERE id = $4
 		`, displayName, email, role, user.ID)
 		user.DisplayName = displayName
-		user.Email = &email
+		if email != "" {
+			user.Email = &email
+		} else {
+			user.Email = nil
+		}
 		user.Role = role
 		return &user, nil
+	}
+
+	var emailPtr *string
+	if email != "" {
+		emailPtr = &email
 	}
 
 	// Create new user
 	newUser := &model.User{
 		ID:           uuid.New(),
 		Username:     username,
-		Email:        &email,
+		Email:        emailPtr,
 		DisplayName:  displayName,
 		Role:         role,
 		AuthProvider: "proxy",
