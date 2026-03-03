@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -20,7 +21,7 @@ func setupProxyTest(t *testing.T, proxyCfg config.ProxyAuthConfig) (*httptest.Se
 	}
 	h := New(testDB, cfg, nil, "ssh-ed25519 AAAA-test-key phoebus-instance", nil)
 	r := chi.NewRouter()
-	h.RegisterRoutes(r)
+	h.RegisterRoutes(context.Background(), r)
 	srv := httptest.NewServer(r)
 	return srv, func() { srv.Close() }
 }

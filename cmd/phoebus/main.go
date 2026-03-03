@@ -87,7 +87,7 @@ func main() {
 	go syncWorker.Start(workerCtx)
 
 	h := handler.New(db, cfg, syncWorker, sshKeyPair.PublicKey, assetStore)
-	h.RegisterRoutes(r)
+	h.RegisterRoutes(workerCtx, r)
 
 	// Serve embedded SPA for all non-API routes
 	r.NotFound(ui.Handler().ServeHTTP)

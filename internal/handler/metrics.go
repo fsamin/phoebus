@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"math"
 	"net/http"
 	"sort"
@@ -148,7 +149,9 @@ func (lr *latencyRing) Percentiles() (p50, p95, p99 float64) {
 }
 
 // updateGauges periodically queries the DB to update gauge metrics.
-func (h *Handler) updateGauges() {
+func (h *Handler) updateGauges(ctx context.Context) {
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
 	for {
 		var count int
 		if err := h.db.Get(&count, `SELECT COUNT(*) FROM users WHERE role = 'learner'`); err == nil {
@@ -157,9 +160,13 @@ func (h *Handler) updateGauges() {
 		if err := h.db.Get(&count, `SELECT COUNT(*) FROM learning_paths WHERE deleted_at IS NULL`); err == nil {
 			learningPathsTotal.Set(float64(count))
 		}
-		if err := h.db.Get(&count, `SELECT COUNT(*) FROM users WHERE updated_at > now() - interval '15 minutes'`); err == nil {
+		if err := h.db.Get(&count, `SELECT COUNT(*) FROM users WHERE last_login_at > now() - interval '15 minutes'`); err == nil {
 			activeUsers.Set(float64(count))
 		}
-		time.Sleep(30 * time.Second)
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+		}
 	}
 }

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -93,7 +94,7 @@ func setupTest(t *testing.T) (*httptest.Server, func()) {
 
 	h := New(testDB, testCfg, nil, "ssh-ed25519 AAAA-test-key phoebus-instance", nil)
 	r := chi.NewRouter()
-	h.RegisterRoutes(r)
+	h.RegisterRoutes(context.Background(), r)
 	srv := httptest.NewServer(r)
 
 	return srv, func() { srv.Close() }

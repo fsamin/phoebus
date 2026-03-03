@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -34,7 +35,7 @@ func New(db *sqlx.DB, cfg *config.Config, s *syncer.Syncer, sshPublicKey string,
 	}
 }
 
-func (h *Handler) RegisterRoutes(r chi.Router) {
+func (h *Handler) RegisterRoutes(ctx context.Context, r chi.Router) {
 	// Latency & metrics tracking middleware
 	r.Use(func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -134,7 +135,7 @@ func (h *Handler) RegisterRoutes(r chi.Router) {
 	})
 
 	// Start background gauge updater
-	go h.updateGauges()
+	go h.updateGauges(ctx)
 }
 
 func (h *Handler) Health(w http.ResponseWriter, r *http.Request) {
