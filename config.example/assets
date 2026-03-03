@@ -1,0 +1,4 @@
+backend: filesystem
+max_file_size: 52428800
+filesystem:
+  data_dir: /data/assets
