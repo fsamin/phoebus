@@ -8,6 +8,7 @@ import (
 	"github.com/fsamin/phoebus/internal/auth"
 	"github.com/fsamin/phoebus/internal/model"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 func isDuplicateKey(err error) bool {
@@ -80,6 +81,10 @@ func (h *Handler) CreateUser(w http.ResponseWriter, r *http.Request) {
 // UpdateUser allows admins to change a user's role or active status.
 func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 	userID := chi.URLParam(r, "userId")
+	if _, err := uuid.Parse(userID); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid user ID"})
+		return
+	}
 
 	var req struct {
 		Role   *model.Role `json:"role,omitempty"`
