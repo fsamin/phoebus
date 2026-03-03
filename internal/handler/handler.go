@@ -129,6 +129,8 @@ func (h *Handler) RegisterRoutes(ctx context.Context, r chi.Router) {
 			r.Delete("/api/admin/repos/{repoId}", h.DeleteRepo)
 			r.Post("/api/admin/repos/{repoId}/sync", h.SyncRepo)
 			r.Get("/api/admin/repos/{repoId}/sync-logs", h.SyncLogs)
+			r.Get("/api/admin/repos/{repoId}/paths", h.ListRepoPaths)
+			r.Patch("/api/admin/repos/{repoId}/paths/{pathId}", h.ToggleRepoPath)
 			r.Get("/api/admin/health", h.AdminHealth)
 			r.Get("/api/admin/ssh-public-key", h.SSHPublicKey)
 		})

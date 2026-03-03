@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Tag, Space, Typography, Popconfirm, Popover, message, Tooltip, Alert } from 'antd';
+import { Table, Button, Tag, Space, Typography, Popconfirm, Popover, message, Tooltip, Alert, Switch } from 'antd';
 import { PlusOutlined, SyncOutlined, CopyOutlined, DeleteOutlined, EditOutlined, UnorderedListOutlined, KeyOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
-import type { GitRepository } from '../../api/client';
+import type { GitRepository, RepoLearningPath } from '../../api/client';
 
 function relativeTime(iso?: string): string {
   if (!iso) return '—';
@@ -20,6 +20,8 @@ const Repositories: React.FC = () => {
   const [repos, setRepos] = useState<Array<GitRepository & { path_titles: string[] }>>([]);
   const [loading, setLoading] = useState(true);
   const [sshPublicKey, setSSHPublicKey] = useState('');
+  const [repoPaths, setRepoPaths] = useState<Record<string, RepoLearningPath[]>>({});
+  const [pathsLoading, setPathsLoading] = useState<Record<string, boolean>>({});
 
   const fetchRepos = () => {
     setLoading(true);
@@ -46,6 +48,33 @@ const Repositories: React.FC = () => {
   const handleCopyWebhook = (uuid: string) => {
     navigator.clipboard.writeText(`${window.location.origin}/api/webhooks/${uuid}`);
     message.success('Webhook URL copied');
+  };
+
+  const handleExpand = async (expanded: boolean, record: GitRepository) => {
+    if (expanded && !repoPaths[record.id]) {
+      setPathsLoading(prev => ({ ...prev, [record.id]: true }));
+      try {
+        const paths = await api.listRepoPaths(record.id);
+        setRepoPaths(prev => ({ ...prev, [record.id]: paths }));
+      } catch {
+        message.error('Failed to load learning paths');
+      } finally {
+        setPathsLoading(prev => ({ ...prev, [record.id]: false }));
+      }
+    }
+  };
+
+  const handleTogglePath = async (repoId: string, pathId: string, enabled: boolean) => {
+    try {
+      await api.toggleRepoPath(repoId, pathId, enabled);
+      message.success(enabled ? 'Learning path enabled' : 'Learning path disabled');
+      setRepoPaths(prev => ({
+        ...prev,
+        [repoId]: prev[repoId].map(p => p.id === pathId ? { ...p, enabled } : p),
+      }));
+    } catch {
+      message.error('Failed to update learning path');
+    }
   };
 
   const statusColor = (s: string) => {
@@ -89,6 +118,54 @@ const Repositories: React.FC = () => {
         dataSource={repos}
         rowKey="id"
         loading={loading}
+        expandable={{
+          onExpand: handleExpand,
+          expandedRowRender: (record: GitRepository) => {
+            const paths = repoPaths[record.id];
+            const isLoading = pathsLoading[record.id];
+            if (isLoading) return <Typography.Text type="secondary">Loading…</Typography.Text>;
+            if (!paths || paths.length === 0) return <Typography.Text type="secondary">No learning paths</Typography.Text>;
+            return (
+              <Table
+                dataSource={paths}
+                rowKey="id"
+                pagination={false}
+                size="small"
+                columns={[
+                  { title: 'Title', dataIndex: 'title' },
+                  { title: 'Description', dataIndex: 'description', ellipsis: true },
+                  {
+                    title: 'Modules',
+                    dataIndex: 'module_count',
+                    width: 80,
+                    align: 'center' as const,
+                  },
+                  {
+                    title: 'Steps',
+                    dataIndex: 'step_count',
+                    width: 80,
+                    align: 'center' as const,
+                  },
+                  {
+                    title: 'Status',
+                    dataIndex: 'enabled',
+                    width: 120,
+                    render: (enabled: boolean, path: RepoLearningPath) => (
+                      <Space>
+                        <Switch
+                          checked={enabled}
+                          onChange={(checked) => handleTogglePath(record.id, path.id, checked)}
+                          size="small"
+                        />
+                        <Tag color={enabled ? 'green' : 'default'}>{enabled ? 'Active' : 'Disabled'}</Tag>
+                      </Space>
+                    ),
+                  },
+                ]}
+              />
+            );
+          },
+        }}
         columns={[
           {
             title: 'Name',

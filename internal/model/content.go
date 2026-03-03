@@ -17,6 +17,7 @@ type LearningPath struct {
 	Tags              pq.StringArray `json:"tags" db:"tags"`
 	EstimatedDuration *string        `json:"estimated_duration,omitempty" db:"estimated_duration"`
 	Prerequisites     pq.StringArray `json:"prerequisites,omitempty" db:"prerequisites"`
+	Enabled           bool           `json:"enabled" db:"enabled"`
 	CreatedAt         time.Time      `json:"created_at" db:"created_at"`
 	UpdatedAt         time.Time      `json:"updated_at" db:"updated_at"`
 }

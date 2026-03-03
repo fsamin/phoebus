@@ -417,6 +417,7 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 			prerequisites = EXCLUDED.prerequisites,
 			deleted_at = NULL,
 			updated_at = now()
+			-- enabled is NOT touched: admin-controlled field
 		RETURNING id
 	`, repoID, lpMeta.Title, lpMeta.Description, lpMeta.Icon, pq.Array(lpMeta.Tags), lpMeta.EstimatedDuration, pq.Array(lpMeta.Prerequisites), filePath)
 	if err != nil {

@@ -291,6 +291,8 @@ go build -o phoebus ./cmd/phoebus
 | `GET/PUT/DELETE` | `/api/admin/repos/{repoId}` | 🔑 | Manage Git repository |
 | `POST` | `/api/admin/repos/{repoId}/sync` | 🔑 | Trigger sync |
 | `GET` | `/api/admin/repos/{repoId}/sync-logs` | 🔑 | Sync job history |
+| `GET` | `/api/admin/repos/{repoId}/paths` | 🔑 | List learning paths for a repo (with enabled status) |
+| `PATCH` | `/api/admin/repos/{repoId}/paths/{pathId}` | 🔑 | Enable/disable a learning path |
 | `GET` | `/api/admin/health` | 🔑 | Detailed health check |
 | `GET` | `/api/admin/ssh-public-key` | 🔑 | Instance SSH public key |
 | `GET` | `/metrics` | — | Prometheus metrics |
