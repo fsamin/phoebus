@@ -16,19 +16,24 @@ type SyncLogEntry struct {
 	Fields    map[string]any `json:"fields,omitempty"`
 }
 
+// sharedEntries holds the shared log entries across all sub-handlers created by WithAttrs/WithGroup.
+type sharedEntries struct {
+	mu      sync.Mutex
+	entries []SyncLogEntry
+}
+
 // SyncCollector is a slog.Handler that captures log records in memory
 // while also forwarding them to a parent handler (dual-write).
 type SyncCollector struct {
-	parent  slog.Handler
-	entries []SyncLogEntry
-	attrs   []slog.Attr
-	groups  []string
-	mu      sync.Mutex
+	parent slog.Handler
+	shared *sharedEntries
+	attrs  []slog.Attr
+	groups []string
 }
 
 // NewSyncCollector creates a collector that dual-writes to the given parent handler.
 func NewSyncCollector(parent slog.Handler) *SyncCollector {
-	return &SyncCollector{parent: parent}
+	return &SyncCollector{parent: parent, shared: &sharedEntries{}}
 }
 
 func (c *SyncCollector) Enabled(ctx context.Context, level slog.Level) bool {
@@ -59,9 +64,9 @@ func (c *SyncCollector) Handle(ctx context.Context, r slog.Record) error {
 		entry.Fields = fields
 	}
 
-	c.mu.Lock()
-	c.entries = append(c.entries, entry)
-	c.mu.Unlock()
+	c.shared.mu.Lock()
+	c.shared.entries = append(c.shared.entries, entry)
+	c.shared.mu.Unlock()
 
 	// Forward to parent
 	return c.parent.Handle(ctx, r)
@@ -69,11 +74,10 @@ func (c *SyncCollector) Handle(ctx context.Context, r slog.Record) error {
 
 func (c *SyncCollector) WithAttrs(attrs []slog.Attr) slog.Handler {
 	return &SyncCollector{
-		parent:  c.parent.WithAttrs(attrs),
-		entries: c.entries, // shared slice pointer
-		attrs:   append(cloneAttrs(c.attrs), attrs...),
-		groups:  cloneStrings(c.groups),
-		mu:      c.mu,
+		parent: c.parent.WithAttrs(attrs),
+		shared: c.shared,
+		attrs:  append(cloneAttrs(c.attrs), attrs...),
+		groups: cloneStrings(c.groups),
 	}
 }
 
@@ -82,20 +86,19 @@ func (c *SyncCollector) WithGroup(name string) slog.Handler {
 		return c
 	}
 	return &SyncCollector{
-		parent:  c.parent.WithGroup(name),
-		entries: c.entries,
-		attrs:   cloneAttrs(c.attrs),
-		groups:  append(cloneStrings(c.groups), name),
-		mu:      c.mu,
+		parent: c.parent.WithGroup(name),
+		shared: c.shared,
+		attrs:  cloneAttrs(c.attrs),
+		groups: append(cloneStrings(c.groups), name),
 	}
 }
 
 // Entries returns all collected log entries as JSON bytes.
 func (c *SyncCollector) Entries() (json.RawMessage, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if len(c.entries) == 0 {
+	c.shared.mu.Lock()
+	defer c.shared.mu.Unlock()
+	if len(c.shared.entries) == 0 {
 		return json.RawMessage("[]"), nil
 	}
-	return json.Marshal(c.entries)
+	return json.Marshal(c.shared.entries)
 }
