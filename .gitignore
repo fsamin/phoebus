@@ -1,0 +1,11 @@
+frontend/node_modules/
+frontend/dist/
+internal/ui/dist/
+!internal/ui/dist/.gitkeep
+bin/
+coverage.out
+e2e/node_modules/
+e2e/playwright-report/
+e2e/test-results/
+e2e/storage-state/
+phoebus

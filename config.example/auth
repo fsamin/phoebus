@@ -1,0 +1,13 @@
+local_enabled: true
+
+# Reverse proxy authentication (for use behind OAuth2 Proxy, Authelia, Traefik Forward Auth, etc.)
+# proxy_auth:
+#   enabled: true
+#   header_user: "X-Remote-User"
+#   header_groups: "X-Remote-Groups"
+#   header_email: "X-Remote-Email"
+#   header_display_name: "X-Remote-Name"
+#   default_role: "learner"
+#   group_to_role:
+#     admin-team: "admin"
+#     trainers: "instructor"
