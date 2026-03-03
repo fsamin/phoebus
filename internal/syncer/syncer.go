@@ -21,6 +21,7 @@ import (
 
 	"github.com/fsamin/phoebus/internal/assets"
 	"github.com/fsamin/phoebus/internal/crypto"
+	"github.com/fsamin/phoebus/internal/logging"
 	"github.com/google/uuid"
 	"github.com/jmoiron/sqlx"
 	"github.com/lib/pq"
@@ -51,11 +52,12 @@ func New(db *sqlx.DB, encryptionKey string, instanceSSHKeyPEM []byte, assetStore
 // Start launches the background worker that picks up sync jobs.
 // It runs until ctx is cancelled.
 func (s *Syncer) Start(ctx context.Context) {
-	slog.Info("sync worker started")
+	logger := logging.FromContext(ctx)
+	logger.Info("sync worker started")
 	for {
 		select {
 		case <-ctx.Done():
-			slog.Info("sync worker stopped")
+			logger.Info("sync worker stopped")
 			return
 		case <-s.notify:
 			s.processAllPending(ctx)
@@ -137,7 +139,10 @@ func (s *Syncer) pickAndProcess(ctx context.Context) bool {
 
 // processJob clones the repo, parses content, and updates the database.
 func (s *Syncer) processJob(ctx context.Context, jobID, repoID uuid.UUID) {
-	logger := slog.With("repo_id", repoID, "job_id", jobID)
+	// Create a sync collector for dual-write: stdout + in-memory accumulation
+	collector := logging.NewSyncCollector(slog.Default().Handler())
+	logger := slog.New(collector).With("repo_id", repoID, "job_id", jobID)
+	ctx = logging.WithLogger(ctx, logger)
 	syncStart := time.Now()
 
 	// Fetch repo details
@@ -152,15 +157,17 @@ func (s *Syncer) processJob(ctx context.Context, jobID, repoID uuid.UUID) {
 		SELECT id, clone_url, branch, auth_type, credentials FROM git_repositories WHERE id = $1
 	`, repoID); err != nil {
 		logger.Error("failed to fetch repo", "error", err)
-		s.failJob(ctx, jobID, repoID, err)
+		s.failJob(ctx, collector, jobID, repoID, err)
 		return
 	}
+
+	logger.Info("fetching repo details", "clone_url", repo.CloneURL, "branch", repo.Branch, "auth_type", repo.AuthType)
 
 	// Clone to temp dir
 	tmpDir, err := os.MkdirTemp("", "phoebus-sync-*")
 	if err != nil {
 		logger.Error("failed to create temp dir", "error", err)
-		s.failJob(ctx, jobID, repoID, err)
+		s.failJob(ctx, collector, jobID, repoID, err)
 		return
 	}
 	defer os.RemoveAll(tmpDir)
@@ -171,10 +178,11 @@ func (s *Syncer) processJob(ctx context.Context, jobID, repoID uuid.UUID) {
 		localPath := strings.TrimPrefix(repo.CloneURL, "file://")
 		if _, err := os.Stat(localPath); err != nil {
 			logger.Error("local path not accessible", "path", localPath, "error", err)
-			s.failJob(ctx, jobID, repoID, fmt.Errorf("local path not accessible: %w", err))
+			s.failJob(ctx, collector, jobID, repoID, fmt.Errorf("local path not accessible: %w", err))
 			return
 		}
 		repoDir = localPath
+		logger.Info("using local path", "path", localPath)
 	} else {
 		// Decrypt credentials if needed
 		var creds []byte
@@ -195,40 +203,45 @@ func (s *Syncer) processJob(ctx context.Context, jobID, repoID uuid.UUID) {
 
 		if err := gitClone(repo.CloneURL, repo.Branch, tmpDir, repo.AuthType, creds); err != nil {
 			logger.Error("git clone failed", "error", err)
-			s.failJob(ctx, jobID, repoID, fmt.Errorf("git clone failed: %w", err))
+			s.failJob(ctx, collector, jobID, repoID, fmt.Errorf("git clone failed: %w", err))
 			return
 		}
+		logger.Info("git clone succeeded")
 	}
 
 	// Parse and sync content
 	if err := s.syncContent(ctx, repoID, repoDir); err != nil {
 		logger.Error("content sync failed", "error", err)
-		s.failJob(ctx, jobID, repoID, err)
+		s.failJob(ctx, collector, jobID, repoID, err)
 		return
 	}
+
+	// Persist collected logs
+	logsJSON, _ := collector.Entries()
 
 	// Mark success
 	s.db.ExecContext(ctx, `
 		UPDATE git_repositories SET sync_status = 'synced', sync_error = NULL, last_synced_at = now(), updated_at = now() WHERE id = $1
 	`, repoID)
 	s.db.ExecContext(ctx, `
-		UPDATE sync_jobs SET status = 'done', completed_at = now(), updated_at = now() WHERE id = $1
-	`, jobID)
+		UPDATE sync_jobs SET status = 'done', completed_at = now(), logs = $2, updated_at = now() WHERE id = $1
+	`, jobID, logsJSON)
 
 	syncJobsTotal.WithLabelValues("done").Inc()
 	syncDuration.Observe(time.Since(syncStart).Seconds())
 	logger.Info("sync completed successfully")
 }
 
-func (s *Syncer) failJob(ctx context.Context, jobID, repoID uuid.UUID, syncErr error) {
+func (s *Syncer) failJob(ctx context.Context, collector *logging.SyncCollector, jobID, repoID uuid.UUID, syncErr error) {
 	syncJobsTotal.WithLabelValues("failed").Inc()
 	errMsg := syncErr.Error()
+	logsJSON, _ := collector.Entries()
 	s.db.ExecContext(ctx, `
 		UPDATE git_repositories SET sync_status = 'error', sync_error = $1, updated_at = now() WHERE id = $2
 	`, errMsg, repoID)
 	s.db.ExecContext(ctx, `
-		UPDATE sync_jobs SET status = 'failed', error = $1, completed_at = now(), updated_at = now() WHERE id = $2
-	`, errMsg, jobID)
+		UPDATE sync_jobs SET status = 'failed', error = $1, completed_at = now(), logs = $3, updated_at = now() WHERE id = $2
+	`, errMsg, jobID, logsJSON)
 }
 
 func gitClone(cloneURL, branch, destDir, authType string, credentials []byte) error {
@@ -321,12 +334,14 @@ func injectBasicAuthInURL(cloneURL, userpass string) (string, error) {
 }
 
 func (s *Syncer) syncContent(ctx context.Context, repoID uuid.UUID, repoDir string) error {
-	// Discover learning paths: either phoebus.yaml at root (single path)
-	// or phoebus.yaml in subdirectories (multi-path repo)
+	logger := logging.FromContext(ctx)
+
+	// Discover learning paths
 	pathDirs, err := discoverLearningPaths(repoDir)
 	if err != nil {
 		return err
 	}
+	logger.Info("discovered learning paths", "count", len(pathDirs))
 
 	// Begin transaction
 	tx, err := s.db.BeginTxx(ctx, nil)
@@ -398,10 +413,13 @@ func discoverLearningPaths(repoDir string) ([]pathDir, error) {
 }
 
 func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID, pathRoot, filePath string) error {
-	lpMeta, err := parsePhoebus(pathRoot)
+	logger := logging.FromContext(ctx)
+
+	lpMeta, err := parsePhoebus(ctx, pathRoot)
 	if err != nil {
 		return fmt.Errorf("parse phoebus.yaml in %s: %w", filePath, err)
 	}
+	logger.Info("syncing learning path", "title", lpMeta.Title, "file_path", filePath)
 
 	// Upsert learning path (without hash yet — computed after modules)
 	var lpID uuid.UUID
@@ -433,6 +451,10 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 	if err != nil {
 		return fmt.Errorf("find modules in %s: %w", filePath, err)
 	}
+	if len(moduleDirs) == 0 {
+		logger.Warn("learning path has no modules", "title", lpMeta.Title, "file_path", filePath)
+	}
+	logger.Debug("found modules", "count", len(moduleDirs))
 
 	// Pre-compute the full path hash to check if we can skip everything
 	pathHashParts := []string{lpMeta.Title, lpMeta.Description, strings.Join(lpMeta.Tags, ",")}
@@ -443,15 +465,20 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 		modulePath := filepath.Base(moduleDir)
 		existingModulePaths[modulePath] = true
 
-		modMeta, err := parseModuleIndex(moduleDir)
+		modMeta, err := parseModuleIndex(ctx, moduleDir)
 		if err != nil {
 			return fmt.Errorf("parse module %s: %w", modulePath, err)
 		}
+		logger.Debug("syncing module", "module", modulePath, "title", modMeta.Title, "competencies", len(modMeta.Competencies))
 
 		// Compute step hashes for this module
 		stepFiles, err := findOrderedSteps(moduleDir)
 		if err != nil {
 			return fmt.Errorf("find steps in %s: %w", modulePath, err)
+		}
+
+		if len(stepFiles) == 0 {
+			logger.Warn("module has no steps", "module", modulePath)
 		}
 
 		var stepHashes []string
@@ -467,10 +494,11 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 
 		for stepPos, stepPath := range stepFiles {
 			stepFilePath := filepath.Base(stepPath)
-			sMeta, contentMD, exerciseData, err := parseStep(stepPath)
+			sMeta, contentMD, exerciseData, err := parseStep(ctx, stepPath)
 			if err != nil {
 				return fmt.Errorf("parse step %s/%s: %w", modulePath, stepFilePath, err)
 			}
+			logger.Debug("parsed step", "module", modulePath, "step", stepFilePath, "type", sMeta.Type)
 			_ = stepPos // used later
 
 			h := computeHash(sMeta.Title, sMeta.Type, sMeta.Duration, contentMD, string(exerciseData))
@@ -526,8 +554,7 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 				WHERE module_id = $1 AND file_path = $2 AND deleted_at IS NULL
 			`, moduleID, sd.filePath)
 			if err == nil && existingStepHash == sd.hash {
-				// Hash matches — skip this step entirely
-				slog.Debug("step unchanged, skipping", "module", modulePath, "step", sd.filePath)
+				logger.Debug("step unchanged, skipping", "module", modulePath, "step", sd.filePath)
 				// Still need to ensure position is correct
 				tx.ExecContext(ctx, `UPDATE steps SET position = $1, updated_at = now() WHERE module_id = $2 AND file_path = $3 AND deleted_at IS NULL`, stepPos, moduleID, sd.filePath)
 				continue
@@ -565,7 +592,7 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 				}
 			}
 
-			slog.Debug("step updated", "module", modulePath, "step", sd.filePath, "hash", sd.hash[:8])
+			logger.Debug("step updated", "module", modulePath, "step", sd.filePath, "hash", sd.hash[:8])
 
 			// Sync assets and rewrite URLs in content_md
 			stepDir := filepath.Dir(sd.stepPath)
@@ -817,7 +844,7 @@ func (s *Syncer) syncStepAssets(ctx context.Context, tx *sqlx.Tx, stepID uuid.UU
 		}
 
 		if info.Size() > s.maxAssetSize {
-			slog.Warn("asset exceeds max size, skipping", "path", path, "size", info.Size(), "max", s.maxAssetSize)
+			logging.FromContext(ctx).Warn("asset exceeds max size, skipping", "path", path, "size", info.Size(), "max", s.maxAssetSize)
 			return nil
 		}
 

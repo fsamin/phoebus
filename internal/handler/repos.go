@@ -2,10 +2,10 @@ package handler
 
 import (
 	"encoding/json"
-	"log/slog"
 	"net/http"
 
 	"github.com/fsamin/phoebus/internal/crypto"
+	"github.com/fsamin/phoebus/internal/logging"
 	"github.com/fsamin/phoebus/internal/model"
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -117,7 +117,7 @@ func (h *Handler) CreateRepo(w http.ResponseWriter, r *http.Request) {
 		RETURNING id, clone_url, branch, auth_type, webhook_uuid, sync_status, sync_error, last_synced_at, created_at, updated_at
 	`, req.CloneURL, req.Branch, req.AuthType, credBytes, webhookUUID)
 	if err != nil {
-		slog.Error("failed to create repository", "error", err)
+		logging.FromContext(r.Context()).Error("failed to create repository", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to create repository"})
 		return
 	}
@@ -226,7 +226,7 @@ func (h *Handler) SyncLogs(w http.ResponseWriter, r *http.Request) {
 		ORDER BY created_at DESC
 		LIMIT 100
 	`, id); err != nil {
-		slog.Error("failed to fetch sync logs", "error", err)
+		logging.FromContext(r.Context()).Error("failed to fetch sync logs", "error", err)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "internal error"})
 		return
 	}
@@ -244,6 +244,37 @@ func (h *Handler) SyncLogs(w http.ResponseWriter, r *http.Request) {
 		}{}
 	}
 	writeJSON(w, http.StatusOK, logs)
+}
+
+// SyncJobLogs returns the detailed logs for a specific sync job.
+func (h *Handler) SyncJobLogs(w http.ResponseWriter, r *http.Request) {
+	repoID := chi.URLParam(r, "repoId")
+	jobID := chi.URLParam(r, "jobId")
+	if _, err := uuid.Parse(repoID); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid repository id"})
+		return
+	}
+	if _, err := uuid.Parse(jobID); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid job id"})
+		return
+	}
+
+	var logsJSON *json.RawMessage
+	err := h.db.GetContext(r.Context(), &logsJSON, `
+		SELECT logs FROM sync_jobs WHERE id = $1 AND repo_id = $2
+	`, jobID, repoID)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "sync job not found"})
+		return
+	}
+
+	if logsJSON == nil {
+		empty := json.RawMessage("[]")
+		logsJSON = &empty
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(*logsJSON)
 }
 
 // --- Webhook ---

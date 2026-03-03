@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/fsamin/phoebus/internal/auth"
+	"github.com/fsamin/phoebus/internal/logging"
 	"github.com/fsamin/phoebus/internal/model"
 )
 
@@ -14,9 +15,11 @@ const claimsKey contextKey = "claims"
 
 func (h *Handler) AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// If claims already set by upstream middleware (e.g. proxy auth), continue
-		if ClaimsFromContext(r.Context()) != nil {
-			next.ServeHTTP(w, r)
+		// If claims already set by upstream middleware (e.g. proxy auth), enrich logger and continue
+		if c := ClaimsFromContext(r.Context()); c != nil {
+			logger := logging.FromContext(r.Context()).With("user_id", c.UserID, "role", c.Role)
+			ctx := logging.WithLogger(r.Context(), logger)
+			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
 
@@ -33,6 +36,9 @@ func (h *Handler) AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		ctx := context.WithValue(r.Context(), claimsKey, claims)
+		// Enrich contextual logger with user info
+		logger := logging.FromContext(ctx).With("user_id", claims.UserID, "role", claims.Role)
+		ctx = logging.WithLogger(ctx, logger)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

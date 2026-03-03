@@ -1,6 +1,7 @@
 package syncer
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -8,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/fsamin/phoebus/internal/logging"
 	"gopkg.in/yaml.v2"
 )
 
@@ -22,7 +24,8 @@ type phoebusMeta struct {
 	Prerequisites     []string `yaml:"prerequisites"`
 }
 
-func parsePhoebus(repoDir string) (*phoebusMeta, error) {
+func parsePhoebus(ctx context.Context, repoDir string) (*phoebusMeta, error) {
+	logger := logging.FromContext(ctx)
 	data, err := os.ReadFile(filepath.Join(repoDir, "phoebus.yaml"))
 	if err != nil {
 		return nil, fmt.Errorf("phoebus.yaml not found: %w", err)
@@ -34,6 +37,13 @@ func parsePhoebus(repoDir string) (*phoebusMeta, error) {
 	if meta.Title == "" {
 		return nil, fmt.Errorf("phoebus.yaml: title is required")
 	}
+	if meta.Description == "" {
+		logger.Warn("phoebus.yaml: description is empty", "title", meta.Title)
+	}
+	if len(meta.Tags) == 0 {
+		logger.Warn("phoebus.yaml: no tags defined", "title", meta.Title)
+	}
+	logger.Debug("parsed phoebus.yaml", "title", meta.Title, "tags", len(meta.Tags))
 	return &meta, nil
 }
 
@@ -45,7 +55,8 @@ type moduleMeta struct {
 	Competencies []string `yaml:"competencies"`
 }
 
-func parseModuleIndex(moduleDir string) (*moduleMeta, error) {
+func parseModuleIndex(ctx context.Context, moduleDir string) (*moduleMeta, error) {
+	logger := logging.FromContext(ctx)
 	data, err := os.ReadFile(filepath.Join(moduleDir, "index.md"))
 	if err != nil {
 		return nil, fmt.Errorf("index.md not found: %w", err)
@@ -54,6 +65,9 @@ func parseModuleIndex(moduleDir string) (*moduleMeta, error) {
 	if err != nil {
 		return nil, err
 	}
+	if fm == "" {
+		logger.Warn("index.md: no front matter found", "dir", filepath.Base(moduleDir))
+	}
 	var meta moduleMeta
 	if err := yaml.Unmarshal([]byte(fm), &meta); err != nil {
 		return nil, fmt.Errorf("invalid front matter in index.md: %w", err)
@@ -61,6 +75,7 @@ func parseModuleIndex(moduleDir string) (*moduleMeta, error) {
 	if meta.Title == "" {
 		return nil, fmt.Errorf("index.md: title is required")
 	}
+	logger.Debug("parsed module index", "title", meta.Title, "competencies", len(meta.Competencies))
 	return &meta, nil
 }
 
@@ -75,7 +90,8 @@ type stepMeta struct {
 	Target interface{} `yaml:"target"`
 }
 
-func parseStep(stepPath string) (*stepMeta, string, json.RawMessage, error) {
+func parseStep(ctx context.Context, stepPath string) (*stepMeta, string, json.RawMessage, error) {
+	logger := logging.FromContext(ctx)
 	data, err := os.ReadFile(stepPath)
 	if err != nil {
 		return nil, "", nil, err
@@ -83,15 +99,18 @@ func parseStep(stepPath string) (*stepMeta, string, json.RawMessage, error) {
 
 	fm, body, err := splitFrontMatter(string(data))
 	if err != nil {
-		return nil, "", nil, err
+		return nil, "", nil, fmt.Errorf("parse front matter in %s: %w", filepath.Base(stepPath), err)
 	}
 
 	var meta stepMeta
 	if err := yaml.Unmarshal([]byte(fm), &meta); err != nil {
-		return nil, "", nil, fmt.Errorf("invalid front matter: %w", err)
+		return nil, "", nil, fmt.Errorf("invalid front matter in %s: %w", filepath.Base(stepPath), err)
 	}
 	if meta.Title == "" || meta.Type == "" {
-		return nil, "", nil, fmt.Errorf("title and type are required in front matter")
+		return nil, "", nil, fmt.Errorf("title and type are required in front matter of %s", filepath.Base(stepPath))
+	}
+	if meta.Duration == "" {
+		logger.Warn("step missing estimated_duration", "file", filepath.Base(stepPath), "title", meta.Title)
 	}
 
 	// Parse exercise data from body based on type
@@ -100,18 +119,19 @@ func parseStep(stepPath string) (*stepMeta, string, json.RawMessage, error) {
 	case "lesson":
 		// No exercise data
 	case "quiz":
-		exerciseData, err = parseQuizBody(body)
+		exerciseData, err = parseQuizBody(ctx, body)
 	case "terminal-exercise":
-		exerciseData, err = parseTerminalBody(body)
+		exerciseData, err = parseTerminalBody(ctx, body)
 	case "code-exercise":
-		exerciseData, err = parseCodeExerciseBody(body, meta.Mode, meta.Target)
+		exerciseData, err = parseCodeExerciseBody(ctx, body, meta.Mode, meta.Target)
 	default:
-		return nil, "", nil, fmt.Errorf("unknown step type: %s", meta.Type)
+		return nil, "", nil, fmt.Errorf("unknown step type %q in %s", meta.Type, filepath.Base(stepPath))
 	}
 	if err != nil {
-		return nil, "", nil, fmt.Errorf("parse %s body: %w", meta.Type, err)
+		return nil, "", nil, fmt.Errorf("parse %s body in %s: %w", meta.Type, filepath.Base(stepPath), err)
 	}
 
+	logger.Debug("parsed step", "file", filepath.Base(stepPath), "title", meta.Title, "type", meta.Type)
 	return &meta, body, exerciseData, nil
 }
 
@@ -131,7 +151,8 @@ func splitFrontMatter(content string) (string, string, error) {
 
 // --- Quiz parser ---
 
-func parseQuizBody(body string) (json.RawMessage, error) {
+func parseQuizBody(ctx context.Context, body string) (json.RawMessage, error) {
+	logger := logging.FromContext(ctx)
 	sections := splitOnH2(body)
 	if len(sections) == 0 {
 		return nil, fmt.Errorf("no questions found")
@@ -143,9 +164,13 @@ func parseQuizBody(body string) (json.RawMessage, error) {
 		if err != nil {
 			return nil, err
 		}
+		if q["explanation"] == "" {
+			logger.Warn("quiz question missing explanation", "question", section.title)
+		}
 		questions = append(questions, q)
 	}
 
+	logger.Debug("parsed quiz", "questions", len(questions))
 	return json.Marshal(map[string]any{"questions": questions})
 }
 
@@ -205,7 +230,9 @@ func parseQuizQuestion(tag, title, body string) (map[string]any, error) {
 
 // --- Terminal exercise parser ---
 
-func parseTerminalBody(body string) (json.RawMessage, error) {
+func parseTerminalBody(ctx context.Context, body string) (json.RawMessage, error) {
+	logger := logging.FromContext(ctx)
+
 	// Split on ## Step headings
 	stepRegex := regexp.MustCompile(`(?mi)^## Step (\d+)`)
 	indices := stepRegex.FindAllStringIndex(body, -1)
@@ -213,6 +240,9 @@ func parseTerminalBody(body string) (json.RawMessage, error) {
 	var intro string
 	if len(indices) > 0 {
 		intro = strings.TrimSpace(body[:indices[0][0]])
+	}
+	if intro == "" {
+		logger.Warn("terminal exercise has no introduction")
 	}
 
 	var steps []map[string]any
@@ -236,6 +266,7 @@ func parseTerminalBody(body string) (json.RawMessage, error) {
 		return nil, fmt.Errorf("no steps found")
 	}
 
+	logger.Debug("parsed terminal exercise", "steps", len(steps))
 	return json.Marshal(map[string]any{
 		"introduction": intro,
 		"steps":        steps,
@@ -301,7 +332,9 @@ func parseTerminalStep(body string) (map[string]any, error) {
 
 // --- Code exercise parser ---
 
-func parseCodeExerciseBody(body, mode string, target interface{}) (json.RawMessage, error) {
+func parseCodeExerciseBody(ctx context.Context, body, mode string, target interface{}) (json.RawMessage, error) {
+	logger := logging.FromContext(ctx)
+
 	// Split on ## Patches
 	patchIdx := strings.Index(body, "## Patches")
 	if patchIdx < 0 {
@@ -309,6 +342,9 @@ func parseCodeExerciseBody(body, mode string, target interface{}) (json.RawMessa
 	}
 
 	description := strings.TrimSpace(body[:patchIdx])
+	if description == "" {
+		logger.Warn("code exercise has no description")
+	}
 	patchesBody := body[patchIdx:]
 
 	// Parse patches
@@ -331,6 +367,8 @@ func parseCodeExerciseBody(body, mode string, target interface{}) (json.RawMessa
 	if correctCount != 1 {
 		return nil, fmt.Errorf("expected exactly 1 correct patch, got %d", correctCount)
 	}
+
+	logger.Debug("parsed code exercise", "patches", len(patches))
 
 	result := map[string]any{
 		"mode":        mode,

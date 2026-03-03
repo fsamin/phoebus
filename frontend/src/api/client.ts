@@ -80,6 +80,8 @@ export const api = {
     request<{ status: string }>(`/admin/repos/${id}/sync`, { method: 'POST' }),
   syncLogs: (id: string) =>
     request<SyncLog[]>(`/admin/repos/${id}/sync-logs`),
+  syncJobLogs: (repoId: string, jobId: string) =>
+    request<SyncJobLogEntry[]>(`/admin/repos/${repoId}/sync-logs/${jobId}`),
   listUsers: (page = 1, perPage = 20) =>
     request<{ users: Array<User & { completed_paths: number }>; total: number; page: number; per_page: number }>(`/admin/users?page=${page}&per_page=${perPage}`),
   createUser: (data: { username: string; display_name: string; email?: string; role: string; password: string }) =>
@@ -226,6 +228,13 @@ export interface SyncLog {
   started_at: string | null;
   completed_at: string | null;
   created_at: string;
+}
+
+export interface SyncJobLogEntry {
+  timestamp: string;
+  level: string;
+  message: string;
+  fields?: Record<string, unknown>;
 }
 
 export interface Competency {

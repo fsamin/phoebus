@@ -140,6 +140,7 @@ Phœbus uses [configstore](https://github.com/ovh/configstore) for configuration
 | `auth` | `local_enabled: true` | `true` |
 | `encryption` | `key: "32-byte-AES-key"` | — (optional) |
 | `assets` | `backend: filesystem` or `s3` | `filesystem` |
+| `log` | `format: json` / `level: info` | `json` / `info` |
 
 ### OIDC Authentication
 
@@ -214,6 +215,24 @@ s3:
 ```
 
 For local development with MinIO, use `endpoint: http://localhost:9000` and `force_path_style: true`.
+
+### Structured Logging
+
+```yaml
+# config/log
+format: json       # "json" (default), "text", or "gelf" (Graylog-compatible)
+level: info        # "debug", "info" (default), "warn", "error"
+request_id_header: X-Request-Id  # optional: use upstream proxy's request ID header
+```
+
+Supported formats:
+- **json** — Standard JSON structured logs (default)
+- **text** — Human-readable text format for development
+- **gelf** — GELF 1.1 spec-compliant format for Graylog/Loki
+
+All HTTP requests are logged with method, path, status, duration, request_id, user_agent, remote_addr, user_id, and bytes_written. The `request_id` is propagated through context to all downstream components.
+
+Sync job logs are captured and persisted in the database, viewable in the admin UI via expandable sync log rows.
 
 ## Development
 
@@ -291,6 +310,7 @@ go build -o phoebus ./cmd/phoebus
 | `GET/PUT/DELETE` | `/api/admin/repos/{repoId}` | 🔑 | Manage Git repository |
 | `POST` | `/api/admin/repos/{repoId}/sync` | 🔑 | Trigger sync |
 | `GET` | `/api/admin/repos/{repoId}/sync-logs` | 🔑 | Sync job history |
+| `GET` | `/api/admin/repos/{repoId}/sync-logs/{jobId}` | 🔑 | Detailed sync job logs |
 | `GET` | `/api/admin/repos/{repoId}/paths` | 🔑 | List learning paths for a repo (with enabled status) |
 | `PATCH` | `/api/admin/repos/{repoId}/paths/{pathId}` | 🔑 | Enable/disable a learning path |
 | `GET` | `/api/admin/health` | 🔑 | Detailed health check |

@@ -4,7 +4,7 @@ import { Table, Tag, Typography, Tooltip, Button, Space } from 'antd';
 import { ArrowLeftOutlined, SyncOutlined } from '@ant-design/icons';
 import type { ColumnsType } from 'antd/es/table';
 import { api } from '../../api/client';
-import type { SyncLog, GitRepository } from '../../api/client';
+import type { SyncLog, SyncJobLogEntry, GitRepository } from '../../api/client';
 
 const { Title, Text } = Typography;
 
@@ -36,11 +36,20 @@ const statusColors: Record<string, string> = {
   pending: 'default',
 };
 
+const levelColors: Record<string, string> = {
+  debug: 'default',
+  info: 'blue',
+  warn: 'orange',
+  error: 'red',
+};
+
 export default function SyncLogs() {
   const { repoId } = useParams<{ repoId: string }>();
   const [logs, setLogs] = useState<SyncLog[]>([]);
   const [repo, setRepo] = useState<GitRepository | null>(null);
   const [loading, setLoading] = useState(true);
+  const [jobLogs, setJobLogs] = useState<Record<string, SyncJobLogEntry[]>>({});
+  const [jobLogsLoading, setJobLogsLoading] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!repoId) return;
@@ -53,6 +62,57 @@ export default function SyncLogs() {
       if (found) setRepo(found);
     }).finally(() => setLoading(false));
   }, [repoId]);
+
+  const loadJobLogs = async (jobId: string) => {
+    if (jobLogs[jobId] || !repoId) return;
+    setJobLogsLoading((prev) => ({ ...prev, [jobId]: true }));
+    try {
+      const entries = await api.syncJobLogs(repoId, jobId);
+      setJobLogs((prev) => ({ ...prev, [jobId]: entries }));
+    } catch {
+      setJobLogs((prev) => ({ ...prev, [jobId]: [] }));
+    } finally {
+      setJobLogsLoading((prev) => ({ ...prev, [jobId]: false }));
+    }
+  };
+
+  const logEntryColumns: ColumnsType<SyncJobLogEntry> = [
+    {
+      title: 'Time',
+      dataIndex: 'timestamp',
+      width: 180,
+      render: (v: string) => new Date(v).toLocaleTimeString(undefined, { hour12: false, fractionalSecondDigits: 3 } as Intl.DateTimeFormatOptions),
+    },
+    {
+      title: 'Level',
+      dataIndex: 'level',
+      width: 80,
+      render: (level: string) => <Tag color={levelColors[level] || 'default'}>{level}</Tag>,
+    },
+    {
+      title: 'Message',
+      dataIndex: 'message',
+      ellipsis: true,
+    },
+    {
+      title: 'Details',
+      dataIndex: 'fields',
+      width: 300,
+      ellipsis: true,
+      render: (fields: Record<string, unknown> | undefined) => {
+        if (!fields || Object.keys(fields).length === 0) return <Text type="secondary">—</Text>;
+        // Filter out repo_id and job_id (already shown in parent row)
+        const filtered = Object.entries(fields).filter(([k]) => !['repo_id', 'job_id'].includes(k));
+        if (filtered.length === 0) return <Text type="secondary">—</Text>;
+        const text = filtered.map(([k, v]) => `${k}=${v}`).join(' ');
+        return (
+          <Tooltip title={text} overlayStyle={{ maxWidth: 600 }}>
+            <Text type="secondary" style={{ fontSize: 12 }}>{text.length > 50 ? text.slice(0, 50) + '…' : text}</Text>
+          </Tooltip>
+        );
+      },
+    },
+  ];
 
   const columns: ColumnsType<SyncLog> = [
     {
@@ -137,6 +197,30 @@ export default function SyncLogs() {
           pagination={{ pageSize: 20, showSizeChanger: false }}
           size="middle"
           locale={{ emptyText: 'No sync jobs found for this repository' }}
+          expandable={{
+            expandedRowRender: (record) => {
+              const entries = jobLogs[record.id];
+              if (jobLogsLoading[record.id]) {
+                return <Text type="secondary">Loading logs...</Text>;
+              }
+              if (!entries || entries.length === 0) {
+                return <Text type="secondary">No detailed logs available</Text>;
+              }
+              return (
+                <Table
+                  dataSource={entries}
+                  columns={logEntryColumns}
+                  rowKey={(_, i) => String(i)}
+                  pagination={false}
+                  size="small"
+                  style={{ margin: 0 }}
+                />
+              );
+            },
+            onExpand: (expanded, record) => {
+              if (expanded) loadJobLogs(record.id);
+            },
+          }}
         />
       </Space>
     </div>

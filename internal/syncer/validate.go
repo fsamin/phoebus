@@ -1,6 +1,7 @@
 package syncer
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,9 +11,10 @@ import (
 // as the sync pipeline. Returns a list of human-readable errors.
 func ValidateContent(dir string) []string {
 	var errors []string
+	ctx := context.Background()
 
 	// Check phoebus.yaml exists
-	_, err := parsePhoebus(dir)
+	_, err := parsePhoebus(ctx, dir)
 	if err != nil {
 		errors = append(errors, fmt.Sprintf("phoebus.yaml: %s", err))
 		return errors // can't continue without root config
@@ -33,7 +35,7 @@ func ValidateContent(dir string) []string {
 		moduleName := filepath.Base(moduleDir)
 
 		// Validate module index.md
-		_, err := parseModuleIndex(moduleDir)
+		_, err := parseModuleIndex(ctx, moduleDir)
 		if err != nil {
 			errors = append(errors, fmt.Sprintf("module %s/index.md: %s", moduleName, err))
 			continue
@@ -56,7 +58,7 @@ func ValidateContent(dir string) []string {
 				stepName = filepath.Base(filepath.Dir(stepPath)) + "/instructions.md"
 			}
 
-			stepMeta, _, _, err := parseStep(stepPath)
+			stepMeta, _, _, err := parseStep(ctx, stepPath)
 			if err != nil {
 				errors = append(errors, fmt.Sprintf("step %s/%s: %s", moduleName, stepName, err))
 				continue
