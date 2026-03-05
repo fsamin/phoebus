@@ -206,7 +206,7 @@ A lesson is the simplest type: pure Markdown content, displayed as-is to the lea
 
 #### Example: `01-filesystem.md`
 
-```markdown
+````markdown
 ---
 title: "The Linux Filesystem"
 type: lesson
@@ -232,12 +232,12 @@ devices, and even processes.
 
 ## Navigation Commands
 
-\`\`\`bash
+```bash
 pwd          # Print working directory
 ls -la       # List all files with details
 cd /etc      # Change directory
-\`\`\`
 ```
+````
 
 #### What Is Supported in Lessons
 
@@ -367,25 +367,25 @@ A terminal exercise simulates a command-line environment. The learner must selec
 
 #### Syntax
 
-```
+````
 (introduction text before the first step)
 
 ## Step N: Step title
 
 Context and instructions.
 
-\`\`\`console
+```console
 $ ▌
-\`\`\`
+```
 
 - [x] `correct-command` — Explanation of why this is correct.
 - [ ] `incorrect-command` — Explanation of why this is incorrect.
 - [ ] `other-incorrect-command` — Another explanation.
 
-\`\`\`output
+```output
 simulated output after the correct command
-\`\`\`
 ```
+````
 
 #### Rules
 
@@ -403,7 +403,7 @@ simulated output after the correct command
 
 From the [Linux Fundamentals — Navigate the Filesystem](https://github.com/fsamin/phoebus-content-samples) path:
 
-```markdown
+````markdown
 ---
 title: "Navigate the Filesystem"
 type: terminal-exercise
@@ -419,55 +419,55 @@ Your first task is to explore the system.
 
 Where are you in the filesystem? Print your current working directory.
 
-\`\`\`console
+```console
 $ ▌
-\`\`\`
+```
 
 - [x] `pwd` — Prints the absolute path of the current working directory.
 - [ ] `ls` — Lists directory contents but doesn't show your location.
 - [ ] `whoami` — Shows your username, not your location.
 
-\`\`\`output
+```output
 /home/devops
-\`\`\`
+```
 
 ## Step 2: List all files including hidden ones
 
 Your home directory might contain hidden configuration files (dotfiles).
 
-\`\`\`console
+```console
 $ ▌
-\`\`\`
+```
 
 - [ ] `ls` — Only shows non-hidden files.
 - [x] `ls -la` — Shows all files including hidden ones, with details.
 - [ ] `ls -l` — Shows details but skips hidden files.
 
-\`\`\`output
+```output
 total 24
 drwxr-xr-x 3 devops devops 4096 Jan 15 10:30 .
 drwxr-xr-x 4 root   root   4096 Jan 15 10:00 ..
 -rw-r--r-- 1 devops devops  220 Jan 15 10:00 .bash_logout
 -rw-r--r-- 1 devops devops 3771 Jan 15 10:00 .bashrc
 drwx------ 2 devops devops 4096 Jan 15 10:30 .ssh
-\`\`\`
+```
 
 ## Step 3: Find configuration files
 
 Locate all `.conf` files under `/etc` that contain the word "listen".
 
-\`\`\`console
+```console
 $ ▌
-\`\`\`
+```
 
 - [ ] `find /etc -name "*.conf"` — Finds conf files but doesn't search contents.
 - [ ] `ls /etc/*.conf` — Only lists files in /etc, not subdirectories.
 - [x] `grep -rl "listen" /etc/*.conf 2>/dev/null` — Recursively searches for "listen" in .conf files.
 
-\`\`\`output
+```output
 /etc/ssh/sshd_config.conf
-\`\`\`
 ```
+````
 
 #### How It Renders in Phœbus
 
@@ -516,7 +516,7 @@ Unlike other types, a code exercise uses a **directory** instead of a single fil
 
 #### `instructions.md` Syntax
 
-```
+````
 (free-form problem description in Markdown)
 
 ## Patches
@@ -525,27 +525,27 @@ Unlike other types, a code exercise uses a **directory** instead of a single fil
 
 Explanation of why this is the right solution.
 
-\`\`\`diff
+```diff
 --- a/Dockerfile
 +++ b/Dockerfile
 @@ -1,8 +1,14 @@
 -FROM golang:1.22
 +FROM golang:1.22-alpine AS builder
  ...
-\`\`\`
+```
 
 ### [ ] Incorrect patch title
 
 Explanation of why this approach doesn't work.
 
-\`\`\`diff
+```diff
 --- a/Dockerfile
 +++ b/Dockerfile
 @@ -7,3 +7,3 @@
 -USER root
 +USER nobody
-\`\`\`
 ```
+````
 
 #### Rules
 
@@ -563,7 +563,7 @@ From the [Containerization — Fix the Dockerfile](https://github.com/fsamin/pho
 
 **`03-fix-dockerfile/instructions.md`**:
 
-```markdown
+````markdown
 ---
 title: "Fix the Dockerfile"
 type: code-exercise
@@ -589,7 +589,7 @@ Review the Dockerfile and identify the problems.
 The Dockerfile should use a multi-stage build to separate compilation from
 runtime, and the final image should not run as root.
 
-\`\`\`diff
+```diff
 --- a/Dockerfile
 +++ b/Dockerfile
 @@ -1,10 +1,16 @@
@@ -615,14 +615,14 @@ runtime, and the final image should not run as root.
 +ENV GIN_MODE=release
 +USER app
 +CMD ["/server"]
-\`\`\`
+```
 
 ### [ ] Just change the USER directive
 
 Changing `USER root` to `USER nobody` fixes the security issue but the image
 is still bloated because the entire Go toolchain is included.
 
-\`\`\`diff
+```diff
 --- a/Dockerfile
 +++ b/Dockerfile
 @@ -7,3 +7,3 @@
@@ -630,14 +630,14 @@ is still bloated because the entire Go toolchain is included.
 -USER root
 +USER nobody
  CMD ["./server"]
-\`\`\`
+```
 
 ### [ ] Add .dockerignore only
 
 A `.dockerignore` file helps but doesn't solve the fundamental problem of
 including the Go toolchain in the final image.
 
-\`\`\`diff
+```diff
 --- a/Dockerfile
 +++ b/Dockerfile
 @@ -1,4 +1,4 @@
@@ -646,8 +646,8 @@ including the Go toolchain in the final image.
  WORKDIR /app
  COPY . .
  RUN go build -o server .
-\`\`\`
 ```
+````
 
 **`03-fix-dockerfile/codebase/Dockerfile`**:
 
@@ -919,18 +919,18 @@ main
 
 ### Terminal Exercise Syntax
 
-```
+````
 ## Step N: Title
 Context.
-\`\`\`console
+```console
 $ ▌
-\`\`\`
+```
 - [x] `correct-command` — Explanation
 - [ ] `wrong-command` — Explanation
-\`\`\`output
+```output
 result
-\`\`\`
 ```
+````
 
 ### Code Exercise Syntax
 
@@ -943,19 +943,19 @@ target:
   lines: [3, 8]
 ```
 
-```
+````
 ## Patches
 ### [x] Correct patch
 Explanation.
-\`\`\`diff
+```diff
 unified diff
-\`\`\`
+```
 ### [ ] Wrong patch
 Explanation.
-\`\`\`diff
+```diff
 unified diff
-\`\`\`
 ```
+````
 
 ### Decision Tree: Which Step Type to Choose?
 
