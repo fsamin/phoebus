@@ -3,7 +3,6 @@ name: E2E
 on:
   push:
     branches: [main, feat/**]
-  workflow_dispatch:
 
 permissions:
   contents: read
