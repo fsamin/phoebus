@@ -2,13 +2,8 @@ name: E2E
 
 on:
   push:
-    branches: [feat/**]
-  workflow_dispatch:
-  workflow_run:
-    workflows: ["CI"]
-    types:
-      - completed
     branches: [main, feat/**]
+  workflow_dispatch:
 
 permissions:
   contents: read
