@@ -1,6 +1,6 @@
 FROM node:24-alpine AS frontend
 WORKDIR /app/frontend
-COPY frontend/package*.json ./
+COPY frontend/package*.json frontend/.npmrc ./
 RUN npm ci --no-audit
 COPY frontend/ .
 RUN NODE_OPTIONS="--max-old-space-size=4096" npm run build

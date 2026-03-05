@@ -54,6 +54,6 @@ export const catalogSteps: Step[] = [
   {
     target: '[data-tour="catalog-cards"]',
     content: 'Each card represents a learning path. Click on one to see its modules and start learning!',
-    placement: 'top',
+    placement: 'bottom',
   },
 ];

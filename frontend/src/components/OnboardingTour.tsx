@@ -33,6 +33,7 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ tour, steps }) => {
       continuous
       showSkipButton
       showProgress
+      scrollToFirstStep
       disableOverlayClose
       callback={handleCallback}
       locale={{
