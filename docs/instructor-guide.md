@@ -16,6 +16,8 @@
    - [Terminal Exercise](#53-terminal-exercise)
    - [Code Exercise](#54-code-exercise)
 6. [Supported Markdown](#6-supported-markdown)
+   - [Mermaid Diagrams](#mermaid-diagrams)
+   - [Admonitions (Callouts)](#admonitions-callouts)
 7. [Assets (Images, Videos, Files)](#7-assets-images-videos-files)
 8. [Synchronization and Updates](#8-synchronization-and-updates)
 9. [Best Practices](#9-best-practices)
@@ -709,6 +711,104 @@ Supported languages: `bash`, `sh`, `go`, `python`, `javascript`, `typescript`, `
 |----------|----------|----------|
 | value    | value    | value    |
 ```
+
+### Mermaid Diagrams
+
+Phœbus renders **Mermaid** diagrams directly in lessons. Use a fenced code block with the `mermaid` language tag:
+
+````markdown
+```mermaid
+graph LR
+    A[Client] -->|HTTP Request| B[Server]
+    B -->|HTTP Response| A
+```
+````
+
+Supported diagram types:
+
+| Type | Directive | Use Case |
+|------|-----------|----------|
+| **Flowchart** | `graph TD` or `graph LR` | Architecture, workflows, decision trees |
+| **Sequence diagram** | `sequenceDiagram` | Protocol flows, API interactions |
+| **Class diagram** | `classDiagram` | Data models, object relationships |
+| **State diagram** | `stateDiagram-v2` | Lifecycle, state machines |
+| **Gantt chart** | `gantt` | Timelines, project planning |
+| **Pie chart** | `pie` | Proportions, statistics |
+
+#### Examples
+
+**Sequence diagram** (great for protocol explanations):
+
+````markdown
+```mermaid
+sequenceDiagram
+    participant Client as 💻 Client
+    participant Server as 🖥️ Server
+
+    Client->>Server: GET /api/users
+    Server-->>Client: 200 OK + JSON
+```
+````
+
+**Architecture diagram**:
+
+````markdown
+```mermaid
+graph TD
+    LB[Load Balancer]
+    A[App Server 1]
+    B[App Server 2]
+    DB[(PostgreSQL)]
+
+    LB --> A
+    LB --> B
+    A --> DB
+    B --> DB
+```
+````
+
+> 💡 **Tip:** Preview your Mermaid diagrams at [mermaid.live](https://mermaid.live) before committing. Syntax errors will cause the diagram to display as raw text.
+
+### Admonitions (Callouts)
+
+Phœbus supports styled callout blocks using the [directive syntax](https://github.com/remarkjs/remark-directive):
+
+````markdown
+:::tip
+Use `ssh-keygen -t ed25519` for the most secure and compact key type.
+:::
+
+:::warning
+Never share your private key with anyone!
+:::
+
+:::danger
+Running `rm -rf /` will destroy your entire filesystem.
+:::
+
+:::info
+SSH uses port 22 by default.
+:::
+
+:::note
+This feature requires OpenSSH 8.0 or later.
+:::
+
+:::caution
+Changing `sshd_config` without keeping an active session open can lock you out.
+:::
+````
+
+Available types:
+
+| Type | Icon | Color | Use Case |
+|------|------|-------|----------|
+| `tip` | 💡 | Green | Best practices, pro tips |
+| `info` | ℹ️ | Blue | Additional context, FYI |
+| `note` | 📝 | Gray | Side notes, clarifications |
+| `warning` | ⚠️ | Orange | Important caveats |
+| `caution` | ⚠️ | Orange | Same as warning |
+| `danger` | 🚨 | Red | Critical mistakes, security risks |
 
 ### Allowed Protocols
 
