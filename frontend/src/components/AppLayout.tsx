@@ -12,18 +12,28 @@ import {
   HeartOutlined,
   MoonOutlined,
   SunOutlined,
+  QuestionCircleOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { useOnboardingContext } from '../contexts/OnboardingContext';
 
 const { Header, Content } = Layout;
 
 const AppLayout: React.FC = () => {
   const { user, loading, logout } = useAuth();
   const { isDark, toggle } = useTheme();
+  const { forceRun } = useOnboardingContext();
   const navigate = useNavigate();
   const location = useLocation();
+
+  const handleReplayTour = () => {
+    if (location.pathname === '/') forceRun('dashboard');
+    else if (location.pathname === '/catalog') forceRun('catalog');
+  };
+
+  const showTourButton = location.pathname === '/' || location.pathname === '/catalog';
 
   if (loading) {
     return (
@@ -87,6 +97,16 @@ const AppLayout: React.FC = () => {
           onClick={({ key }) => navigate(key)}
           style={{ flex: 1, background: 'transparent' }}
         />
+        {showTourButton && (
+          <Button
+            type="text"
+            icon={<QuestionCircleOutlined />}
+            onClick={handleReplayTour}
+            style={{ color: '#fff', marginRight: 4 }}
+            title="Replay guided tour"
+            data-tour="replay-tour"
+          />
+        )}
         <Button
           type="text"
           icon={isDark ? <SunOutlined /> : <MoonOutlined />}

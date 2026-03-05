@@ -103,6 +103,9 @@ The backend has no code execution, no infrastructure orchestration, and no WebSo
 | `GET /api/analytics/*` | Learner and instructor analytics |
 | `GET /api/users/*` | User management (admin only) |
 | `GET /api/assets/{hash}` | Serve binary assets (images, videos) by content hash. Public, immutable caching |
+| `GET /api/me/onboarding` | Returns onboarding tour status (`{ tour_name: boolean }`) for the authenticated user |
+| `PATCH /api/me/onboarding` | Marks a tour as seen (body: `{"tour":"<name>"}`) |
+| `DELETE /api/me/onboarding` | Resets all onboarding tours for the authenticated user |
 
 #### 3.2.2 Internal Services
 
@@ -148,7 +151,9 @@ The `content_md` column stores **raw Markdown**, consistent with client-side ren
 │ email            │     │ step_id (FK)     │
 │ display_name     │     │ status (enum)    │
 │ role (enum)      │     │ started_at       │
-│ created_at       │     │ completed_at     │
+│ onboarding_tours │     │ completed_at     │
+│ _seen (JSONB)    │     │                  │
+│ created_at       │     │                  │
 └─────────────────┘     └─────────────────┘
 
 ┌─────────────────┐     ┌─────────────────────┐
@@ -218,6 +223,7 @@ The `content_md` column stores **raw Markdown**, consistent with client-side ren
 - **`step_assets`** — N:N relationship between steps and content_assets. Tracks which assets are used by each step, with the original relative path for reference.
 - **`progress`** — tracks step-level completion status. `status` enum: `not_started`, `in_progress`, `completed`
 - **`sync_jobs`** — PostgreSQL-based job queue for content sync. Webhook inserts a row; a worker goroutine consumes via `SELECT FOR UPDATE SKIP LOCKED`. Tracks status (`pending`, `running`, `completed`, `failed`), attempt count, and error messages. Provides retry semantics, sync history for the admin UI, and multi-replica coordination.
+- **`users.onboarding_tours_seen`** — `JSONB NOT NULL DEFAULT '{}'` column tracking which onboarding tours the user has completed (e.g., `{"dashboard": true, "catalog": true}`). Added in migration `011`. Used by `GET/PATCH/DELETE /api/me/onboarding` endpoints.
 
 ### 3.4 Content Syncer
 

@@ -90,6 +90,9 @@ func (h *Handler) RegisterRoutes(ctx context.Context, r chi.Router) {
 		r.Use(h.AuthMiddleware)
 		r.Get("/api/me", h.Me)
 		r.Get("/api/me/dashboard", h.Dashboard)
+		r.Get("/api/me/onboarding", h.GetOnboarding)
+		r.Patch("/api/me/onboarding", h.MarkOnboardingSeen)
+		r.Delete("/api/me/onboarding", h.ResetOnboarding)
 		r.Post("/api/auth/logout", h.Logout)
 		r.Post("/api/auth/refresh", h.RefreshToken)
 
@@ -299,7 +302,7 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 
 	var user model.User
 	err := h.db.GetContext(r.Context(), &user, `
-		SELECT id, username, email, display_name, role, auth_provider, active, created_at, updated_at
+		SELECT id, username, email, display_name, role, auth_provider, active, onboarding_tours_seen, created_at, updated_at
 		FROM users WHERE id = $1
 	`, claims.UserID)
 	if err != nil {

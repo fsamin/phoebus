@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider, theme as antTheme } from 'antd';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider, useTheme } from './contexts/ThemeContext';
+import { OnboardingProvider } from './contexts/OnboardingContext';
 import AppLayout from './components/AppLayout';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -35,6 +36,7 @@ function ThemedApp() {
       algorithm: isDark ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
     }}>
       <AuthProvider>
+        <OnboardingProvider>
         <BrowserRouter>
           <Routes>
             <Route path="/login" element={<Login />} />
@@ -55,6 +57,7 @@ function ThemedApp() {
             </Route>
           </Routes>
         </BrowserRouter>
+        </OnboardingProvider>
       </AuthProvider>
     </ConfigProvider>
   );

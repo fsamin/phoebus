@@ -597,6 +597,7 @@ Never use panic for control flow — it will crash the server.
 | Light/Dark mode | Theme follows system preference by default; toggle in header to override. Preference persisted in `localStorage` | Must Have |
 | Bookmarks & notes | Learners can bookmark steps and take personal notes | Should Have |
 | Exercise reset | Learners can reset any exercise and start over, unlimited resets | Must Have |
+| Onboarding tour | Interactive guided tour (React Joyride) on Dashboard and Catalog pages; auto-triggered on first visit, replayable via a "?" button in the header; tour completion state persisted in backend | Must Have |
 
 ### 6.3 Terminal Exercises (Simulated)
 

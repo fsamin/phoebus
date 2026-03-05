@@ -90,6 +90,17 @@ export const api = {
       body: JSON.stringify(data),
     }),
   sshPublicKey: () => request<{ public_key: string }>('/admin/ssh-public-key'),
+
+  // Onboarding
+  getOnboarding: () => request<Record<string, boolean>>('/me/onboarding'),
+  markOnboardingSeen: (tour: string) =>
+    request<{ status: string }>('/me/onboarding', {
+      method: 'PATCH',
+      body: JSON.stringify({ tour }),
+    }),
+  resetOnboarding: () =>
+    request<{ status: string }>('/me/onboarding', { method: 'DELETE' }),
+
   listRepoPaths: (repoId: string) =>
     request<RepoLearningPath[]>(`/admin/repos/${repoId}/paths`),
   toggleRepoPath: (repoId: string, pathId: string, enabled: boolean) =>

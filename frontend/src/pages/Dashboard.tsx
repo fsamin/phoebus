@@ -6,6 +6,8 @@ import {
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import OnboardingTour from '../components/OnboardingTour';
+import { dashboardSteps } from '../tours/steps';
 
 interface DashboardData {
   continue_learning: { step_id: string; step_title: string; path_id: string; path_title: string } | null;
@@ -32,13 +34,14 @@ const Dashboard: React.FC = () => {
 
   return (
     <div>
-      <Typography.Title level={2}>
+      <OnboardingTour tour="dashboard" steps={dashboardSteps} />
+      <Typography.Title level={2} data-tour="dashboard-welcome">
         Welcome back, {user?.display_name || user?.username}!
       </Typography.Title>
 
       {/* Continue Learning */}
       {data.continue_learning && (
-        <Card style={{ marginBottom: 24, borderLeft: '4px solid var(--color-primary)' }}>
+        <Card style={{ marginBottom: 24, borderLeft: '4px solid var(--color-primary)' }} data-tour="dashboard-continue">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <Typography.Text type="secondary">Continue Learning</Typography.Text>
@@ -59,7 +62,7 @@ const Dashboard: React.FC = () => {
       )}
 
       {/* Stats */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }} data-tour="dashboard-stats">
         <Col xs={24} sm={8}>
           <Card><Statistic title="Steps Completed" value={data.stats.steps_completed} prefix={<CheckCircleOutlined />} /></Card>
         </Col>
@@ -74,7 +77,7 @@ const Dashboard: React.FC = () => {
       <Row gutter={[16, 16]}>
         {/* Enrolled Paths */}
         <Col xs={24} lg={12}>
-          <Card title="My Learning Paths" style={{ marginBottom: 24 }}>
+          <Card title="My Learning Paths" style={{ marginBottom: 24 }} data-tour="dashboard-paths">
             {data.enrolled_paths.length === 0 ? (
               <Empty description="No enrolled paths yet" image={Empty.PRESENTED_IMAGE_SIMPLE}>
                 <Button type="primary" onClick={() => navigate('/catalog')}>Browse Catalog</Button>
@@ -102,7 +105,7 @@ const Dashboard: React.FC = () => {
 
           {/* Competencies */}
           {data.competencies.length > 0 && (
-            <Card title="Competencies" style={{ marginBottom: 24 }}>
+            <Card title="Competencies" style={{ marginBottom: 24 }} data-tour="dashboard-competencies">
               {data.competencies.map((c, i) => (
                 <Tag key={i} color={c.acquired ? 'green' : 'default'} style={{ marginBottom: 4 }}>
                   {c.acquired ? '✅' : '⬜'} {c.name}
@@ -114,7 +117,7 @@ const Dashboard: React.FC = () => {
 
         {/* Recent Activity */}
         <Col xs={24} lg={12}>
-          <Card title="Recent Activity">
+          <Card title="Recent Activity" data-tour="dashboard-activity">
             {data.recent_activity.length === 0 ? (
               <Empty description="No activity yet" image={Empty.PRESENTED_IMAGE_SIMPLE} />
             ) : (

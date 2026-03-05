@@ -4,6 +4,8 @@ import { SearchOutlined, CheckCircleOutlined, WarningOutlined } from '@ant-desig
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Competency } from '../api/client';
+import OnboardingTour from '../components/OnboardingTour';
+import { catalogSteps } from '../tours/steps';
 
 interface CatalogPath {
   id: string;
@@ -134,8 +136,9 @@ const Catalog: React.FC = () => {
 
   return (
     <div>
-      <Typography.Title level={2}>Catalog</Typography.Title>
-      <Row gutter={16} style={{ marginBottom: 24 }}>
+      <OnboardingTour tour="catalog" steps={catalogSteps} />
+      <Typography.Title level={2} data-tour="catalog-title">Catalog</Typography.Title>
+      <Row gutter={16} style={{ marginBottom: 24 }} data-tour="catalog-filters">
         <Col xs={24} sm={5}>
           <Input
             prefix={<SearchOutlined />}
@@ -143,6 +146,7 @@ const Catalog: React.FC = () => {
             value={searchInput}
             onChange={(e) => setSearchInput(e.target.value)}
             allowClear
+            data-tour="catalog-search"
           />
         </Col>
         <Col xs={24} sm={5}>
@@ -198,7 +202,7 @@ const Catalog: React.FC = () => {
       {filtered.length === 0 ? (
         <Empty description="No learning paths match your search" />
       ) : (
-        <Row gutter={[16, 16]}>
+        <Row gutter={[16, 16]} data-tour="catalog-cards">
           {filtered.map((path) => {
             const pct = path.progress_total
               ? Math.round(((path.progress_completed ?? 0) / path.progress_total) * 100)
