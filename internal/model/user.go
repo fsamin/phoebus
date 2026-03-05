@@ -1,6 +1,7 @@
 package model
 
 import (
+	"encoding/json"
 	"time"
 
 	"github.com/google/uuid"
@@ -24,7 +25,8 @@ type User struct {
 	ExternalID   *string    `json:"-" db:"external_id"`
 	AuthProvider string     `json:"auth_provider" db:"auth_provider"`
 	Active       bool       `json:"active" db:"active"`
-	LastLoginAt  *time.Time `json:"last_login_at,omitempty" db:"last_login_at"`
-	CreatedAt    time.Time  `json:"created_at" db:"created_at"`
-	UpdatedAt    time.Time  `json:"updated_at" db:"updated_at"`
+	LastLoginAt        *time.Time      `json:"last_login_at,omitempty" db:"last_login_at"`
+	OnboardingToursSeen json.RawMessage `json:"onboarding_tours_seen" db:"onboarding_tours_seen"`
+	CreatedAt          time.Time       `json:"created_at" db:"created_at"`
+	UpdatedAt          time.Time       `json:"updated_at" db:"updated_at"`
 }

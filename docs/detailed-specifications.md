@@ -2223,3 +2223,21 @@ graph TD
 ```
 
 **Legend:** 🔵 Blue = all authenticated users · 🟢 Green = instructor+ · 🔴 Red = admin only
+
+### 10.18 Onboarding Tour
+
+**Purpose:** Guide new users through the UI with an interactive step-by-step tour on their first visit.
+
+**Implementation:**
+
+| Aspect | Detail |
+|---|---|
+| Library | React Joyride |
+| Tours | Two separate tours: **Dashboard** tour and **Catalog** tour |
+| Trigger | Each tour starts automatically the first time the user visits the corresponding page |
+| Replay | A **"?"** button in the global header (`AppLayout`) replays the current page's tour on click |
+| Target elements | Dashboard and Catalog components expose `data-tour` attributes on key UI elements to anchor tour steps |
+| State management | `OnboardingContext` (React Context) + `useOnboarding` hook manage tour visibility and status client-side |
+| Persistence | Tour completion state is persisted server-side via the `onboarding_tours_seen` JSONB column on the `users` table |
+| API | `GET /api/me/onboarding` — returns `{ tour_name: boolean }` status; `PATCH /api/me/onboarding` — body `{"tour":"<name>"}` marks a tour as seen; `DELETE /api/me/onboarding` — resets all tours |
+| E2E testing | Onboarding tours are covered by end-to-end tests |
