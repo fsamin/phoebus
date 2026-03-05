@@ -38,7 +38,11 @@ One Git repository = one learning path. Each subdirectory is a module, and each 
 
 ## 2. Content Repository Structure
 
-Here is the complete structure expected by Phœbus:
+Phœbus treats any Git repository as a potential source of learning content. A repository can be a **dedicated training repo** or a **standard project repo** (with code, CI, docs) that also contains learning paths. Phœbus simply looks for directories with a `phoebus.yaml` file.
+
+### Single-Path Layout
+
+When `phoebus.yaml` is at the root, the entire repo is one Learning Path:
 
 ```
 my-learning-path/
@@ -65,6 +69,31 @@ my-learning-path/
     ├── index.md
     └── ...
 ```
+
+### Multi-Path Layout
+
+When there is **no** `phoebus.yaml` at the root, Phœbus scans immediate subdirectories. Each subdirectory containing a `phoebus.yaml` becomes a separate Learning Path. Other files and directories are ignored.
+
+```
+my-training-repo/                  # Any Git repo
+├── README.md                      # Ignored by Phœbus
+├── .github/                       # CI/CD, ignored
+├── src/                           # Application code, ignored
+├── networking/                    # ← Learning Path 1
+│   ├── phoebus.yaml
+│   ├── 01-fundamentals/
+│   │   ├── index.md
+│   │   └── 01-basics.md
+│   └── ...
+├── ssh/                           # ← Learning Path 2
+│   ├── phoebus.yaml
+│   └── ...
+└── kubernetes/                    # ← Learning Path 3
+    ├── phoebus.yaml
+    └── ...
+```
+
+> **Note:** The two layouts are mutually exclusive. If `phoebus.yaml` exists at the root, subdirectories are not scanned.
 
 ### Ordering Rules
 
@@ -815,7 +844,7 @@ You can configure a Git webhook (GitHub, GitLab, Bitbucket) to trigger synchroni
 
 ### Content Organization
 
-- **One repository = one learning path** — Don't mix multiple paths in the same repository
+- **Group related paths** in the same repository when they share a theme (e.g., all networking courses together). Use separate repos for unrelated domains
 - **3 to 7 steps per module** — Enough to cover a topic, not too many to discourage learners
 - **Alternate step types** — Lesson → Exercise → Quiz to maintain engagement
 - **End each module with a quiz** — To validate knowledge retention
@@ -943,9 +972,12 @@ Does the learner need to do something?
 
 ## Resources
 
-- **Sample repository**: [fsamin/phoebus-content-samples](https://github.com/fsamin/phoebus-content-samples)
+- **Sample repository**: [fsamin/phoebus-content-samples](https://github.com/fsamin/phoebus-content-samples) — a multi-path repo containing 8 learning paths:
   - `linux-fundamentals/` — Lessons, quizzes, terminal exercises
   - `containerization/` — Code exercise (Fix the Dockerfile)
   - `golang-programming/` — Full path with all exercise types
   - `kubernetes/` — Advanced terminal exercises
   - `git-mastery/` — Git exercises
+  - `virtualization/` — From theory to vSphere & OpenStack, with quizzes
+  - `networking/` — TCP/IP, DNS, HTTP, SSL/TLS with Mermaid diagrams
+  - `ssh/` — From zero to The Bastion (OVH), key management, server hardening

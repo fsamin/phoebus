@@ -83,7 +83,8 @@ Phœbus provides **interactive, guided exercises** — terminal command sequenci
 
 A **Learning Path** is the top-level organizational unit. It represents a complete training journey on a specific topic (e.g., "Kubernetes Fundamentals", "CI/CD with GitLab", "Linux Administration").
 
-- Each Learning Path maps to **one Git repository**
+- Each Learning Path is identified by a **directory containing a `phoebus.yaml` file** inside a Git repository
+- A single Git repository can contain **one or many Learning Paths** (see [Repository Layouts](#41-repository-structure))
 - A Learning Path contains an ordered sequence of **Modules**
 - Learners enroll in Learning Paths and progress through them
 
@@ -169,7 +170,13 @@ Competencies serve two purposes:
 
 ### 4.1 Repository Structure
 
-Each Learning Path is a Git repository with a well-defined structure:
+A Git repository registered in Phœbus can be **any standard Git repository** — it may contain application code, documentation, CI pipelines, etc. Phœbus simply looks for directories containing a `phoebus.yaml` file and treats each one as a Learning Path.
+
+Two layouts are supported:
+
+#### Single-path layout
+
+If `phoebus.yaml` is at the **root** of the repository, the entire repo is one Learning Path:
 
 ```
 learning-path-kubernetes/
@@ -192,6 +199,35 @@ learning-path-kubernetes/
 └── assets/
     └── diagrams/              # Shared images, videos, and media assets
 ```
+
+#### Multi-path layout
+
+If there is **no** `phoebus.yaml` at the root, Phœbus scans **immediate subdirectories** for `phoebus.yaml` files. Each matching subdirectory becomes a separate Learning Path. The repository can contain any other files or directories alongside them — they are simply ignored.
+
+```
+my-training-repo/                  # A normal Git repo
+├── README.md                      # Ignored by Phœbus
+├── .github/                       # CI/CD, ignored by Phœbus
+├── src/                           # Application code, ignored
+├── networking/                    # ← Learning Path 1
+│   ├── phoebus.yaml
+│   ├── 01-fundamentals/
+│   │   ├── index.md
+│   │   └── 01-what-is-a-network.md
+│   └── 02-tcpip/
+│       └── ...
+├── ssh/                           # ← Learning Path 2
+│   ├── phoebus.yaml
+│   ├── 01-what-is-ssh/
+│   │   ├── index.md
+│   │   └── 01-understanding-ssh.md
+│   └── ...
+└── kubernetes/                    # ← Learning Path 3
+    ├── phoebus.yaml
+    └── ...
+```
+
+> **Note:** The two layouts are mutually exclusive. If a `phoebus.yaml` exists at the root, subdirectories are not scanned. This prevents ambiguity when a single-path repo also has nested `phoebus.yaml` files for other purposes.
 
 **Asset management:** Binary assets (images, videos, PDFs) placed in `assets/` directories are automatically uploaded to the platform's asset store during synchronization. Relative paths in Markdown (`![](./assets/diagram.png)`) are transparently rewritten to API URLs. Assets are deduplicated by content hash and served with immutable HTTP caching. The asset store supports two backends: **filesystem** (default, for development) and **S3** (for production, compatible with any S3 service including MinIO). Maximum file size is configurable (default: 50 MB).
 
@@ -728,7 +764,7 @@ The following are explicitly **not** in the initial scope:
 
 | Term | Definition |
 |---|---|
-| **Learning Path** | A complete training journey on a topic, stored as a Git repository |
+| **Learning Path** | A complete training journey on a topic, identified by a directory containing a `phoebus.yaml` file inside a Git repository |
 | **Module** | A section within a Learning Path covering a coherent topic |
 | **Step** | The atomic unit of content: lesson, quiz, terminal exercise, or code exercise |
 | **Terminal Exercise** | An interactive simulated terminal scenario where the learner chooses commands from proposals at each step |

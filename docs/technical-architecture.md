@@ -249,25 +249,28 @@ Webhook POST ──▶ Insert job into sync_jobs table
                      Lookup repo by UUID ──▶ git clone to /tmp
                               │
                               ▼
-                     Parse directory structure
+                     Discover learning paths:
+                       1. Check root for phoebus.yaml → single-path
+                       2. Else scan subdirectories → multi-path
                               │
                               ▼
-                     Parse phoebus.yaml (learning path metadata)
+                     For each learning path:
+                       Parse phoebus.yaml (metadata)
                               │
                               ▼
-                     For each module directory:
-                       Parse index.md (module metadata)
+                       For each module directory:
+                         Parse index.md (module metadata)
                               │
                               ▼
-                     For each step file/directory:
-                       Parse front matter + Markdown body
-                       Extract exercise_data from body
-                       (quiz questions, terminal steps, patches)
+                       For each step file/directory:
+                         Parse front matter + Markdown body
+                         Extract exercise_data from body
+                         (quiz questions, terminal steps, patches)
                               │
                               ▼
-                     For code exercises:
-                       Read codebase/ directory files
-                       Store in codebase_files table
+                       For code exercises:
+                         Read codebase/ directory files
+                         Store in codebase_files table
                               │
                               ▼
                      Compute SHA-256 content hashes
@@ -294,7 +297,8 @@ Webhook POST ──▶ Insert job into sync_jobs table
 
 **Key Design Decisions:**
 - Git repos are cloned to `/tmp` (ephemeral) and deleted after sync — no persistent disk state
-- The syncer parses the directory tree, reading `phoebus.yaml`, `index.md` (modules), and step Markdown files
+- The syncer first **discovers learning paths** (`discoverLearningPaths`): if `phoebus.yaml` exists at the repo root, the repo is treated as a single learning path; otherwise, immediate subdirectories containing `phoebus.yaml` are each treated as separate learning paths
+- The syncer then parses `index.md` (modules) and step Markdown files within each learning path
 - Front matter is parsed using a YAML parser; body is stored as raw Markdown
 - Exercise logic is **extracted from the Markdown body** during sync: checkbox syntax is parsed into structured JSONB (`exercise_data`) so the backend can validate answers at runtime without re-parsing Markdown
 - Ordering is determined by the directory/file naming convention (numeric prefix)
