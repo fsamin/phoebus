@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 )
 
@@ -43,11 +44,12 @@ func (h *Handler) MarkOnboardingSeen(w http.ResponseWriter, r *http.Request) {
 	// Merge the tour key into the existing JSONB
 	_, err := h.db.ExecContext(r.Context(), `
 		UPDATE users
-		SET onboarding_tours_seen = onboarding_tours_seen || jsonb_build_object($2, true),
+		SET onboarding_tours_seen = onboarding_tours_seen || jsonb_build_object($2::text, true),
 		    updated_at = now()
 		WHERE id = $1
 	`, claims.UserID, req.Tour)
 	if err != nil {
+		log.Printf("MarkOnboardingSeen error: %v (userID=%s, tour=%s)", err, claims.UserID, req.Tour)
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to update onboarding status"})
 		return
 	}
