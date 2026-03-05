@@ -1,0 +1,16 @@
+{
+    "user": "phoebus",
+    "password": "phoebus",
+    "database": "phoebus",
+    "writers": [
+        { "host": "db", "port": 5432 }
+    ],
+    "readers": [
+        { "host": "db", "port": 5432 }
+    ],
+    "analytics": [
+        { "host": "db", "port": 5432 }
+    ],
+    "type": "postgresql",
+    "ssl": "off"
+}
