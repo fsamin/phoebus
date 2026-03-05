@@ -150,15 +150,14 @@ func buildDatabaseURL(adv AdvancedDatabaseConfig) (string, error) {
 	}
 
 	w := adv.Writers[0]
-	u := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
-		url.PathEscape(adv.User),
-		url.PathEscape(adv.Password),
-		w.Host,
-		w.Port,
-		url.PathEscape(adv.Database),
-		sslMode,
-	)
-	return u, nil
+	u := &url.URL{
+		Scheme:   "postgres",
+		User:     url.UserPassword(adv.User, adv.Password),
+		Host:     fmt.Sprintf("%s:%d", w.Host, w.Port),
+		Path:     adv.Database,
+		RawQuery: "sslmode=" + sslMode,
+	}
+	return u.String(), nil
 }
 
 func mapSSLMode(ssl string) (string, error) {
