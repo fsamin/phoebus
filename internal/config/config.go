@@ -1,132 +1,197 @@
 package config
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/url"
 
 	"github.com/ovh/configstore"
-	"gopkg.in/yaml.v2"
+	"sigs.k8s.io/yaml"
 )
 
 type Config struct {
-	HTTP          HTTPConfig     `yaml:"http"`
-	Database      DatabaseConfig `yaml:"database"`
-	JWT           JWTConfig      `yaml:"jwt"`
-	Admin         AdminConfig    `yaml:"admin"`
-	Auth          AuthConfig     `yaml:"auth"`
-	Assets        AssetsConfig   `yaml:"assets"`
-	Log           LogConfig      `yaml:"log"`
-	EncryptionKey string         `yaml:"encryption_key"`
+	HTTP          HTTPConfig     `json:"http"`
+	Database      DatabaseConfig `json:"database"`
+	JWT           JWTConfig      `json:"jwt"`
+	Admin         AdminConfig    `json:"admin"`
+	Auth          AuthConfig     `json:"auth"`
+	Assets        AssetsConfig   `json:"assets"`
+	Log           LogConfig      `json:"log"`
+	EncryptionKey string         `json:"encryption_key"`
 }
 
 type LogConfig struct {
-	Format          string `yaml:"format"`           // "json" (default), "text", "gelf"
-	Level           string `yaml:"level"`             // "debug", "info" (default), "warn", "error"
-	RequestIDHeader string `yaml:"request_id_header"` // header name for upstream request ID (e.g. "X-Request-Id")
+	Format          string `json:"format"`            // "json" (default), "text", "gelf"
+	Level           string `json:"level"`             // "debug", "info" (default), "warn", "error"
+	RequestIDHeader string `json:"request_id_header"` // header name for upstream request ID (e.g. "X-Request-Id")
 }
 
 type HTTPConfig struct {
-	Port int `yaml:"port"`
+	Port int `json:"port"`
 }
 
 type DatabaseConfig struct {
-	URL string `yaml:"url"`
+	URL string `json:"url"`
 }
 
 type JWTConfig struct {
-	Secret string `yaml:"secret"`
+	Secret string `json:"secret"`
 }
 
 type AdminConfig struct {
-	Username string `yaml:"username"`
-	Password string `yaml:"password"`
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 type AssetsConfig struct {
-	Backend     string               `yaml:"backend"` // "filesystem" (default) or "s3"
-	MaxFileSize int64                `yaml:"max_file_size"`
-	Filesystem  FilesystemStoreConfig `yaml:"filesystem"`
-	S3          S3StoreConfig        `yaml:"s3"`
+	Backend     string                `json:"backend"` // "filesystem" (default) or "s3"
+	MaxFileSize int64                 `json:"max_file_size"`
+	Filesystem  FilesystemStoreConfig `json:"filesystem"`
+	S3          S3StoreConfig         `json:"s3"`
 }
 
 type FilesystemStoreConfig struct {
-	DataDir string `yaml:"data_dir"`
+	DataDir string `json:"data_dir"`
 }
 
 type S3StoreConfig struct {
-	Bucket         string `yaml:"bucket"`
-	Region         string `yaml:"region"`
-	Endpoint       string `yaml:"endpoint"`
-	Prefix         string `yaml:"prefix"`
-	AccessKey      string `yaml:"access_key"`
-	SecretKey      string `yaml:"secret_key"`
-	ForcePathStyle bool   `yaml:"force_path_style"`
+	Bucket         string `json:"bucket"`
+	Region         string `json:"region"`
+	Endpoint       string `json:"endpoint"`
+	Prefix         string `json:"prefix"`
+	AccessKey      string `json:"access_key"`
+	SecretKey      string `json:"secret_key"`
+	ForcePathStyle bool   `json:"force_path_style"`
 }
 
 type AuthConfig struct {
-	LocalEnabled bool            `yaml:"local_enabled"`
-	OIDC         OIDCConfig      `yaml:"oidc"`
-	LDAP         LDAPConfig      `yaml:"ldap"`
-	ProxyAuth    ProxyAuthConfig `yaml:"proxy_auth"`
+	LocalEnabled bool            `json:"local_enabled"`
+	OIDC         OIDCConfig      `json:"oidc"`
+	LDAP         LDAPConfig      `json:"ldap"`
+	ProxyAuth    ProxyAuthConfig `json:"proxy_auth"`
 }
 
 type ProxyAuthConfig struct {
-	Enabled           bool              `yaml:"enabled"`
-	HeaderUser        string            `yaml:"header_user"`
-	HeaderGroups      string            `yaml:"header_groups"`
-	HeaderEmail       string            `yaml:"header_email"`
-	HeaderDisplayName string            `yaml:"header_display_name"`
-	DefaultRole       string            `yaml:"default_role"`
-	GroupToRole       map[string]string `yaml:"group_to_role"`
+	Enabled           bool              `json:"enabled"`
+	HeaderUser        string            `json:"header_user"`
+	HeaderGroups      string            `json:"header_groups"`
+	HeaderEmail       string            `json:"header_email"`
+	HeaderDisplayName string            `json:"header_display_name"`
+	DefaultRole       string            `json:"default_role"`
+	GroupToRole       map[string]string `json:"group_to_role"`
 }
 
 type OIDCConfig struct {
-	Enabled      bool              `yaml:"enabled"`
-	IssuerURL    string            `yaml:"issuer_url"`
-	ClientID     string            `yaml:"client_id"`
-	ClientSecret string            `yaml:"client_secret"`
-	RedirectURL  string            `yaml:"redirect_url"`
-	Scopes       []string          `yaml:"scopes"`
-	ClaimMapping OIDCClaimMapping  `yaml:"claim_mapping"`
+	Enabled      bool             `json:"enabled"`
+	IssuerURL    string           `json:"issuer_url"`
+	ClientID     string           `json:"client_id"`
+	ClientSecret string           `json:"client_secret"`
+	RedirectURL  string           `json:"redirect_url"`
+	Scopes       []string         `json:"scopes"`
+	ClaimMapping OIDCClaimMapping `json:"claim_mapping"`
 }
 
 type OIDCClaimMapping struct {
-	DisplayName string `yaml:"display_name"`
-	Email       string `yaml:"email"`
-	ExternalID  string `yaml:"external_id"`
+	DisplayName string `json:"display_name"`
+	Email       string `json:"email"`
+	ExternalID  string `json:"external_id"`
 }
 
 type LDAPConfig struct {
-	Enabled          bool              `yaml:"enabled"`
-	ServerURL        string            `yaml:"server_url"`
-	BaseDN           string            `yaml:"base_dn"`
-	UserSearchFilter string            `yaml:"user_search_filter"`
-	BindDN           string            `yaml:"bind_dn"`
-	BindPassword     string            `yaml:"bind_password"`
-	AttributeMapping LDAPAttrMapping   `yaml:"attribute_mapping"`
-	GroupToRole       map[string]string `yaml:"group_to_role"`
-	GroupSearchBase   string            `yaml:"group_search_base"`
-	GroupSearchFilter string            `yaml:"group_search_filter"`
+	Enabled           bool              `json:"enabled"`
+	ServerURL         string            `json:"server_url"`
+	BaseDN            string            `json:"base_dn"`
+	UserSearchFilter  string            `json:"user_search_filter"`
+	BindDN            string            `json:"bind_dn"`
+	BindPassword      string            `json:"bind_password"`
+	AttributeMapping  LDAPAttrMapping   `json:"attribute_mapping"`
+	GroupToRole       map[string]string `json:"group_to_role"`
+	GroupSearchBase   string            `json:"group_search_base"`
+	GroupSearchFilter string            `json:"group_search_filter"`
 }
 
 type LDAPAttrMapping struct {
-	DisplayName string `yaml:"display_name"`
-	Email       string `yaml:"email"`
+	DisplayName string `json:"display_name"`
+	Email       string `json:"email"`
+}
+
+// AdvancedDatabaseConfig represents an alternative database configuration format
+// commonly used in advanced environments.
+type AdvancedDatabaseConfig struct {
+	User      string                 `json:"user"`
+	Password  string                 `json:"password"`
+	Database  string                 `json:"database"`
+	Writers   []AdvancedDatabaseEndpoint `json:"writers"`
+	Readers   []AdvancedDatabaseEndpoint `json:"readers"`
+	Analytics []AdvancedDatabaseEndpoint `json:"analytics"`
+	Type      string                 `json:"type"`
+	SSL       string                 `json:"ssl"`
+}
+
+// AdvancedDatabaseEndpoint represents a host:port pair in advanced database config.
+type AdvancedDatabaseEndpoint struct {
+	Host string `json:"host"`
+	Port int    `json:"port"`
+}
+
+// buildDatabaseURL constructs a PostgreSQL DSN from a advanced database configuration.
+// It uses the first writer endpoint and maps the SSL field to PostgreSQL sslmode values.
+func buildDatabaseURL(adv AdvancedDatabaseConfig) (string, error) {
+	if adv.Type != "postgresql" {
+		return "", fmt.Errorf("unsupported database type %q, only \"postgresql\" is supported", adv.Type)
+	}
+	if len(adv.Writers) == 0 {
+		return "", fmt.Errorf("database config has no writer endpoints")
+	}
+
+	sslMode, err := mapSSLMode(adv.SSL)
+	if err != nil {
+		return "", err
+	}
+
+	w := adv.Writers[0]
+	u := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
+		url.PathEscape(adv.User),
+		url.PathEscape(adv.Password),
+		w.Host,
+		w.Port,
+		url.PathEscape(adv.Database),
+		sslMode,
+	)
+	return u, nil
+}
+
+func mapSSLMode(ssl string) (string, error) {
+	switch ssl {
+	case "off":
+		return "disable", nil
+	case "preferred":
+		return "prefer", nil
+	case "required":
+		return "require", nil
+	case "strict":
+		return "verify-full", nil
+	case "":
+		return "disable", nil
+	default:
+		return "", fmt.Errorf("unsupported ssl value %q, expected off|preferred|required|strict", ssl)
+	}
 }
 
 func Load() (*Config, error) {
 	configstore.InitFromEnvironment()
 
 	cfg := &Config{
-		HTTP:     HTTPConfig{Port: 8080},
-		Admin:    AdminConfig{Username: "admin", Password: "admin"},
-		Log:      LogConfig{Format: "json", Level: "info"},
+		HTTP:  HTTPConfig{Port: 8080},
+		Admin: AdminConfig{Username: "admin", Password: "admin"},
+		Log:   LogConfig{Format: "json", Level: "info"},
 		Assets: AssetsConfig{
 			Backend:     "filesystem",
 			MaxFileSize: 50 * 1024 * 1024, // 50 MB
 			Filesystem:  FilesystemStoreConfig{DataDir: "./data/assets"},
 			S3:          S3StoreConfig{Prefix: "assets"},
 		},
-		Auth:     AuthConfig{
+		Auth: AuthConfig{
 			LocalEnabled: true,
 			OIDC: OIDCConfig{
 				Scopes: []string{"openid", "email", "profile"},
@@ -155,11 +220,8 @@ func Load() (*Config, error) {
 		// optional, keep defaults
 	}
 
-	if err := unmarshalItem("database", &cfg.Database); err != nil {
-		return nil, fmt.Errorf("missing required config item 'database': %w", err)
-	}
-	if cfg.Database.URL == "" {
-		return nil, fmt.Errorf("database.url is required")
+	if err := loadDatabaseConfig(cfg); err != nil {
+		return nil, err
 	}
 
 	if err := unmarshalItem("jwt", &cfg.JWT); err != nil {
@@ -178,7 +240,7 @@ func Load() (*Config, error) {
 	}
 
 	var encCfg struct {
-		Key string `yaml:"key"`
+		Key string `json:"key"`
 	}
 	if err := unmarshalItem("encryption", &encCfg); err == nil {
 		cfg.EncryptionKey = encCfg.Key
@@ -193,6 +255,36 @@ func Load() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// loadDatabaseConfig tries to load the database config from a advanced-style JSON
+// format first (auto-detected by the presence of a "type" field), then falls
+// back to the standard YAML format (url: ...).
+func loadDatabaseConfig(cfg *Config) error {
+	raw, err := configstore.GetItemValue("database")
+	if err != nil {
+		return fmt.Errorf("missing required config item 'database': %w", err)
+	}
+
+	// Try advanced JSON format
+	var adv AdvancedDatabaseConfig
+	if jsonErr := json.Unmarshal([]byte(raw), &adv); jsonErr == nil && adv.Type != "" {
+		dsn, err := buildDatabaseURL(adv)
+		if err != nil {
+			return fmt.Errorf("invalid advanced database config: %w", err)
+		}
+		cfg.Database.URL = dsn
+		return nil
+	}
+
+	// Fallback: standard YAML format
+	if yamlErr := yaml.Unmarshal([]byte(raw), &cfg.Database); yamlErr != nil {
+		return fmt.Errorf("invalid database config: %w", yamlErr)
+	}
+	if cfg.Database.URL == "" {
+		return fmt.Errorf("database.url is required")
+	}
+	return nil
 }
 
 func unmarshalItem(key string, dest interface{}) error {

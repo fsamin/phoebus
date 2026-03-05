@@ -10,18 +10,18 @@ import (
 	"strings"
 
 	"github.com/fsamin/phoebus/internal/logging"
-	"gopkg.in/yaml.v2"
+	"sigs.k8s.io/yaml"
 )
 
 // --- phoebus.yaml ---
 
 type phoebusMeta struct {
-	Title             string   `yaml:"title"`
-	Description       string   `yaml:"description"`
-	Icon              string   `yaml:"icon"`
-	Tags              []string `yaml:"tags"`
-	EstimatedDuration string   `yaml:"estimated_duration"`
-	Prerequisites     []string `yaml:"prerequisites"`
+	Title             string   `json:"title"`
+	Description       string   `json:"description"`
+	Icon              string   `json:"icon"`
+	Tags              []string `json:"tags"`
+	EstimatedDuration string   `json:"estimated_duration"`
+	Prerequisites     []string `json:"prerequisites"`
 }
 
 func parsePhoebus(ctx context.Context, repoDir string) (*phoebusMeta, error) {
@@ -50,9 +50,9 @@ func parsePhoebus(ctx context.Context, repoDir string) (*phoebusMeta, error) {
 // --- Module index.md ---
 
 type moduleMeta struct {
-	Title        string   `yaml:"title"`
-	Description  string   `yaml:"description"`
-	Competencies []string `yaml:"competencies"`
+	Title        string   `json:"title"`
+	Description  string   `json:"description"`
+	Competencies []string `json:"competencies"`
 }
 
 func parseModuleIndex(ctx context.Context, moduleDir string) (*moduleMeta, error) {
@@ -82,12 +82,12 @@ func parseModuleIndex(ctx context.Context, moduleDir string) (*moduleMeta, error
 // --- Step files ---
 
 type stepMeta struct {
-	Title    string `yaml:"title"`
-	Type     string `yaml:"type"`
-	Duration string `yaml:"estimated_duration"`
+	Title    string `json:"title"`
+	Type     string `json:"type"`
+	Duration string `json:"estimated_duration"`
 	// Code exercise fields
-	Mode   string      `yaml:"mode"`
-	Target interface{} `yaml:"target"`
+	Mode   string      `json:"mode"`
+	Target interface{} `json:"target"`
 }
 
 func parseStep(ctx context.Context, stepPath string) (*stepMeta, string, json.RawMessage, error) {
