@@ -202,14 +202,14 @@ const Catalog: React.FC = () => {
       {filtered.length === 0 ? (
         <Empty description="No learning paths match your search" />
       ) : (
-        <Row gutter={[16, 16]} data-tour="catalog-cards">
-          {filtered.map((path) => {
+        <Row gutter={[16, 16]}>
+          {filtered.map((path, index) => {
             const pct = path.progress_total
               ? Math.round(((path.progress_completed ?? 0) / path.progress_total) * 100)
               : 0;
             const status = getPathStatus(path);
             return (
-              <Col xs={24} sm={12} lg={8} key={path.id}>
+              <Col xs={24} sm={12} lg={8} key={path.id} {...(index === 0 ? { 'data-tour': 'catalog-cards' } : {})}>
                 <Card
                   hoverable
                   onClick={() => navigate(`/paths/${path.id}`)}
