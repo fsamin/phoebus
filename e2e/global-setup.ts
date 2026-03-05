@@ -85,6 +85,11 @@ export default async function globalSetup(config: FullConfig) {
   await ctx.storageState({ path: path.join(storageDir, 'admin.json') });
   console.log('✅ Admin logged in, storage state saved');
 
+  // Mark onboarding tours as seen so they don't interfere with other tests
+  await ctx.patch(`${BASE_URL}/api/me/onboarding`, { data: { tour: 'dashboard' } });
+  await ctx.patch(`${BASE_URL}/api/me/onboarding`, { data: { tour: 'catalog' } });
+  console.log('✅ Onboarding tours marked as seen');
+
   // Add content repo if token is available
   if (GITHUB_TOKEN) {
     console.log('⏳ Adding content-samples repo…');
