@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { api } from '../api/client';
+import { useAuth } from '../contexts/AuthContext';
 
 export type TourName = 'dashboard' | 'catalog';
 
@@ -13,24 +14,30 @@ interface OnboardingState {
 }
 
 export function useOnboarding(): OnboardingState {
+  const { user, loading: authLoading } = useAuth();
   const [seen, setSeen] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [forced, setForced] = useState<string | null>(null);
 
   useEffect(() => {
+    if (authLoading || !user) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     api.getOnboarding()
       .then(setSeen)
       .catch(() => setSeen({}))
       .finally(() => setLoading(false));
-  }, []);
+  }, [user, authLoading]);
 
   const shouldRun = useCallback(
     (tour: TourName) => {
-      if (loading) return false;
+      if (loading || authLoading || !user) return false;
       if (forced === tour) return true;
       return !seen[tour];
     },
-    [seen, loading, forced],
+    [seen, loading, forced, authLoading, user],
   );
 
   const markSeen = useCallback(async (tour: TourName) => {
