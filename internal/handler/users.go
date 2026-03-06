@@ -120,6 +120,19 @@ func (h *Handler) UpdateUser(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Prevent role change for forced admins
+	if req.Role != nil {
+		var username string
+		if err := h.db.GetContext(r.Context(), &username, "SELECT username FROM users WHERE id = $1", userID); err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "user not found"})
+			return
+		}
+		if h.cfg.IsForcedAdmin(username) {
+			writeJSON(w, http.StatusForbidden, map[string]string{"error": "this user's role is managed by configuration and cannot be changed"})
+			return
+		}
+	}
+
 	// Build update query
 	if req.Role != nil && req.Active != nil {
 		_, err := h.db.ExecContext(r.Context(),

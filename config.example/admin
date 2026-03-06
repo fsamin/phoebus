@@ -1,2 +1,4 @@
 username: admin
 password: admin
+forced_admins:
+  - admin

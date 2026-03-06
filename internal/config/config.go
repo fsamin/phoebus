@@ -39,8 +39,19 @@ type JWTConfig struct {
 }
 
 type AdminConfig struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
+	Username     string   `json:"username"`
+	Password     string   `json:"password"`
+	ForcedAdmins []string `json:"forced_admins"`
+}
+
+// IsForcedAdmin returns true if the given username is in the forced_admins list.
+func (c *Config) IsForcedAdmin(username string) bool {
+	for _, u := range c.Admin.ForcedAdmins {
+		if u == username {
+			return true
+		}
+	}
+	return false
 }
 
 type AssetsConfig struct {

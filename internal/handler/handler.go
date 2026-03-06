@@ -252,11 +252,15 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var user model.User
+	role := "learner"
+	if h.cfg.IsForcedAdmin(req.Username) {
+		role = "admin"
+	}
 	err = h.db.QueryRowxContext(r.Context(), `
 		INSERT INTO users (id, username, display_name, email, password_hash, role, auth_provider, active)
-		VALUES (gen_random_uuid(), $1, $2, NULLIF($3, ''), $4, 'learner', 'local', true)
+		VALUES (gen_random_uuid(), $1, $2, NULLIF($3, ''), $4, $5, 'local', true)
 		RETURNING id, username, display_name, role, auth_provider, active, created_at, updated_at
-	`, req.Username, req.DisplayName, req.Email, hash).StructScan(&user)
+	`, req.Username, req.DisplayName, req.Email, hash, role).StructScan(&user)
 	if err != nil {
 		if isDuplicateKey(err) {
 			writeJSON(w, http.StatusConflict, map[string]string{"error": "username already taken"})
@@ -372,11 +376,16 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 
 	type userResponse struct {
 		model.User
-		CompletedPaths int `json:"completed_paths"`
+		CompletedPaths int  `json:"completed_paths"`
+		RoleLocked     bool `json:"role_locked"`
 	}
 	out := make([]userResponse, len(users))
 	for i, u := range users {
-		out[i] = userResponse{User: u, CompletedPaths: countMap[u.ID.String()]}
+		out[i] = userResponse{
+			User:           u,
+			CompletedPaths: countMap[u.ID.String()],
+			RoleLocked:     h.cfg.IsForcedAdmin(u.Username),
+		}
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{

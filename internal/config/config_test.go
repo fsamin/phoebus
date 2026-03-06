@@ -181,3 +181,32 @@ func searchString(s, substr string) bool {
 	}
 	return false
 }
+
+func TestIsForcedAdmin(t *testing.T) {
+	cfg := &Config{
+		Admin: AdminConfig{
+			ForcedAdmins: []string{"alice", "bob"},
+		},
+	}
+
+	if !cfg.IsForcedAdmin("alice") {
+		t.Error("expected alice to be a forced admin")
+	}
+	if !cfg.IsForcedAdmin("bob") {
+		t.Error("expected bob to be a forced admin")
+	}
+	if cfg.IsForcedAdmin("charlie") {
+		t.Error("expected charlie to NOT be a forced admin")
+	}
+	if cfg.IsForcedAdmin("Alice") {
+		t.Error("expected matching to be case-sensitive")
+	}
+}
+
+func TestIsForcedAdmin_Empty(t *testing.T) {
+	cfg := &Config{}
+
+	if cfg.IsForcedAdmin("anyone") {
+		t.Error("expected no forced admins when list is empty")
+	}
+}
