@@ -3,7 +3,7 @@ import { Table, Button, Tag, Space, Typography, Popconfirm, Popover, message, To
 import { PlusOutlined, SyncOutlined, CopyOutlined, DeleteOutlined, EditOutlined, UnorderedListOutlined, KeyOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
-import type { GitRepository, RepoLearningPath } from '../../api/client';
+import type { GitRepository, RepoLearningPath, RepoOwner } from '../../api/client';
 
 function relativeTime(iso?: string): string {
   if (!iso) return '—';
@@ -17,7 +17,7 @@ function relativeTime(iso?: string): string {
 
 const Repositories: React.FC = () => {
   const navigate = useNavigate();
-  const [repos, setRepos] = useState<Array<GitRepository & { path_titles: string[] }>>([]);
+  const [repos, setRepos] = useState<Array<GitRepository & { path_titles: string[]; owners: RepoOwner[] }>>([]);
   const [loading, setLoading] = useState(true);
   const [sshPublicKey, setSSHPublicKey] = useState('');
   const [repoPaths, setRepoPaths] = useState<Record<string, RepoLearningPath[]>>({});
@@ -187,6 +187,15 @@ const Repositories: React.FC = () => {
             dataIndex: 'auth_type',
             width: 100,
             render: (v: string) => <Tag>{v}</Tag>,
+          },
+          {
+            title: 'Owners',
+            dataIndex: 'owners',
+            width: 180,
+            render: (owners: RepoOwner[]) =>
+              owners?.length > 0
+                ? owners.map((o) => <Tag key={o.id}>{o.display_name}</Tag>)
+                : <Typography.Text type="secondary">—</Typography.Text>,
           },
           {
             title: 'Status',

@@ -21,6 +21,7 @@ interface CatalogPath {
   step_count: number;
   progress_total?: number;
   progress_completed?: number;
+  owners: string[];
 }
 
 const Catalog: React.FC = () => {
@@ -233,6 +234,13 @@ const Catalog: React.FC = () => {
                       {path.competencies_provided.map((c) => (
                         <Tag key={c} color="geekblue" style={{ fontSize: 11 }}>{c}</Tag>
                       ))}
+                    </div>
+                  )}
+                  {path.owners?.length > 0 && (
+                    <div style={{ marginTop: 8 }}>
+                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        Instructor{path.owners.length > 1 ? 's' : ''}: {path.owners.join(', ')}
+                      </Typography.Text>
                     </div>
                   )}
                   <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between' }}>

@@ -162,15 +162,39 @@ func (h *Handler) ListLearningPaths(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Fetch owners per learning path (via repo_id)
+	type ownerRow struct {
+		RepoID      string `db:"repo_id"`
+		DisplayName string `db:"display_name"`
+	}
+	var ownerRows []ownerRow
+	h.db.SelectContext(r.Context(), &ownerRows, `
+		SELECT DISTINCT lp.repo_id::text AS repo_id, u.display_name
+		FROM learning_paths lp
+		JOIN repository_owners ro ON ro.repo_id = lp.repo_id
+		JOIN users u ON u.id = ro.user_id
+		WHERE lp.deleted_at IS NULL AND lp.enabled = true
+		ORDER BY u.display_name
+	`)
+	ownersByRepo := map[string][]string{}
+	for _, o := range ownerRows {
+		ownersByRepo[o.RepoID] = append(ownersByRepo[o.RepoID], o.DisplayName)
+	}
+
 	type enrichedPath struct {
 		learningPathResponse
-		ProgressTotal     *int `json:"progress_total,omitempty"`
-		ProgressCompleted *int `json:"progress_completed,omitempty"`
-		PrerequisitesMet  bool `json:"prerequisites_met"`
+		ProgressTotal     *int     `json:"progress_total,omitempty"`
+		ProgressCompleted *int     `json:"progress_completed,omitempty"`
+		PrerequisitesMet  bool     `json:"prerequisites_met"`
+		Owners            []string `json:"owners"`
 	}
 	out := make([]enrichedPath, len(paths))
 	for i, p := range paths {
-		out[i] = enrichedPath{learningPathResponse: p, PrerequisitesMet: true}
+		owners := ownersByRepo[p.RepoID.String()]
+		if owners == nil {
+			owners = []string{}
+		}
+		out[i] = enrichedPath{learningPathResponse: p, PrerequisitesMet: true, Owners: owners}
 		if pp, ok := progMap[p.ID.String()]; ok {
 			out[i].ProgressTotal = &pp.Total
 			out[i].ProgressCompleted = &pp.Completed

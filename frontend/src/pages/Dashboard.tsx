@@ -1,11 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Typography, List, Tag, Spin, Empty, Progress as AntProgress, Timeline, Statistic, Button } from 'antd';
+import { Card, Row, Col, Typography, List, Tag, Spin, Empty, Progress as AntProgress, Timeline, Statistic, Button, message, Space, Tooltip } from 'antd';
 import {
   CheckCircleOutlined, PlayCircleOutlined, TrophyOutlined,
-  ExperimentOutlined, ArrowRightOutlined,
+  ExperimentOutlined, ArrowRightOutlined, SyncOutlined, UnorderedListOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { api } from '../api/client';
 import OnboardingTour from '../components/OnboardingTour';
 import { dashboardSteps } from '../tours/steps';
 
@@ -15,6 +16,7 @@ interface DashboardData {
   competencies: Array<{ name: string; acquired: boolean; path_title: string }>;
   stats: { steps_completed: number; total_exercises: number; steps_in_progress: number };
   recent_activity: Array<{ step_title: string; path_title: string; path_id: string; step_id: string; event: string; timestamp: string }>;
+  instructor_repos: Array<{ id: string; clone_url: string; branch: string; sync_status: string; sync_error?: string; last_synced_at?: string; path_titles: string[] }>;
 }
 
 const Dashboard: React.FC = () => {
@@ -23,12 +25,22 @@ const Dashboard: React.FC = () => {
   const [data, setData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchDashboard = () =>
     fetch('/api/me/dashboard', { credentials: 'include' })
       .then((r) => r.json())
-      .then(setData)
-      .finally(() => setLoading(false));
+      .then(setData);
+
+  useEffect(() => {
+    fetchDashboard().finally(() => setLoading(false));
   }, []);
+
+  // Poll while any instructor repo is syncing
+  useEffect(() => {
+    const hasSyncing = data?.instructor_repos?.some((r) => r.sync_status === 'syncing');
+    if (!hasSyncing) return;
+    const interval = setInterval(fetchDashboard, 3000);
+    return () => clearInterval(interval);
+  }, [data]);
 
   if (loading || !data) return <Spin size="large" style={{ display: 'block', marginTop: 100 }} />;
 
@@ -58,6 +70,73 @@ const Dashboard: React.FC = () => {
               Resume
             </Button>
           </div>
+        </Card>
+      )}
+
+      {/* Instructor Repos */}
+      {data.instructor_repos?.length > 0 && (
+        <Card title="My Repositories" style={{ marginBottom: 24 }}>
+          <List
+            dataSource={data.instructor_repos}
+            renderItem={(repo) => (
+              <List.Item
+                actions={[
+                  <Tooltip title="Sync now" key="sync">
+                    <Button
+                      size="small"
+                      icon={<SyncOutlined />}
+                      loading={repo.sync_status === 'syncing'}
+                      onClick={async () => {
+                        try {
+                          await api.instructorSyncRepo(repo.id);
+                          message.success('Sync triggered');
+                          fetchDashboard();
+                        } catch (e) {
+                          message.error((e as Error).message);
+                        }
+                      }}
+                    />
+                  </Tooltip>,
+                  <Tooltip title="Sync logs" key="logs">
+                    <Button
+                      size="small"
+                      icon={<UnorderedListOutlined />}
+                      onClick={() => navigate(`/instructor/repositories/${repo.id}/sync-logs`)}
+                    />
+                  </Tooltip>,
+                ]}
+              >
+                <List.Item.Meta
+                  title={
+                    <Space>
+                      <span>{repo.path_titles.length > 0 ? repo.path_titles.join(', ') : repo.clone_url}</span>
+                      <Typography.Text type="secondary" style={{ fontWeight: 'normal' }}>{repo.branch}</Typography.Text>
+                    </Space>
+                  }
+                  description={
+                    <Space direction="vertical" size={2}>
+                      <Typography.Text type="secondary" style={{ fontSize: 12 }} copyable={{ text: repo.clone_url }}>
+                        {repo.clone_url}
+                      </Typography.Text>
+                      <Space size="middle">
+                        <Tag
+                          color={repo.sync_status === 'synced' ? 'green' : repo.sync_status === 'syncing' ? 'blue' : repo.sync_status === 'error' ? 'red' : 'default'}
+                          icon={repo.sync_status === 'syncing' ? <SyncOutlined spin /> : undefined}
+                        >
+                          {repo.sync_status}
+                        </Tag>
+                        {repo.last_synced_at && (
+                          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                            Last synced: {new Date(repo.last_synced_at).toLocaleString()}
+                          </Typography.Text>
+                        )}
+                      </Space>
+                    </Space>
+                  }
+                />
+              </List.Item>
+            )}
+          />
         </Card>
       )}
 

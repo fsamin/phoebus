@@ -2,8 +2,22 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 	"time"
+
+	"github.com/fsamin/phoebus/internal/model"
 )
+
+func splitNonEmpty(s, sep string) []string {
+	parts := strings.Split(s, sep)
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p != "" {
+			out = append(out, p)
+		}
+	}
+	return out
+}
 
 var serverStartTime = time.Now()
 
@@ -147,12 +161,64 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		recentActivity = []activity{}
 	}
 
+	// Instructor repos (if user is instructor or admin)
+	type instructorRepo struct {
+		ID           string  `json:"id" db:"id"`
+		CloneURL     string  `json:"clone_url" db:"clone_url"`
+		Branch       string  `json:"branch" db:"branch"`
+		SyncStatus   string  `json:"sync_status" db:"sync_status"`
+		SyncError    *string `json:"sync_error,omitempty" db:"sync_error"`
+		LastSyncedAt *string `json:"last_synced_at,omitempty" db:"last_synced_at"`
+		PathTitles   string  `json:"path_titles_raw" db:"path_titles"`
+	}
+	type instructorRepoOut struct {
+		ID           string   `json:"id"`
+		CloneURL     string   `json:"clone_url"`
+		Branch       string   `json:"branch"`
+		SyncStatus   string   `json:"sync_status"`
+		SyncError    *string  `json:"sync_error,omitempty"`
+		LastSyncedAt *string  `json:"last_synced_at,omitempty"`
+		PathTitles   []string `json:"path_titles"`
+	}
+	var instructorRepos []instructorRepoOut
+	if claims.Role == model.RoleInstructor || claims.Role == model.RoleAdmin {
+		var rows []instructorRepo
+		h.db.SelectContext(r.Context(), &rows, `
+			SELECT gr.id::text AS id, gr.clone_url, gr.branch, gr.sync_status, gr.sync_error,
+			       to_char(gr.last_synced_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS last_synced_at,
+			       COALESCE(string_agg(lp.title, '||'), '') AS path_titles
+			FROM git_repositories gr
+			JOIN repository_owners ro ON ro.repo_id = gr.id
+			LEFT JOIN learning_paths lp ON lp.repo_id = gr.id AND lp.deleted_at IS NULL
+			WHERE ro.user_id = $1
+			GROUP BY gr.id
+			ORDER BY gr.created_at DESC
+		`, claims.UserID)
+		for _, row := range rows {
+			titles := []string{}
+			if row.PathTitles != "" {
+				for _, t := range splitNonEmpty(row.PathTitles, "||") {
+					titles = append(titles, t)
+				}
+			}
+			instructorRepos = append(instructorRepos, instructorRepoOut{
+				ID: row.ID, CloneURL: row.CloneURL, Branch: row.Branch,
+				SyncStatus: row.SyncStatus, SyncError: row.SyncError,
+				LastSyncedAt: row.LastSyncedAt, PathTitles: titles,
+			})
+		}
+	}
+	if instructorRepos == nil {
+		instructorRepos = []instructorRepoOut{}
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"continue_learning": continueStep,
 		"enrolled_paths":    enrolledPaths,
 		"competencies":      competencies,
 		"stats":             stats,
 		"recent_activity":   recentActivity,
+		"instructor_repos":  instructorRepos,
 	})
 }
 

@@ -117,6 +117,16 @@ func (h *Handler) RegisterRoutes(ctx context.Context, r chi.Router) {
 			r.Get("/api/analytics/paths/{pathId}", h.AnalyticsPath)
 			r.Get("/api/analytics/paths/{pathId}/steps/{stepId}", h.AnalyticsStep)
 			r.Get("/api/analytics/learners/{learnerId}", h.AnalyticsLearner)
+
+			// Instructor repos (ownership-verified)
+			r.Get("/api/instructor/repos", h.InstructorListRepos)
+			r.Route("/api/instructor/repos/{repoId}", func(r chi.Router) {
+				r.Use(h.instructorOwnerMiddleware)
+				r.Get("/", h.InstructorGetRepo)
+				r.Post("/sync", h.InstructorSyncRepo)
+				r.Get("/sync-logs", h.InstructorSyncLogs)
+				r.Get("/sync-logs/{jobId}", h.InstructorSyncJobLogs)
+			})
 		})
 
 		// Admin only
@@ -125,6 +135,7 @@ func (h *Handler) RegisterRoutes(ctx context.Context, r chi.Router) {
 			r.Get("/api/admin/users", h.ListUsers)
 			r.Post("/api/admin/users", h.CreateUser)
 			r.Patch("/api/admin/users/{userId}", h.UpdateUser)
+			r.Get("/api/admin/instructor-users", h.ListInstructorUsers)
 			r.Get("/api/admin/repos", h.ListRepos)
 			r.Get("/api/admin/repos/{repoId}", h.GetRepo)
 			r.Post("/api/admin/repos", h.CreateRepo)

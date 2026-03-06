@@ -3,7 +3,7 @@ import { Form, Input, Select, Button, Card, Typography, message, Breadcrumb, Ale
 import { KeyOutlined } from '@ant-design/icons';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { api } from '../../api/client';
-import type { RepoInput } from '../../api/client';
+import type { RepoInput, RepoOwner } from '../../api/client';
 
 const RepoForm: React.FC = () => {
   const navigate = useNavigate();
@@ -12,16 +12,19 @@ const RepoForm: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [authType, setAuthType] = useState('none');
   const [sshPublicKey, setSSHPublicKey] = useState('');
+  const [instructorUsers, setInstructorUsers] = useState<RepoOwner[]>([]);
   const isEdit = !!repoId;
 
   useEffect(() => {
     api.sshPublicKey().then(r => setSSHPublicKey(r.public_key)).catch(() => {});
+    api.listInstructorUsers().then(setInstructorUsers).catch(() => {});
     if (repoId) {
       api.getRepo(repoId).then((repo) => {
         form.setFieldsValue({
           clone_url: repo.clone_url,
           branch: repo.branch,
           auth_type: repo.auth_type,
+          owner_ids: repo.owners?.map((o) => o.id) || [],
         });
         setAuthType(repo.auth_type);
       });
@@ -97,6 +100,20 @@ const RepoForm: React.FC = () => {
               <Input.Password placeholder={isEdit ? '••••••••' : authType === 'http-token' ? 'ghp_...' : 'user:password'} />
             </Form.Item>
           )}
+          <Form.Item name="owner_ids" label="Owners (Instructors)">
+            <Select
+              mode="multiple"
+              placeholder="Select instructors..."
+              options={instructorUsers.map((u) => ({
+                label: `${u.display_name} (${u.username})`,
+                value: u.id,
+              }))}
+              filterOption={(input, option) =>
+                (option?.label as string)?.toLowerCase().includes(input.toLowerCase())
+              }
+              allowClear
+            />
+          </Form.Item>
           <Form.Item>
             <Button type="primary" htmlType="submit" loading={loading}>
               Save & Sync

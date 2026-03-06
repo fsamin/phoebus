@@ -18,7 +18,7 @@ Phœbus follows a **content-as-code** philosophy: learning paths are authored in
 ## Features
 
 - 📚 **Content as Code** — Author learning paths in Markdown with YAML front matter (Docusaurus-style)
-- 🔄 **Git Sync** — Register Git repositories, auto-sync via webhooks or manual triggers
+- 🔄 **Git Sync** — Register Git repositories, auto-sync via webhooks or manual triggers, assign instructor owners
 - 🧩 **4 Exercise Types** — Lessons, quizzes (multiple-choice & short-answer), terminal exercises, code exercises (identify-and-fix / choose-the-fix)
 - 🧭 **Competency-Based Navigation** — Prerequisites & competencies on modules, topological sort in catalog, prerequisite enforcement popup
 - 🖼️ **Asset Management** — Attach images, videos, and files to lessons with pluggable storage (local filesystem or S3/MinIO)
@@ -317,9 +317,15 @@ go build -o phoebus ./cmd/phoebus
 | `GET` | `/api/analytics/paths/{pathId}` | 👨‍🏫 | Path analytics |
 | `GET` | `/api/analytics/paths/{pathId}/steps/{stepId}` | 👨‍🏫 | Step-level analytics |
 | `GET` | `/api/analytics/learners/{learnerId}` | 👨‍🏫 | Learner analytics |
+| `GET` | `/api/instructor/repos` | 👨‍🏫 | List owned repositories |
+| `GET` | `/api/instructor/repos/{repoId}` | 👨‍🏫 | Owned repo details (ownership verified) |
+| `POST` | `/api/instructor/repos/{repoId}/sync` | 👨‍🏫 | Trigger sync on owned repo |
+| `GET` | `/api/instructor/repos/{repoId}/sync-logs` | 👨‍🏫 | Sync logs on owned repo |
+| `GET` | `/api/instructor/repos/{repoId}/sync-logs/{jobId}` | 👨‍🏫 | Sync job logs on owned repo |
 | `GET/POST` | `/api/admin/users` | 🔑 | List / create users |
 | `PATCH` | `/api/admin/users/{userId}` | 🔑 | Update user role |
-| `GET/POST` | `/api/admin/repos` | 🔑 | List / register Git repos |
+| `GET` | `/api/admin/instructor-users` | 🔑 | List instructor/admin users (for owner selector) |
+| `GET/POST` | `/api/admin/repos` | 🔑 | List / register Git repos (with owners) |
 | `GET/PUT/DELETE` | `/api/admin/repos/{repoId}` | 🔑 | Manage Git repository |
 | `POST` | `/api/admin/repos/{repoId}/sync` | 🔑 | Trigger sync |
 | `GET` | `/api/admin/repos/{repoId}/sync-logs` | 🔑 | Sync job history |
@@ -330,7 +336,7 @@ go build -o phoebus ./cmd/phoebus
 | `GET` | `/api/admin/ssh-public-key` | 🔑 | Instance SSH public key |
 | `GET` | `/metrics` | — | Prometheus metrics |
 
-Roles: ✅ = any authenticated user, 👨‍🏫 = instructor+, 🔑 = admin only
+Roles: ✅ = any authenticated user, 👨‍🏫 = instructor+ (ownership verified for repos), 🔑 = admin only
 
 ## Documentation
 

@@ -42,6 +42,8 @@ Each section describes the detailed behavior, rules, edge cases, and UI expectat
 | Name | Learning path title (from `phoebus.yaml`) |
 | Clone URL | Git repository URL |
 | Branch | Tracked branch |
+| Auth | Authentication type |
+| Owners | Assigned instructor/admin owners |
 | Last Synced | Timestamp of last successful sync |
 | Status | `synced`, `syncing`, `error`, `never_synced` |
 | Actions | Edit, Sync Now, Delete, Copy Webhook URL |
@@ -880,8 +882,12 @@ Managers can view aggregated progress for their team members. Teams are derived 
 | Complete exercises | ✅ | ✅ | ✅ |
 | View own progress | ✅ | ✅ | ✅ |
 | View analytics (all learners) | ❌ | ✅ | ✅ |
+| View owned repositories | ❌ | ✅ (own) | ✅ |
+| Trigger sync on owned repositories | ❌ | ✅ (own) | ✅ |
+| View sync logs on owned repositories | ❌ | ✅ (own) | ✅ |
 | Register Git repository | ❌ | ❌ | ✅ |
-| Trigger manual sync | ❌ | ❌ | ✅ |
+| Manage repository owners | ❌ | ❌ | ✅ |
+| Trigger manual sync (any repo) | ❌ | ❌ | ✅ |
 | Manage users | ❌ | ❌ | ✅ |
 | View platform health | ❌ | ❌ | ✅ |
 
@@ -911,6 +917,32 @@ See section 2.1 (Git Repository Registration). The admin UI provides:
 **UI:** Expandable row in the repository table showing a sub-table of learning paths with:
 - Title, description, module/step counts
 - Toggle switch + status tag (Active / Disabled)
+
+### 8.2.2 Repository Owners
+
+**Description:** Administrators can assign instructors (or admins) as owners of a repository. Owners have read access to their repositories and can trigger syncs and view sync logs, but cannot edit or delete the repository.
+
+**Behavior:**
+- Repository ownership is a N:N relationship (multiple instructors per repository, one instructor can own multiple repositories)
+- Administrators assign owners from the repository add/edit form via a multi-select dropdown listing users with `instructor` or `admin` roles
+- The catalog displays deduplicated owner display names on each learning path card (via the repository association); owners are fetched with `DISTINCT` to avoid duplication when a repository contains multiple learning paths
+- The instructor dashboard shows a "My Repositories" section listing owned repositories with clone URL (copyable), sync status, and action buttons (Sync / Sync Logs)
+- Instructors can trigger a sync and view sync logs only on repositories they own
+- Ownership verification is enforced server-side via middleware on `/api/instructor/repos/{repoId}/*` routes
+
+**API:**
+- `GET /api/admin/instructor-users` — list users with instructor/admin role (for owner selection)
+- `POST /api/admin/repos` and `PUT /api/admin/repos/{repoId}` — accept `owner_ids` field (array of user IDs)
+- `GET /api/admin/repos` and `GET /api/admin/repos/{repoId}` — return `owners` field (array of `{id, username, display_name}`)
+- `GET /api/instructor/repos` — list repos owned by the authenticated instructor
+- `GET /api/instructor/repos/{repoId}` — repo details (ownership verified)
+- `POST /api/instructor/repos/{repoId}/sync` — trigger sync (ownership verified)
+- `GET /api/instructor/repos/{repoId}/sync-logs` — sync logs (ownership verified)
+- `GET /api/instructor/repos/{repoId}/sync-logs/{jobId}` — sync job details (ownership verified)
+
+**Database:**
+- `repository_owners` table: `repo_id UUID FK`, `user_id UUID FK`, `created_at`, composite primary key `(repo_id, user_id)`
+- Cascading delete: removing a repository or user automatically removes the ownership associations
 
 ### 8.3 Platform Health
 

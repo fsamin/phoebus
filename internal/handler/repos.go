@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
@@ -40,9 +41,29 @@ func (h *Handler) ListRepos(w http.ResponseWriter, r *http.Request) {
 		titleMap[pt.RepoID] = append(titleMap[pt.RepoID], pt.Title)
 	}
 
+	// Fetch owners for all repos
+	type ownerRow struct {
+		RepoID      string `db:"repo_id" json:"-"`
+		ID          string `db:"id" json:"id"`
+		Username    string `db:"username" json:"username"`
+		DisplayName string `db:"display_name" json:"display_name"`
+	}
+	var ownerRows []ownerRow
+	h.db.SelectContext(r.Context(), &ownerRows, `
+		SELECT ro.repo_id::text AS repo_id, u.id::text AS id, u.username, u.display_name
+		FROM repository_owners ro
+		JOIN users u ON u.id = ro.user_id
+		ORDER BY u.display_name
+	`)
+	ownerMap := map[string][]ownerRow{}
+	for _, o := range ownerRows {
+		ownerMap[o.RepoID] = append(ownerMap[o.RepoID], o)
+	}
+
 	type repoResponse struct {
 		model.GitRepository
-		PathTitles []string `json:"path_titles"`
+		PathTitles []string   `json:"path_titles"`
+		Owners     []ownerRow `json:"owners"`
 	}
 	out := make([]repoResponse, len(repos))
 	for i, repo := range repos {
@@ -50,7 +71,11 @@ func (h *Handler) ListRepos(w http.ResponseWriter, r *http.Request) {
 		if titles == nil {
 			titles = []string{}
 		}
-		out[i] = repoResponse{GitRepository: repo, PathTitles: titles}
+		owners := ownerMap[repo.ID.String()]
+		if owners == nil {
+			owners = []ownerRow{}
+		}
+		out[i] = repoResponse{GitRepository: repo, PathTitles: titles, Owners: owners}
 	}
 	writeJSON(w, http.StatusOK, out)
 }
@@ -66,14 +91,36 @@ func (h *Handler) GetRepo(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "repository not found"})
 		return
 	}
-	writeJSON(w, http.StatusOK, repo)
+
+	type ownerInfo struct {
+		ID          string `db:"id" json:"id"`
+		Username    string `db:"username" json:"username"`
+		DisplayName string `db:"display_name" json:"display_name"`
+	}
+	var owners []ownerInfo
+	h.db.SelectContext(r.Context(), &owners, `
+		SELECT u.id::text AS id, u.username, u.display_name
+		FROM repository_owners ro
+		JOIN users u ON u.id = ro.user_id
+		WHERE ro.repo_id = $1
+		ORDER BY u.display_name
+	`, id)
+	if owners == nil {
+		owners = []ownerInfo{}
+	}
+
+	writeJSON(w, http.StatusOK, struct {
+		model.GitRepository
+		Owners []ownerInfo `json:"owners"`
+	}{repo, owners})
 }
 
 type createRepoRequest struct {
-	CloneURL    string `json:"clone_url"`
-	Branch      string `json:"branch"`
-	AuthType    string `json:"auth_type"`
-	Credentials string `json:"credentials,omitempty"`
+	CloneURL    string   `json:"clone_url"`
+	Branch      string   `json:"branch"`
+	AuthType    string   `json:"auth_type"`
+	Credentials string   `json:"credentials,omitempty"`
+	OwnerIDs    []string `json:"owner_ids,omitempty"`
 }
 
 func (h *Handler) CreateRepo(w http.ResponseWriter, r *http.Request) {
@@ -125,6 +172,9 @@ func (h *Handler) CreateRepo(w http.ResponseWriter, r *http.Request) {
 	// Enqueue initial sync
 	h.enqueueSync(r.Context(), repo.ID)
 
+	// Save owners
+	h.setRepoOwners(r.Context(), repo.ID.String(), req.OwnerIDs)
+
 	h.auditLog(r.Context(), ClaimsFromContext(r.Context()), "create", "git_repository", repo.ID.String(), map[string]any{"clone_url": req.CloneURL})
 
 	writeJSON(w, http.StatusCreated, repo)
@@ -167,6 +217,9 @@ func (h *Handler) UpdateRepo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.auditLog(r.Context(), ClaimsFromContext(r.Context()), "update", "git_repository", id, nil)
+
+	// Update owners
+	h.setRepoOwners(r.Context(), id, req.OwnerIDs)
 
 	writeJSON(w, http.StatusOK, repo)
 }
@@ -275,6 +328,38 @@ func (h *Handler) SyncJobLogs(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	w.Write(*logsJSON)
+}
+
+// setRepoOwners replaces all owners for a given repo.
+func (h *Handler) setRepoOwners(ctx context.Context, repoID string, ownerIDs []string) {
+	h.db.ExecContext(ctx, "DELETE FROM repository_owners WHERE repo_id = $1", repoID)
+	for _, uid := range ownerIDs {
+		h.db.ExecContext(ctx, "INSERT INTO repository_owners (repo_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", repoID, uid)
+	}
+}
+
+// ListInstructorUsers returns users with instructor or admin role (for owner selector).
+func (h *Handler) ListInstructorUsers(w http.ResponseWriter, r *http.Request) {
+	type userInfo struct {
+		ID          string `db:"id" json:"id"`
+		Username    string `db:"username" json:"username"`
+		DisplayName string `db:"display_name" json:"display_name"`
+	}
+	var users []userInfo
+	err := h.db.SelectContext(r.Context(), &users, `
+		SELECT id::text AS id, username, display_name
+		FROM users
+		WHERE role IN ('instructor', 'admin') AND active = true
+		ORDER BY display_name
+	`)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list users"})
+		return
+	}
+	if users == nil {
+		users = []userInfo{}
+	}
+	writeJSON(w, http.StatusOK, users)
 }
 
 // --- Webhook ---
