@@ -5,6 +5,7 @@ import { ArrowLeftOutlined, SyncOutlined, FileTextOutlined } from '@ant-design/i
 import type { ColumnsType } from 'antd/es/table';
 import { api } from '../../api/client';
 import type { SyncLog, SyncJobLogEntry, GitRepository } from '../../api/client';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const { Title, Text } = Typography;
 
@@ -105,6 +106,7 @@ function LogLine({ entry }: { entry: SyncJobLogEntry }) {
 }
 
 export default function SyncLogs() {
+  usePageTitle('Sync Logs');
   const { repoId } = useParams<{ repoId: string }>();
   const [logs, setLogs] = useState<SyncLog[]>([]);
   const [repo, setRepo] = useState<GitRepository | null>(null);

@@ -7,6 +7,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api/client';
+import { usePageTitle } from '../hooks/usePageTitle';
 import OnboardingTour from '../components/OnboardingTour';
 import { dashboardSteps } from '../tours/steps';
 
@@ -20,6 +21,7 @@ interface DashboardData {
 }
 
 const Dashboard: React.FC = () => {
+  usePageTitle('Dashboard');
   const { user } = useAuth();
   const navigate = useNavigate();
   const [data, setData] = useState<DashboardData | null>(null);

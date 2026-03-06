@@ -4,10 +4,12 @@ import { KeyOutlined } from '@ant-design/icons';
 import { useNavigate, useParams, Link } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { RepoInput, RepoOwner } from '../../api/client';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const RepoForm: React.FC = () => {
-  const navigate = useNavigate();
   const { repoId } = useParams<{ repoId: string }>();
+  usePageTitle(repoId ? 'Edit Repository' : 'Add Repository');
+  const navigate = useNavigate();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [authType, setAuthType] = useState('none');

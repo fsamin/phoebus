@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Typography, Card, Row, Col, Table, Spin, Statistic } from 'antd';
 import { TeamOutlined, BookOutlined, TrophyOutlined, ExperimentOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 interface AnalyticsOverviewData {
   total_paths: number;
@@ -28,6 +29,7 @@ interface ActivityEvent {
 }
 
 const Analytics: React.FC = () => {
+  usePageTitle('Analytics');
   const navigate = useNavigate();
   const [overview, setOverview] = useState<AnalyticsOverviewData | null>(null);
   const [activity, setActivity] = useState<ActivityEvent[]>([]);
