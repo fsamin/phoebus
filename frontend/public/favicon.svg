@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <defs>
+    <linearGradient id="flame" x1="0" y1="1" x2="0.5" y2="0">
+      <stop offset="0%" stop-color="#ff4d00"/>
+      <stop offset="50%" stop-color="#ff7a45"/>
+      <stop offset="100%" stop-color="#ffa940"/>
+    </linearGradient>
+  </defs>
+  <!-- Phoenix flame / feather -->
+  <path d="M32 4 C20 16, 12 24, 14 36 C16 46, 24 52, 32 60 C40 52, 48 46, 50 36 C52 24, 44 16, 32 4Z" fill="url(#flame)" />
+  <!-- Inner highlight -->
+  <path d="M32 16 C26 24, 22 30, 24 38 C26 44, 30 48, 32 52 C34 48, 38 44, 40 38 C42 30, 38 24, 32 16Z" fill="#fff3e0" opacity="0.6"/>
+</svg>
