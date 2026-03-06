@@ -9,6 +9,7 @@ import {
 } from '@ant-design/icons';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api/client';
+import { usePageTitle } from '../hooks/usePageTitle';
 import type { LearningPathDetail, Progress, StepSummary, LearningPathSummary } from '../api/client';
 
 const stepIcon = (type: string) => {
@@ -36,6 +37,7 @@ const PathOverview: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [prereqModalOpen, setPrereqModalOpen] = useState(false);
   const [pendingStepId, setPendingStepId] = useState<string | null>(null);
+  usePageTitle(path ? path.title : 'Learning Path');
 
   useEffect(() => {
     if (!pathId) return;

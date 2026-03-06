@@ -4,8 +4,10 @@ import { SearchOutlined, PlusOutlined, LockOutlined } from '@ant-design/icons';
 import { api } from '../../api/client';
 import type { User } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 const Users: React.FC = () => {
+  usePageTitle('Users');
   const { user: currentUser } = useAuth();
   const [users, setUsers] = useState<Array<User & { completed_paths: number }>>([]);
   const [loading, setLoading] = useState(true);

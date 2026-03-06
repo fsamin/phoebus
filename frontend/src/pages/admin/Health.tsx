@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { Card, Typography, Tag, Row, Col, Spin, Statistic, Table } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined, SyncOutlined, ClockCircleOutlined } from '@ant-design/icons';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 interface HealthData {
   api: { status: string; uptime: string };
@@ -12,6 +13,7 @@ interface HealthData {
 }
 
 const Health: React.FC = () => {
+  usePageTitle('Health');
   const [data, setData] = useState<HealthData | null>(null);
   const [loading, setLoading] = useState(true);
 

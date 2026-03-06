@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Typography, Card, Table, Spin, Tag, Breadcrumb, Row, Col, Progress as AntProgress, Timeline } from 'antd';
 import { CheckCircleOutlined, PlayCircleOutlined } from '@ant-design/icons';
 import { useParams, Link } from 'react-router-dom';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 interface LearnerData {
   user_id: string;
@@ -34,6 +35,7 @@ interface LearnerData {
 }
 
 const LearnerDetail: React.FC = () => {
+  usePageTitle('Learner Detail');
   const { learnerId } = useParams<{ learnerId: string }>();
   const [data, setData] = useState<LearnerData | null>(null);
   const [loading, setLoading] = useState(true);

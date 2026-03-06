@@ -8,6 +8,7 @@ import {
 } from '@ant-design/icons';
 import { api } from '../api/client';
 import type { StepDetail, LearningPathDetail, Progress } from '../api/client';
+import { usePageTitle } from '../hooks/usePageTitle';
 import MarkdownRenderer from '../components/MarkdownRenderer';
 import Quiz from '../components/Quiz';
 import TerminalExercise from '../components/TerminalExercise';
@@ -36,6 +37,7 @@ const StepView: React.FC = () => {
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const resizingRef = useRef(false);
+  usePageTitle(step && path ? `${step.title} — ${path.title}` : 'Step');
 
   useEffect(() => {
     if (!pathId || !stepId) return;

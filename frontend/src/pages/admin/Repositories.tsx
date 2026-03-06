@@ -4,6 +4,7 @@ import { PlusOutlined, SyncOutlined, CopyOutlined, DeleteOutlined, EditOutlined,
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../api/client';
 import type { GitRepository, RepoLearningPath, RepoOwner } from '../../api/client';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 function relativeTime(iso?: string): string {
   if (!iso) return '—';
@@ -16,6 +17,7 @@ function relativeTime(iso?: string): string {
 }
 
 const Repositories: React.FC = () => {
+  usePageTitle('Repositories');
   const navigate = useNavigate();
   const [repos, setRepos] = useState<Array<GitRepository & { path_titles: string[]; owners: RepoOwner[] }>>([]);
   const [loading, setLoading] = useState(true);

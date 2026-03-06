@@ -4,6 +4,7 @@ import { SearchOutlined, CheckCircleOutlined, WarningOutlined } from '@ant-desig
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Competency } from '../api/client';
+import { usePageTitle } from '../hooks/usePageTitle';
 import OnboardingTour from '../components/OnboardingTour';
 import { catalogSteps } from '../tours/steps';
 
@@ -25,6 +26,7 @@ interface CatalogPath {
 }
 
 const Catalog: React.FC = () => {
+  usePageTitle('Catalog');
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [paths, setPaths] = useState<CatalogPath[]>([]);
