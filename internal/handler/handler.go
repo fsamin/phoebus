@@ -196,6 +196,12 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	// Update last login
 	h.db.ExecContext(r.Context(), "UPDATE users SET last_login_at = now() WHERE id = $1", user.ID)
 
+	// Enforce forced admin role on every login
+	if h.cfg.IsForcedAdmin(user.Username) && user.Role != model.RoleAdmin {
+		h.db.ExecContext(r.Context(), "UPDATE users SET role = 'admin', updated_at = now() WHERE id = $1", user.ID)
+		user.Role = model.RoleAdmin
+	}
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     "phoebus_session",
 		Value:    token,

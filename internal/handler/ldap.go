@@ -106,6 +106,11 @@ func (h *Handler) LDAPLogin(w http.ResponseWriter, r *http.Request) {
 		role = h.resolveLDAPRole(conn, userDN, cfg)
 	}
 
+	// Override role for forced admins
+	if h.cfg.IsForcedAdmin(req.Username) {
+		role = model.RoleAdmin
+	}
+
 	// Upsert user
 	user, err := h.upsertLDAPUser(r, req.Username, email, displayName, userDN, role)
 	if err != nil {
