@@ -62,8 +62,9 @@ export const api = {
     request<ExerciseAttempt[]>(`/exercises/${stepId}/attempts`),
 
   // Admin
-  listRepos: () => request<Array<GitRepository & { path_titles: string[] }>>('/admin/repos'),
-  getRepo: (id: string) => request<GitRepository>(`/admin/repos/${id}`),
+  listRepos: () => request<Array<GitRepository & { path_titles: string[]; owners: RepoOwner[] }>>('/admin/repos'),
+  getRepo: (id: string) => request<GitRepository & { owners: RepoOwner[] }>(`/admin/repos/${id}`),
+  listInstructorUsers: () => request<RepoOwner[]>('/admin/instructor-users'),
   createRepo: (data: RepoInput) =>
     request<GitRepository>('/admin/repos', {
       method: 'POST',
@@ -90,6 +91,12 @@ export const api = {
       body: JSON.stringify(data),
     }),
   sshPublicKey: () => request<{ public_key: string }>('/admin/ssh-public-key'),
+
+  // Instructor repos
+  instructorListRepos: () => request<Array<GitRepository & { path_titles: string[] }>>('/instructor/repos'),
+  instructorSyncRepo: (id: string) => request<{ status: string }>(`/instructor/repos/${id}/sync`, { method: 'POST' }),
+  instructorSyncLogs: (id: string) => request<SyncLog[]>(`/instructor/repos/${id}/sync-logs`),
+  instructorSyncJobLogs: (repoId: string, jobId: string) => request<SyncJobLogEntry[]>(`/instructor/repos/${repoId}/sync-logs/${jobId}`),
 
   // Onboarding
   getOnboarding: () => request<Record<string, boolean>>('/me/onboarding'),
@@ -138,6 +145,7 @@ export interface LearningPathSummary {
   step_count: number;
   progress_total?: number;
   progress_completed?: number;
+  owners: string[];
 }
 
 export interface LearningPathDetail {
@@ -229,6 +237,13 @@ export interface RepoInput {
   branch: string;
   auth_type: string;
   credentials?: string;
+  owner_ids?: string[];
+}
+
+export interface RepoOwner {
+  id: string;
+  username: string;
+  display_name: string;
 }
 
 export interface SyncLog {

@@ -99,8 +99,13 @@ The backend has no code execution, no infrastructure orchestration, and no WebSo
 | `POST /api/exercises/{id}/reset` | Reset exercise progress for a learner |
 | `GET /api/admin/repos` | Manage registered Git repositories (CRUD, sync status) |
 | `POST /api/admin/repos/{id}/sync` | Manually trigger content sync for a repository |
+| `GET /api/admin/instructor-users` | List users with instructor/admin role (for owner selection) |
 | `POST /api/admin/users` | Create a local user (admin only, local auth must be enabled) |
 | `GET /api/analytics/*` | Learner and instructor analytics |
+| `GET /api/instructor/repos` | List repositories owned by the authenticated instructor |
+| `GET /api/instructor/repos/{id}` | View owned repo details (ownership verified) |
+| `POST /api/instructor/repos/{id}/sync` | Trigger sync on owned repo (ownership verified) |
+| `GET /api/instructor/repos/{id}/sync-logs` | View sync logs on owned repo (ownership verified) |
 | `GET /api/users/*` | User management (admin only) |
 | `GET /api/assets/{hash}` | Serve binary assets (images, videos) by content hash. Public, immutable caching |
 | `GET /api/me/onboarding` | Returns onboarding tour status (`{ tour_name: boolean }`) for the authenticated user |
@@ -224,6 +229,7 @@ The `content_md` column stores **raw Markdown**, consistent with client-side ren
 - **`progress`** — tracks step-level completion status. `status` enum: `not_started`, `in_progress`, `completed`
 - **`sync_jobs`** — PostgreSQL-based job queue for content sync. Webhook inserts a row; a worker goroutine consumes via `SELECT FOR UPDATE SKIP LOCKED`. Tracks status (`pending`, `running`, `completed`, `failed`), attempt count, and error messages. Provides retry semantics, sync history for the admin UI, and multi-replica coordination.
 - **`users.onboarding_tours_seen`** — `JSONB NOT NULL DEFAULT '{}'` column tracking which onboarding tours the user has completed (e.g., `{"dashboard": true, "catalog": true}`). Added in migration `011`. Used by `GET/PATCH/DELETE /api/me/onboarding` endpoints.
+- **`repository_owners`** — N:N join table between `git_repositories` and `users`. Composite primary key `(repo_id, user_id)` with cascading deletes. Tracks which instructors own which repositories, enabling ownership-based access control on instructor routes. Added in migration `012`.
 
 ### 3.4 Content Syncer
 
@@ -480,12 +486,14 @@ Browser ──▶ [Reverse Proxy] ──▶ Backend ──▶ OIDC Provider / LD
                              RBAC middleware
                              ┌────────────────┐
                              │ admin          │ Full access (repos, users, all analytics)
-                             │ instructor     │ Content management + analytics
+                             │ instructor     │ Content management + analytics + owned repos (sync, logs)
                              │ learner        │ Learning paths + own progress
                              └────────────────┘
 ```
 
 **Forced admin users:** The `admin.forced_admins` configuration list allows specific usernames to be permanently assigned the `admin` role. This override is applied at user creation and on every login (upsert) across all authentication providers (OIDC, proxy, local). The role is locked: the `PATCH /api/admin/users/{userId}` endpoint rejects role changes for these users (HTTP 403), and the `GET /api/admin/users` response includes a `role_locked: true` field so the frontend can disable the role selector.
+
+**Repository ownership:** Administrators can assign instructors (or admins) as owners of git repositories via the `repository_owners` join table (N:N). Owners gain read-only access to their repositories through `/api/instructor/repos/*` routes: list owned repos, view details, trigger sync, and read sync logs. Ownership is verified server-side via a Chi middleware (`instructorOwnerMiddleware`) that checks the `repository_owners` table before allowing access (admins bypass the check). The catalog API enriches learning paths with deduplicated owner display names (using `SELECT DISTINCT` to avoid repeating the same instructor when a repository contains multiple learning paths), and the instructor dashboard includes a "My Repositories" section with repo URL, sync status, and action buttons.
 
 Authentication supports four providers:
 
