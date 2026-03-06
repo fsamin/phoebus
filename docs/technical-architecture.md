@@ -485,6 +485,8 @@ Browser ──▶ [Reverse Proxy] ──▶ Backend ──▶ OIDC Provider / LD
                              └────────────────┘
 ```
 
+**Forced admin users:** The `admin.forced_admins` configuration list allows specific usernames to be permanently assigned the `admin` role. This override is applied at user creation and on every login (upsert) across all authentication providers (OIDC, proxy, local). The role is locked: the `PATCH /api/admin/users/{userId}` endpoint rejects role changes for these users (HTTP 403), and the `GET /api/admin/users` response includes a `role_locked: true` field so the frontend can disable the role selector.
+
 Authentication supports four providers:
 
 1. **OIDC** — Redirect-based SSO via OpenID Connect

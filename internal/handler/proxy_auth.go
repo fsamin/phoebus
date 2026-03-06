@@ -46,6 +46,11 @@ func (h *Handler) ProxyAuthMiddleware(next http.Handler) http.Handler {
 			}
 		}
 
+		// Override role for forced admins
+		if h.cfg.IsForcedAdmin(remoteUser) {
+			role = model.RoleAdmin
+		}
+
 		// Extract optional headers
 		email := ""
 		if cfg.HeaderEmail != "" {

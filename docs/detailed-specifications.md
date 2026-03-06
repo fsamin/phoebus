@@ -869,6 +869,7 @@ Managers can view aggregated progress for their team members. Teams are derived 
 5. Administrators can change a user's role: `learner`, `instructor`, `admin`
 6. Administrators can deactivate users (soft-delete — they cannot log in but their data is preserved)
 7. User list displays: name, email, role, last login, number of completed paths
+8. **Forced admin users**: Specific usernames can be configured in the `admin.forced_admins` list. These users are always assigned the `admin` role upon account creation or login (OIDC, proxy, or local registration). Their role is locked: it cannot be changed from the admin UI, and the API rejects role modification requests with a 403 error. The role selector is replaced by a locked badge in the user list.
 
 **RBAC Matrix:**
 

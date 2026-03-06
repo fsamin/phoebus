@@ -121,6 +121,7 @@ export interface User {
   active: boolean;
   last_login_at?: string;
   created_at: string;
+  role_locked?: boolean;
 }
 
 export interface LearningPathSummary {

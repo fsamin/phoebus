@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Tag, Typography, Select, Switch, message, Input, Button, Modal, Form } from 'antd';
-import { SearchOutlined, PlusOutlined } from '@ant-design/icons';
+import { Table, Tag, Typography, Select, Switch, message, Input, Button, Modal, Form, Tooltip } from 'antd';
+import { SearchOutlined, PlusOutlined, LockOutlined } from '@ant-design/icons';
 import { api } from '../../api/client';
 import type { User } from '../../api/client';
 import { useAuth } from '../../contexts/AuthContext';
@@ -111,7 +111,11 @@ const Users: React.FC = () => {
             title: 'Role',
             dataIndex: 'role',
             width: 140,
-            render: (v: string, record: User) => (
+            render: (v: string, record: User) => record.role_locked ? (
+              <Tooltip title="Role managed by configuration">
+                <span><Tag color="red" icon={<LockOutlined />}>{v}</Tag></span>
+              </Tooltip>
+            ) : (
               <Select
                 value={v}
                 size="small"

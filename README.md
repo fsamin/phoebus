@@ -136,7 +136,7 @@ Phœbus uses [configstore](https://github.com/ovh/configstore) for configuration
 | `database` | `url: postgres://user:pass@host:5432/db?sslmode=disable` | — (required) |
 | `jwt` | `secret: your-jwt-secret` | — (required) |
 | `http` | `port: 8080` | `8080` |
-| `admin` | `username: admin` / `password: admin` | `admin:admin` |
+| `admin` | `username: admin` / `password: admin` / `forced_admins: [user1, user2]` | `admin:admin` |
 | `auth` | `local_enabled: true` | `true` |
 | `encryption` | `key: "32-byte-AES-key"` | — (optional) |
 | `assets` | `backend: filesystem` or `s3` | `filesystem` |
@@ -194,6 +194,19 @@ proxy_auth:
   group_to_role:
     admins: admin
     trainers: instructor
+```
+
+### Forced Admin Users
+
+You can force specific usernames to always have the `admin` role, regardless of their authentication provider (OIDC, LDAP, proxy, or local registration). Their role is locked and cannot be changed from the admin UI.
+
+```yaml
+# config/admin
+username: admin
+password: admin
+forced_admins:
+  - alice
+  - bob
 ```
 
 ### S3 Asset Storage

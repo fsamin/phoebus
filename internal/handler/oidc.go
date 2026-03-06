@@ -193,6 +193,11 @@ func (h *Handler) upsertOIDCUser(ctx context.Context, externalID, email, display
 		`, displayName, email, user.ID)
 		user.DisplayName = displayName
 		user.Email = &email
+		// Override role for forced admins on every login
+		if h.cfg.IsForcedAdmin(user.Username) && user.Role != model.RoleAdmin {
+			h.db.ExecContext(ctx, `UPDATE users SET role = 'admin', updated_at = now() WHERE id = $1`, user.ID)
+			user.Role = model.RoleAdmin
+		}
 		return &user, nil
 	}
 
@@ -227,6 +232,11 @@ func (h *Handler) upsertOIDCUser(ctx context.Context, externalID, email, display
 		Active:       true,
 		CreatedAt:    time.Now(),
 		UpdatedAt:    time.Now(),
+	}
+
+	// Override role for forced admins
+	if h.cfg.IsForcedAdmin(username) {
+		newUser.Role = model.RoleAdmin
 	}
 
 	_, err = h.db.ExecContext(ctx, `
