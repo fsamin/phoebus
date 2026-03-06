@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Typography, Card, Table, Spin, Tag, Breadcrumb, Row, Col, Statistic, Progress as AntProgress, Tabs } from 'antd';
 import { WarningOutlined } from '@ant-design/icons';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { usePageTitle } from '../../hooks/usePageTitle';
 
 interface PathAnalytics {
   id: string;
@@ -32,6 +33,7 @@ interface StepDrillDown {
 }
 
 const PathAnalyticsView: React.FC = () => {
+  usePageTitle('Path Analytics');
   const { pathId } = useParams<{ pathId: string }>();
   const navigate = useNavigate();
   const [data, setData] = useState<PathAnalytics | null>(null);

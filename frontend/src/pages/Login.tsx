@@ -4,6 +4,7 @@ import { FireOutlined, LoginOutlined, SafetyOutlined, UserAddOutlined } from '@a
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate, useSearchParams, Navigate } from 'react-router-dom';
 import { api } from '../api/client';
+import { usePageTitle } from '../hooks/usePageTitle';
 
 interface AuthProviders {
   local: boolean;
@@ -13,6 +14,7 @@ interface AuthProviders {
 }
 
 const Login: React.FC = () => {
+  usePageTitle('Login');
   const { user, login } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
