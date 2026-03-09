@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/url"
 	"os"
@@ -246,6 +247,7 @@ func (s *Syncer) failJob(ctx context.Context, collector *logging.SyncCollector, 
 
 func gitClone(cloneURL, branch, destDir, authType string, credentials []byte) error {
 	args := []string{"clone", "--branch", branch, "--depth", "1", "--single-branch"}
+	var extraEnv []string
 
 	// For HTTP token auth, inject token into the clone URL
 	if authType == "http-token" && len(credentials) > 0 {
@@ -254,28 +256,14 @@ func gitClone(cloneURL, branch, destDir, authType string, credentials []byte) er
 			return fmt.Errorf("inject token in URL: %w", err)
 		}
 		args = append(args, authURL, destDir)
-		cmd := exec.Command("git", args...)
-		cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		return cmd.Run()
-	}
-
-	if authType == "http-basic" && len(credentials) > 0 {
+	} else if authType == "http-basic" && len(credentials) > 0 {
 		// credentials expected as "username:password"
 		authURL, err := injectBasicAuthInURL(cloneURL, string(credentials))
 		if err != nil {
 			return fmt.Errorf("inject basic auth in URL: %w", err)
 		}
 		args = append(args, authURL, destDir)
-		cmd := exec.Command("git", args...)
-		cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		return cmd.Run()
-	}
-
-	if authType == "instance-ssh-key" && len(credentials) > 0 {
+	} else if authType == "instance-ssh-key" && len(credentials) > 0 {
 		// Write SSH key to temp file
 		tmpKey, err := os.CreateTemp("", "phoebus-ssh-*")
 		if err != nil {
@@ -290,22 +278,27 @@ func gitClone(cloneURL, branch, destDir, authType string, credentials []byte) er
 		os.Chmod(tmpKey.Name(), 0600)
 
 		args = append(args, cloneURL, destDir)
-		cmd := exec.Command("git", args...)
-		cmd.Env = append(os.Environ(),
+		extraEnv = append(extraEnv,
 			fmt.Sprintf("GIT_SSH_COMMAND=ssh -i %s -o StrictHostKeyChecking=no", tmpKey.Name()),
 		)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		return cmd.Run()
+	} else {
+		// No auth
+		args = append(args, cloneURL, destDir)
 	}
 
-	// No auth
-	args = append(args, cloneURL, destDir)
 	cmd := exec.Command("git", args...)
-	cmd.Env = append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
+	cmd.Env = append(os.Environ(), append([]string{"GIT_TERMINAL_PROMPT=0"}, extraEnv...)...)
+	var stderrBuf bytes.Buffer
 	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
+	cmd.Stderr = io.MultiWriter(os.Stderr, &stderrBuf)
+	if err := cmd.Run(); err != nil {
+		stderr := strings.TrimSpace(stderrBuf.String())
+		if stderr != "" {
+			return fmt.Errorf("%w: %s", err, stderr)
+		}
+		return err
+	}
+	return nil
 }
 
 // injectTokenInURL returns https://x-access-token:<token>@host/path
