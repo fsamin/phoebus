@@ -20,7 +20,7 @@ RUN CGO_ENABLED=0 go build -ldflags "-s -w \
     -o /phoebus ./cmd/phoebus
 
 FROM alpine:3.21
-RUN apk add --no-cache ca-certificates git
+RUN apk add --no-cache ca-certificates git openssh-client
 COPY --from=builder /phoebus /usr/local/bin/phoebus
 EXPOSE 8080
 CMD ["phoebus"]
