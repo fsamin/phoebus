@@ -87,8 +87,10 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
     if (e.key === 'Enter' && selected && !submitting) {
       e.preventDefault();
       handleSubmit();
-    } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && availableProposals.length > 0 && !submitting) {
+    } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
+      e.stopPropagation();
+      if (availableProposals.length === 0 || submitting) return;
       const curIdx = availableProposals.findIndex((p) => p.command === selected);
       let next: number;
       if (e.key === 'ArrowDown') {
