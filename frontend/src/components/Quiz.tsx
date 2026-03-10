@@ -40,7 +40,7 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit }) => {
             ) : (
               <Tag icon={<CloseCircleOutlined />} color="error">Q{r.idx + 1}: Incorrect</Tag>
             )}
-            <Typography.Text style={{ marginLeft: 8 }}>{questions[r.idx].text}</Typography.Text>
+            <Typography.Text style={{ marginLeft: 8, whiteSpace: 'normal' }}>{questions[r.idx].text}</Typography.Text>
           </div>
         ))}
       </Card>
@@ -82,13 +82,11 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit }) => {
 
   return (
     <Card
-      title={
-        <span>
-          {q.text}
-          <Tag style={{ marginLeft: 12 }}>Q {currentIdx + 1}/{questions.length}</Tag>
-        </span>
-      }
+      title={<Tag>Question {currentIdx + 1}/{questions.length}</Tag>}
     >
+      <div style={{ marginBottom: 16 }}>
+        <MarkdownRenderer content={q.text} />
+      </div>
       {q.type === 'multiple-choice' ? (
         q.multi_select ? (
           <Space direction="vertical" style={{ width: '100%' }}>
