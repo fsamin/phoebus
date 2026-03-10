@@ -227,3 +227,47 @@ func TestProxyAuth_Providers(t *testing.T) {
 		t.Errorf("expected proxy=true, got %v", data["proxy"])
 	}
 }
+
+func TestProxyAuth_PreservesAdminAssignedRole(t *testing.T) {
+	srv, cleanup := setupProxyTest(t, config.ProxyAuthConfig{
+		Enabled:      true,
+		HeaderUser:   "X-Remote-User",
+		HeaderGroups: "X-Remote-Groups",
+		DefaultRole:  "learner",
+		GroupToRole: map[string]string{
+			"trainers": "instructor",
+		},
+	})
+	defer cleanup()
+
+	// Step 1: Create user via proxy (gets "learner" role)
+	req, _ := http.NewRequest("GET", srv.URL+"/api/me", nil)
+	req.Header.Set("X-Remote-User", "proxy-role-preserve-1")
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data := readJSON(t, resp)
+	if data["role"] != "learner" {
+		t.Fatalf("expected initial role learner, got %v", data["role"])
+	}
+
+	// Step 2: Admin changes user role to "instructor" directly in DB
+	_, err = testDB.Exec(`UPDATE users SET role = 'instructor' WHERE username = 'proxy-role-preserve-1'`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Step 3: User logs in again via proxy (still no group header) — role should stay "instructor"
+	req, _ = http.NewRequest("GET", srv.URL+"/api/me", nil)
+	req.Header.Set("X-Remote-User", "proxy-role-preserve-1")
+	resp, err = client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	data = readJSON(t, resp)
+	if data["role"] != "instructor" {
+		t.Errorf("expected preserved role instructor, got %v", data["role"])
+	}
+}
