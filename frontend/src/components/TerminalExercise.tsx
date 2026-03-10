@@ -20,9 +20,10 @@ interface TerminalExerciseProps {
   introduction: string;
   steps: TerminalStep[];
   onSubmit: (body: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  onComplete?: () => void;
 }
 
-const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps, onSubmit }) => {
+const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps, onSubmit, onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [selected, setSelected] = useState('');
   const [feedback, setFeedback] = useState<Record<string, unknown> | null>(null);
@@ -68,6 +69,7 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
           setFeedback(null);
           if (currentStep + 1 >= steps.length) {
             setCompleted(true);
+            onComplete?.();
           } else {
             setCurrentStep(currentStep + 1);
             setSelected('');

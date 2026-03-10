@@ -35,6 +35,7 @@ const StepView: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [exerciseCompleted, setExerciseCompleted] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const resizingRef = useRef(false);
   usePageTitle(step && path ? `${step.title} — ${path.title}` : 'Step');
@@ -42,6 +43,7 @@ const StepView: React.FC = () => {
   useEffect(() => {
     if (!pathId || !stepId) return;
     setLoading(true);
+    setExerciseCompleted(false);
     Promise.all([
       api.getPath(pathId),
       api.getStep(pathId, stepId),
@@ -236,6 +238,7 @@ const StepView: React.FC = () => {
             <Quiz
               questions={(exerciseData.questions as Record<string, unknown>[]).map((q) => q as any)}
               onSubmit={handleSubmitAttempt}
+              onComplete={() => setExerciseCompleted(true)}
             />
           )}
 
@@ -244,6 +247,7 @@ const StepView: React.FC = () => {
               introduction={exerciseData.introduction as string || ''}
               steps={(exerciseData.steps as Record<string, unknown>[]).map((s) => s as any)}
               onSubmit={handleSubmitAttempt}
+              onComplete={() => setExerciseCompleted(true)}
             />
           )}
 
@@ -264,11 +268,19 @@ const StepView: React.FC = () => {
               </Button>
             ) : <div />}
             {nextStep ? (
-              <Button type="primary" onClick={() => navigate(`/paths/${pathId}/steps/${nextStep.id}`)}>
+              <Button
+                type="primary"
+                disabled={step.type !== 'lesson' && !isCompleted && !exerciseCompleted}
+                onClick={() => navigate(`/paths/${pathId}/steps/${nextStep.id}`)}
+              >
                 {nextStep.title} <ArrowRightOutlined />
               </Button>
             ) : (
-              <Button type="primary" onClick={() => navigate(`/paths/${pathId}`)}>
+              <Button
+                type="primary"
+                disabled={step.type !== 'lesson' && !isCompleted && !exerciseCompleted}
+                onClick={() => navigate(`/paths/${pathId}`)}
+              >
                 Back to Overview
               </Button>
             )}

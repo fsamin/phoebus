@@ -15,9 +15,10 @@ interface QuizQuestion {
 interface QuizProps {
   questions: QuizQuestion[];
   onSubmit: (body: Record<string, unknown>) => Promise<Record<string, unknown>>;
+  onComplete?: () => void;
 }
 
-const Quiz: React.FC<QuizProps> = ({ questions, onSubmit }) => {
+const Quiz: React.FC<QuizProps> = ({ questions, onSubmit, onComplete }) => {
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selected, setSelected] = useState<string[]>([]);
   const [answer, setAnswer] = useState('');
@@ -72,6 +73,7 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit }) => {
   const handleNext = () => {
     if (currentIdx + 1 >= questions.length) {
       setShowSummary(true);
+      onComplete?.();
     } else {
       setCurrentIdx(currentIdx + 1);
       setSelected([]);
