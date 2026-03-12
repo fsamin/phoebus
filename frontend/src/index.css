@@ -192,6 +192,12 @@ body {
   border-color: var(--color-ide-disabled-border) !important;
 }
 
+/* ── Markdown images ── */
+.markdown-body img {
+  max-width: 100%;
+  height: auto;
+}
+
 /* ── Markdown tables ── */
 .markdown-body table {
   width: 100%;
