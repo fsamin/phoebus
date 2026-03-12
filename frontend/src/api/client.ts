@@ -133,6 +133,7 @@ export interface User {
 
 export interface LearningPathSummary {
   id: string;
+  slug: string;
   title: string;
   description: string;
   icon?: string;
@@ -150,6 +151,7 @@ export interface LearningPathSummary {
 
 export interface LearningPathDetail {
   id: string;
+  slug: string;
   title: string;
   description: string;
   icon?: string;
@@ -161,6 +163,7 @@ export interface LearningPathDetail {
 
 export interface ModuleWithSteps {
   id: string;
+  slug: string;
   title: string;
   description: string;
   competencies: string[];
@@ -170,6 +173,7 @@ export interface ModuleWithSteps {
 
 export interface StepSummary {
   id: string;
+  slug: string;
   title: string;
   type: 'lesson' | 'quiz' | 'terminal-exercise' | 'code-exercise';
   estimated_duration?: string;
@@ -178,6 +182,7 @@ export interface StepSummary {
 
 export interface StepDetail {
   id: string;
+  slug: string;
   module_id: string;
   title: string;
   type: 'lesson' | 'quiz' | 'terminal-exercise' | 'code-exercise';

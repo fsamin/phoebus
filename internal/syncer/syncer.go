@@ -416,9 +416,15 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 
 	// Upsert learning path (without hash yet — computed after modules)
 	var lpID uuid.UUID
+	lpSlug := GenerateSlug(lpMeta.Title)
+	// Ensure slug uniqueness across all learning paths
+	lpSlug, err = ensureUniqueSlug(ctx, tx, "learning_paths", "slug", lpSlug, "repo_id = $%d AND file_path = $%d", repoID, filePath)
+	if err != nil {
+		return fmt.Errorf("generate slug for learning path %s: %w", lpMeta.Title, err)
+	}
 	err = tx.GetContext(ctx, &lpID, `
-		INSERT INTO learning_paths (repo_id, title, description, icon, tags, estimated_duration, prerequisites, file_path)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO learning_paths (repo_id, title, description, icon, tags, estimated_duration, prerequisites, file_path, slug)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		ON CONFLICT (repo_id, file_path) DO UPDATE SET
 			title = EXCLUDED.title,
 			description = EXCLUDED.description,
@@ -426,11 +432,12 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 			tags = EXCLUDED.tags,
 			estimated_duration = EXCLUDED.estimated_duration,
 			prerequisites = EXCLUDED.prerequisites,
+			slug = EXCLUDED.slug,
 			deleted_at = NULL,
 			updated_at = now()
 			-- enabled is NOT touched: admin-controlled field
 		RETURNING id
-	`, repoID, lpMeta.Title, lpMeta.Description, lpMeta.Icon, pq.Array(lpMeta.Tags), lpMeta.EstimatedDuration, pq.Array(lpMeta.Prerequisites), filePath)
+	`, repoID, lpMeta.Title, lpMeta.Description, lpMeta.Icon, pq.Array(lpMeta.Tags), lpMeta.EstimatedDuration, pq.Array(lpMeta.Prerequisites), filePath, lpSlug)
 	if err != nil {
 		return fmt.Errorf("upsert learning path %s: %w", lpMeta.Title, err)
 	}
@@ -511,19 +518,25 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 
 		// Upsert module
 		var moduleID uuid.UUID
+		modSlug := GenerateSlug(modMeta.Title)
+		modSlug, err = ensureUniqueScopedSlug(ctx, tx, "modules", "slug", modSlug, "learning_path_id", lpID, "file_path", modulePath)
+		if err != nil {
+			return fmt.Errorf("generate slug for module %s: %w", modulePath, err)
+		}
 		err = tx.GetContext(ctx, &moduleID, `
-			INSERT INTO modules (learning_path_id, title, description, competencies, position, file_path, content_hash)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			INSERT INTO modules (learning_path_id, title, description, competencies, position, file_path, content_hash, slug)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 			ON CONFLICT (learning_path_id, file_path) DO UPDATE SET
 				title = EXCLUDED.title,
 				description = EXCLUDED.description,
 				competencies = EXCLUDED.competencies,
 				position = EXCLUDED.position,
 				content_hash = EXCLUDED.content_hash,
+				slug = EXCLUDED.slug,
 				deleted_at = NULL,
 				updated_at = now()
 			RETURNING id
-		`, lpID, modMeta.Title, modMeta.Description, pq.Array(modMeta.Competencies), position, modulePath, moduleHash)
+		`, lpID, modMeta.Title, modMeta.Description, pq.Array(modMeta.Competencies), position, modulePath, moduleHash, modSlug)
 		if err != nil {
 			return fmt.Errorf("upsert module %s: %w", modulePath, err)
 		}
@@ -540,6 +553,12 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 		for stepPos, sd := range stepsToSync {
 			existingStepPaths[sd.filePath] = true
 
+			stepSlug := GenerateSlug(sd.meta.Title)
+			stepSlug, err = ensureUniqueScopedSlug(ctx, tx, "steps", "slug", stepSlug, "module_id", moduleID, "file_path", sd.filePath)
+			if err != nil {
+				return fmt.Errorf("generate slug for step %s/%s: %w", modulePath, sd.filePath, err)
+			}
+
 			// Check if this step's hash matches what's in DB
 			var existingStepHash string
 			err = tx.GetContext(ctx, &existingStepHash, `
@@ -548,16 +567,16 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 			`, moduleID, sd.filePath)
 			if err == nil && existingStepHash == sd.hash {
 				logger.Debug("step unchanged, skipping", "module", modulePath, "step", sd.filePath)
-				// Still need to ensure position is correct
-				tx.ExecContext(ctx, `UPDATE steps SET position = $1, updated_at = now() WHERE module_id = $2 AND file_path = $3 AND deleted_at IS NULL`, stepPos, moduleID, sd.filePath)
+				// Still need to ensure position and slug are correct
+				tx.ExecContext(ctx, `UPDATE steps SET position = $1, slug = $4, updated_at = now() WHERE module_id = $2 AND file_path = $3 AND deleted_at IS NULL`, stepPos, moduleID, sd.filePath, stepSlug)
 				continue
 			}
 
 			// Step changed or new — upsert
 			var stepID uuid.UUID
 			err = tx.GetContext(ctx, &stepID, `
-				INSERT INTO steps (module_id, title, type, estimated_duration, content_md, exercise_data, position, file_path, content_hash)
-				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+				INSERT INTO steps (module_id, title, type, estimated_duration, content_md, exercise_data, position, file_path, content_hash, slug)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 				ON CONFLICT (module_id, file_path) WHERE deleted_at IS NULL DO UPDATE SET
 					title = EXCLUDED.title,
 					type = EXCLUDED.type,
@@ -566,20 +585,21 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 					exercise_data = EXCLUDED.exercise_data,
 					position = EXCLUDED.position,
 					content_hash = EXCLUDED.content_hash,
+					slug = EXCLUDED.slug,
 					deleted_at = NULL,
 					updated_at = now()
 				RETURNING id
-			`, moduleID, sd.meta.Title, sd.meta.Type, sd.meta.Duration, sd.contentMD, sd.exerciseData, stepPos, sd.filePath, sd.hash)
+			`, moduleID, sd.meta.Title, sd.meta.Type, sd.meta.Duration, sd.contentMD, sd.exerciseData, stepPos, sd.filePath, sd.hash, stepSlug)
 			if err != nil {
 				// Fallback: step might be soft-deleted, restore it
 				err = tx.GetContext(ctx, &stepID, `
 					UPDATE steps SET
 						title = $1, type = $2, estimated_duration = $3,
 						content_md = $4, exercise_data = $5, position = $6,
-						content_hash = $7, deleted_at = NULL, updated_at = now()
+						content_hash = $7, slug = $10, deleted_at = NULL, updated_at = now()
 					WHERE module_id = $8 AND file_path = $9
 					RETURNING id
-				`, sd.meta.Title, sd.meta.Type, sd.meta.Duration, sd.contentMD, sd.exerciseData, stepPos, sd.hash, moduleID, sd.filePath)
+				`, sd.meta.Title, sd.meta.Type, sd.meta.Duration, sd.contentMD, sd.exerciseData, stepPos, sd.hash, moduleID, sd.filePath, stepSlug)
 				if err != nil {
 					return fmt.Errorf("upsert step %s/%s: %w", modulePath, sd.filePath, err)
 				}

@@ -20,6 +20,7 @@ type analyticsOverview struct {
 
 type pathAnalyticsSummary struct {
 	ID             string  `json:"id" db:"id"`
+	Slug           string  `json:"slug" db:"slug"`
 	Title          string  `json:"title" db:"title"`
 	EnrolledCount  int     `json:"enrolled_count" db:"enrolled_count"`
 	CompletionRate float64 `json:"completion_rate" db:"completion_rate"`
@@ -50,12 +51,12 @@ func (h *Handler) AnalyticsOverview(w http.ResponseWriter, r *http.Request) {
 	// Per-path analytics
 	h.db.SelectContext(ctx, &overview.PathsAnalytics, `
 		WITH path_steps AS (
-			SELECT lp.id AS path_id, lp.title, COUNT(s.id) AS total_steps
+			SELECT lp.id AS path_id, lp.slug, lp.title, COUNT(s.id) AS total_steps
 			FROM learning_paths lp
 			LEFT JOIN modules m ON m.learning_path_id = lp.id AND m.deleted_at IS NULL
 			LEFT JOIN steps s ON s.module_id = m.id AND s.deleted_at IS NULL
 			WHERE lp.deleted_at IS NULL
-			GROUP BY lp.id, lp.title
+			GROUP BY lp.id, lp.title, lp.slug
 		),
 		path_enrollment AS (
 			SELECT ps.path_id, COUNT(DISTINCT p.user_id) AS enrolled_count
@@ -78,7 +79,7 @@ func (h *Handler) AnalyticsOverview(w http.ResponseWriter, r *http.Request) {
 			FROM path_steps ps
 			JOIN path_enrollment pe ON pe.path_id = ps.path_id
 		)
-		SELECT ps.path_id AS id, ps.title, ps.total_steps,
+		SELECT ps.path_id AS id, ps.slug, ps.title, ps.total_steps,
 		       COALESCE(pe.enrolled_count, 0) AS enrolled_count,
 		       COALESCE(pc.completion_rate, 0) AS completion_rate
 		FROM path_steps ps
@@ -157,13 +158,19 @@ type learnerProgress struct {
 }
 
 func (h *Handler) AnalyticsPath(w http.ResponseWriter, r *http.Request) {
-	pathID := chi.URLParam(r, "pathId")
+	pathParam := chi.URLParam(r, "pathId")
 	ctx := r.Context()
+	pathUUID, err := h.resolvePathSlug(ctx, pathParam)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "path not found"})
+		return
+	}
+	pathID := pathUUID.String()
 
 	// Get path info
 	var detail pathAnalyticsDetail
 	var title string
-	err := h.db.GetContext(ctx, &title, `SELECT title FROM learning_paths WHERE id = $1 AND deleted_at IS NULL`, pathID)
+	err = h.db.GetContext(ctx, &title, `SELECT title FROM learning_paths WHERE id = $1 AND deleted_at IS NULL`, pathID)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "path not found"})
 		return
@@ -276,11 +283,17 @@ type stepAnalyticsDetail struct {
 }
 
 func (h *Handler) AnalyticsStep(w http.ResponseWriter, r *http.Request) {
-	stepID := chi.URLParam(r, "stepId")
+	stepParam := chi.URLParam(r, "stepId")
 	ctx := r.Context()
+	stepUUID, err := h.resolveStepSlug(ctx, stepParam, "")
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "step not found"})
+		return
+	}
+	stepID := stepUUID.String()
 
 	var detail stepAnalyticsDetail
-	err := h.db.QueryRowxContext(ctx, `SELECT id, title, type FROM steps WHERE id = $1 AND deleted_at IS NULL`, stepID).Scan(&detail.StepID, &detail.Title, &detail.Type)
+	err = h.db.QueryRowxContext(ctx, `SELECT id, title, type FROM steps WHERE id = $1 AND deleted_at IS NULL`, stepID).Scan(&detail.StepID, &detail.Title, &detail.Type)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "step not found"})
 		return
@@ -327,6 +340,7 @@ type learnerDetail struct {
 
 type enrolledPath struct {
 	PathID     string  `json:"path_id" db:"path_id"`
+	PathSlug   string  `json:"path_slug" db:"path_slug"`
 	PathTitle  string  `json:"path_title" db:"path_title"`
 	Completed  int     `json:"completed" db:"completed"`
 	Total      int     `json:"total" db:"total"`
@@ -364,7 +378,7 @@ func (h *Handler) AnalyticsLearner(w http.ResponseWriter, r *http.Request) {
 
 	// Enrolled paths with progress
 	h.db.SelectContext(ctx, &detail.EnrolledPaths, `
-		SELECT DISTINCT lp.id AS path_id, lp.title AS path_title,
+		SELECT DISTINCT lp.id AS path_id, lp.slug AS path_slug, lp.title AS path_title,
 		       COUNT(CASE WHEN p.status = 'completed' THEN 1 END) AS completed,
 		       COUNT(*) AS total
 		FROM progress p
@@ -372,7 +386,7 @@ func (h *Handler) AnalyticsLearner(w http.ResponseWriter, r *http.Request) {
 		JOIN modules m ON m.id = s.module_id AND m.deleted_at IS NULL
 		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL
 		WHERE p.user_id = $1
-		GROUP BY lp.id, lp.title
+		GROUP BY lp.id, lp.title, lp.slug
 		ORDER BY lp.title
 	`, learnerID)
 	for i := range detail.EnrolledPaths {

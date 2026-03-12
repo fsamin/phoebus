@@ -533,26 +533,27 @@ func seedContentForCompetencyTests(t *testing.T) (string, string, string) {
 	stepA1 := uuid.New()
 	stepA2 := uuid.New()
 	stepB1 := uuid.New()
+	suffix := pathAID.String()[:8]
 
 	testDB.MustExec(`INSERT INTO git_repositories (id, clone_url, branch, auth_type, webhook_uuid, sync_status, created_at, updated_at)
 		VALUES ($1, 'https://github.com/test/comp.git', 'main', 'none', $2, 'synced', now(), now())`, repoID, uuid.New())
 
-	testDB.MustExec(`INSERT INTO learning_paths (id, repo_id, title, description, tags, prerequisites, file_path, created_at, updated_at)
-		VALUES ($1, $2, 'Linux Fundamentals', 'Learn Linux', '{linux,cli}', '{}', 'linux/', now(), now())`, pathAID, repoID)
-	testDB.MustExec(`INSERT INTO learning_paths (id, repo_id, title, description, tags, prerequisites, file_path, created_at, updated_at)
-		VALUES ($1, $2, 'Docker Fundamentals', 'Learn Docker', '{docker,containers}', '{linux-cli}', 'docker/', now(), now())`, pathBID, repoID)
+	testDB.MustExec(`INSERT INTO learning_paths (id, repo_id, title, description, tags, prerequisites, file_path, slug, created_at, updated_at)
+		VALUES ($1, $2, 'Linux Fundamentals', 'Learn Linux', '{linux,cli}', '{}', 'linux/', 'linux-fundamentals-' || $3, now(), now())`, pathAID, repoID, suffix)
+	testDB.MustExec(`INSERT INTO learning_paths (id, repo_id, title, description, tags, prerequisites, file_path, slug, created_at, updated_at)
+		VALUES ($1, $2, 'Docker Fundamentals', 'Learn Docker', '{docker,containers}', '{linux-cli}', 'docker/', 'docker-fundamentals-' || $3, now(), now())`, pathBID, repoID, suffix)
 
-	testDB.MustExec(`INSERT INTO modules (id, learning_path_id, title, description, competencies, position, file_path, created_at, updated_at)
-		VALUES ($1, $2, 'CLI Basics', 'Learn the CLI', '{linux-cli,linux-fs}', 0, 'cli/', now(), now())`, modAID, pathAID)
-	testDB.MustExec(`INSERT INTO modules (id, learning_path_id, title, description, competencies, position, file_path, created_at, updated_at)
-		VALUES ($1, $2, 'Docker Basics', 'Learn Docker', '{docker-basics}', 0, 'docker/', now(), now())`, modBID, pathBID)
+	testDB.MustExec(`INSERT INTO modules (id, learning_path_id, title, description, competencies, position, file_path, slug, created_at, updated_at)
+		VALUES ($1, $2, 'CLI Basics', 'Learn the CLI', '{linux-cli,linux-fs}', 0, 'cli/', 'cli-basics-' || $3, now(), now())`, modAID, pathAID, suffix)
+	testDB.MustExec(`INSERT INTO modules (id, learning_path_id, title, description, competencies, position, file_path, slug, created_at, updated_at)
+		VALUES ($1, $2, 'Docker Basics', 'Learn Docker', '{docker-basics}', 0, 'docker/', 'docker-basics-' || $3, now(), now())`, modBID, pathBID, suffix)
 
-	testDB.MustExec(`INSERT INTO steps (id, module_id, title, type, content_md, position, file_path, created_at, updated_at)
-		VALUES ($1, $2, 'Intro to CLI', 'lesson', '# CLI', 0, 'cli/01.md', now(), now())`, stepA1, modAID)
-	testDB.MustExec(`INSERT INTO steps (id, module_id, title, type, content_md, position, file_path, created_at, updated_at)
-		VALUES ($1, $2, 'File System', 'lesson', '# FS', 1, 'cli/02.md', now(), now())`, stepA2, modAID)
-	testDB.MustExec(`INSERT INTO steps (id, module_id, title, type, content_md, position, file_path, created_at, updated_at)
-		VALUES ($1, $2, 'Docker Intro', 'lesson', '# Docker', 0, 'docker/01.md', now(), now())`, stepB1, modBID)
+	testDB.MustExec(`INSERT INTO steps (id, module_id, title, type, content_md, position, file_path, slug, created_at, updated_at)
+		VALUES ($1, $2, 'Intro to CLI', 'lesson', '# CLI', 0, 'cli/01.md', 'intro-to-cli-' || $3, now(), now())`, stepA1, modAID, suffix)
+	testDB.MustExec(`INSERT INTO steps (id, module_id, title, type, content_md, position, file_path, slug, created_at, updated_at)
+		VALUES ($1, $2, 'File System', 'lesson', '# FS', 1, 'cli/02.md', 'file-system-' || $3, now(), now())`, stepA2, modAID, suffix)
+	testDB.MustExec(`INSERT INTO steps (id, module_id, title, type, content_md, position, file_path, slug, created_at, updated_at)
+		VALUES ($1, $2, 'Docker Intro', 'lesson', '# Docker', 0, 'docker/01.md', 'docker-intro-' || $3, now(), now())`, stepB1, modBID, suffix)
 
 	return pathAID.String(), pathBID.String(), repoID.String()
 }

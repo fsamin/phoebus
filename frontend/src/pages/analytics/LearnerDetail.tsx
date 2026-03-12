@@ -14,6 +14,7 @@ interface LearnerData {
   created_at: string;
   enrolled_paths: Array<{
     path_id: string;
+    path_slug: string;
     path_title: string;
     completed: number;
     total: number;
@@ -99,7 +100,7 @@ const LearnerDetail: React.FC = () => {
               data.enrolled_paths.map((ep) => (
                 <div key={ep.path_id} style={{ marginBottom: 16 }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Link to={`/analytics/paths/${ep.path_id}`}>{ep.path_title}</Link>
+                    <Link to={`/analytics/paths/${ep.path_slug}`}>{ep.path_title}</Link>
                     <Typography.Text type="secondary">{ep.completed}/{ep.total} steps</Typography.Text>
                   </div>
                   <AntProgress percent={Math.round(ep.percentage)} size="small" />
