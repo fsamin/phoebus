@@ -44,7 +44,7 @@ func (h *Handler) ListPathDependencies(w http.ResponseWriter, r *http.Request) {
 	}
 	var comps []compRow
 	if err := h.db.SelectContext(r.Context(), &comps,
-		`SELECT m.learning_path_id, unnest(m.competencies) AS competency
+		`SELECT DISTINCT m.learning_path_id, unnest(m.competencies) AS competency
 		 FROM modules m
 		 JOIN learning_paths lp ON lp.id = m.learning_path_id
 		 WHERE lp.enabled = true AND m.deleted_at IS NULL`); err != nil {
