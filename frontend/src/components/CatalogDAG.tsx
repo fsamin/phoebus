@@ -215,8 +215,14 @@ const CatalogDAG: React.FC<CatalogDAGProps> = ({ paths, edges: depEdges }) => {
     return { initialNodes: layoutNodes, initialEdges: rfEdges };
   }, [paths, depEdges, pathIds]);
 
-  const [nodes, , onNodesChange] = useNodesState(initialNodes);
-  const [edgesState, , onEdgesChange] = useEdgesState(initialEdges);
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edgesState, setEdges, onEdgesChange] = useEdgesState(initialEdges);
+
+  // Update nodes and edges when data changes
+  React.useEffect(() => {
+    setNodes(initialNodes);
+    setEdges(initialEdges);
+  }, [initialNodes, initialEdges, setNodes, setEdges]);
 
   const onInit = useCallback((instance: any) => {
     setTimeout(() => instance.fitView({ padding: 0.2 }), 100);
