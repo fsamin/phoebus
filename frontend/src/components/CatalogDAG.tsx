@@ -212,6 +212,7 @@ const CatalogDAG: React.FC<CatalogDAGProps> = ({ paths, edges: depEdges }) => {
         id: `edge-${i}`,
         source: e.source,
         target: e.target,
+        type: 'smoothstep',
         animated: e.type !== 'auto',
         style: { stroke: e.type === 'auto' ? '#8c8c8c' : '#b37feb', strokeWidth: 2, opacity: 0.6 },
         markerEnd: { type: MarkerType.ArrowClosed, color: e.type === 'auto' ? '#8c8c8c' : '#b37feb' },
@@ -219,6 +220,7 @@ const CatalogDAG: React.FC<CatalogDAGProps> = ({ paths, edges: depEdges }) => {
         labelStyle: { fontSize: 10, fill: isDark ? '#b0b0b0' : '#8c8c8c', fontWeight: 500 },
         labelBgStyle: { fill: isDark ? '#1f1f1f' : '#fff', fillOpacity: 0.85 },
         labelBgPadding: [4, 2] as [number, number],
+        pathOptions: { borderRadius: 12 },
       }));
 
     const layoutNodes = getLayout(rfNodes, rfEdges);
