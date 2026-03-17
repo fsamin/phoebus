@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Layout, Menu, Spin, Button, Typography, Popconfirm, message, Modal, Result } from 'antd';
+import { Layout, Menu, Spin, Button, Typography, Popconfirm, message, Modal } from 'antd';
 import {
   ArrowLeftOutlined, ArrowRightOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
   FileTextOutlined, QuestionCircleOutlined, DesktopOutlined, CodeOutlined,
