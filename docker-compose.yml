@@ -2,15 +2,13 @@ services:
   phoebus:
     build: .
     ports:
-      - "21818:8080"
+      - "8080:8080"
     environment:
       CONFIGURATION_FROM: "filetree:/etc/phoebus/conf.d"
     volumes:
       - ./config.example:/etc/phoebus/conf.d:ro
       - ~/phoebus-content:/data/phoebus-content:ro
       - assets_data:/data/assets
-      - /home/fsamin/src/github.com/fsamin/phoebus-content-samples:/data/phoebus-content-samples:ro
-      - /home/fsamin/src/stash.ovh.net/francois.samin:/data/francois.samin:ro 
     depends_on:
       db:
         condition: service_healthy
