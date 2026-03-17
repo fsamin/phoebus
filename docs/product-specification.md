@@ -491,7 +491,7 @@ Never use panic for control flow — it will crash the server.
 2. Learner enrolls in a Learning Path
 3. Learner progresses through Modules and Steps in order
 4. For each Step:
-   - **Lesson**: Learner reads the content and marks it as complete
+   - **Lesson**: Learner reads the content; after scrolling through at least 75% of the lesson, a "Complete & Continue" button becomes enabled. Clicking it marks the step as completed and navigates to the next step
    - **Quiz**: Learner answers questions and gets immediate results
    - **Terminal Exercise**: Learner navigates a simulated terminal scenario, choosing the correct commands step by step
    - **Code Exercise**: Learner reviews code, identifies problems, and selects the correct patch
@@ -590,7 +590,8 @@ Never use panic for control flow — it will crash the server.
 | Feature | Description | Priority |
 |---|---|---|
 | Sequential progression | Learners progress through steps in order | Must Have |
-| Progress tracking | Track completion of steps, modules, and learning paths | Must Have |
+| Unified lesson completion | Lessons use a single "Complete & Continue" button (enabled after 75% scroll) that marks the step as completed and navigates to the next step. On the last step, a congratulations modal is shown before redirecting to the path overview | Must Have |
+| Progress tracking | Track completion of steps, modules, and learning paths. `in_progress` is a distinct third state shown in all analytics | Must Have |
 | Personal dashboard | Learner sees their enrolled paths, progress, and competencies | Must Have |
 | Competency-based catalog | Filter catalog by competency, sort by competency dependency order (topological) | Must Have |
 | Prerequisite enforcement | Confirmation popup when starting a path with unmet prerequisites; link to prerequisite paths | Must Have |

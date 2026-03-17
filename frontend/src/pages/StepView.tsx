@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Layout, Menu, Spin, Button, Typography, Popconfirm, message } from 'antd';
+import { Layout, Menu, Spin, Button, Typography, Popconfirm, message, Modal, Result } from 'antd';
 import {
   ArrowLeftOutlined, ArrowRightOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
   FileTextOutlined, QuestionCircleOutlined, DesktopOutlined, CodeOutlined,
-  CheckCircleOutlined, PlayCircleOutlined, CloseOutlined,
+  CheckCircleOutlined, ClockCircleOutlined, CloseOutlined,
 } from '@ant-design/icons';
 import { api } from '../api/client';
 import type { StepDetail, LearningPathDetail, Progress } from '../api/client';
@@ -38,12 +38,15 @@ const StepView: React.FC = () => {
   const [exerciseCompleted, setExerciseCompleted] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const resizingRef = useRef(false);
+  const contentRef = useRef<HTMLDivElement>(null);
+  const scrollTrackedRef = useRef(false);
   usePageTitle(step && path ? `${step.title} — ${path.title}` : 'Step');
 
   useEffect(() => {
     if (!pathId || !stepId) return;
     setLoading(true);
     setExerciseCompleted(false);
+    scrollTrackedRef.current = false;
     Promise.all([
       api.getPath(pathId),
       api.getStep(pathId, stepId),
@@ -53,11 +56,67 @@ const StepView: React.FC = () => {
         setPath(p);
         setStep(s);
         setProgress(pr);
-        // Mark as in_progress
-        api.updateProgress(stepId, 'in_progress').catch(() => {});
+        // Auto in_progress only for non-lesson steps (exercises/quizzes)
+        if (s.type !== 'lesson') {
+          api.updateProgress(stepId, 'in_progress').catch(() => {});
+        }
       })
       .finally(() => setLoading(false));
   }, [pathId, stepId]);
+
+  // Scroll tracking for lessons: mark in_progress at 75% scroll
+  useEffect(() => {
+    if (!step || step.type !== 'lesson' || !stepId) return;
+    const status = getStepStatus(step.id);
+    if (status === 'completed' || status === 'in_progress') return;
+
+    const container = contentRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      if (scrollTrackedRef.current) return;
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const scrollableHeight = scrollHeight - clientHeight;
+      if (scrollableHeight <= 0) return; // Content fits without scroll
+      const scrollPercent = scrollTop / scrollableHeight;
+      if (scrollPercent >= 0.75) {
+        scrollTrackedRef.current = true;
+        api.updateProgress(stepId, 'in_progress').catch(() => {});
+        setProgress((prev) => {
+          const existing = prev.find((p) => p.step_id === stepId);
+          if (existing) {
+            return prev.map((p) => p.step_id === stepId ? { ...p, status: 'in_progress' as const } : p);
+          }
+          return [...prev, { id: '', user_id: '', step_id: stepId, status: 'in_progress' as const }];
+        });
+      }
+    };
+
+    // Also check if content is short enough that no scroll is needed — auto-mark
+    const checkNoScroll = () => {
+      if (scrollTrackedRef.current) return;
+      const { scrollHeight, clientHeight } = container;
+      if (scrollHeight <= clientHeight) {
+        scrollTrackedRef.current = true;
+        api.updateProgress(stepId, 'in_progress').catch(() => {});
+        setProgress((prev) => {
+          const existing = prev.find((p) => p.step_id === stepId);
+          if (existing) {
+            return prev.map((p) => p.step_id === stepId ? { ...p, status: 'in_progress' as const } : p);
+          }
+          return [...prev, { id: '', user_id: '', step_id: stepId, status: 'in_progress' as const }];
+        });
+      }
+    };
+
+    // Delay check for short content (DOM needs to render)
+    const timer = setTimeout(checkNoScroll, 500);
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      clearTimeout(timer);
+      container.removeEventListener('scroll', handleScroll);
+    };
+  }, [step, stepId, progress]);
 
   const allSteps = path?.modules.flatMap((m) =>
     m.steps.map((s) => ({ ...s, moduleTitle: m.title, moduleId: m.id }))
@@ -81,7 +140,18 @@ const StepView: React.FC = () => {
       }
       return [...prev, { id: '', user_id: '', step_id: stepId, status: 'completed' as const }];
     });
-    message.success('Step completed!');
+
+    if (nextStep && path) {
+      navigate(`/paths/${path.slug}/steps/${nextStep.slug}`);
+    } else if (path) {
+      // Last step — show congratulations
+      Modal.success({
+        title: '🎉 Congratulations!',
+        content: `You've completed all steps in "${path.title}". Well done!`,
+        okText: 'Back to Overview',
+        onOk: () => navigate(`/paths/${path.slug}`),
+      });
+    }
   };
 
   const handleSubmitAttempt = useCallback(async (body: Record<string, unknown>) => {
@@ -121,7 +191,7 @@ const StepView: React.FC = () => {
         icon: status === 'completed'
           ? <CheckCircleOutlined style={{ color: 'var(--color-success)' }} />
           : status === 'in_progress'
-          ? <PlayCircleOutlined style={{ color: 'var(--color-warning)' }} />
+          ? <ClockCircleOutlined style={{ color: 'var(--color-warning)' }} />
           : stepIcon(s.type),
         label: <span style={(s.slug === stepId || s.id === stepId) ? { fontWeight: 'bold' } : undefined}>{s.title}</span>,
       };
@@ -196,7 +266,7 @@ const StepView: React.FC = () => {
           />
         )}
       </div>
-      <Content style={step.type === 'code-exercise' ? { padding: 0, overflow: 'hidden' } : { padding: 24, overflow: 'auto' }}>
+      <Content ref={contentRef} style={step.type === 'code-exercise' ? { padding: 0, overflow: 'hidden' } : { padding: 24, overflow: 'auto' }}>
         {step.type === 'code-exercise' && exerciseData ? (
           <CodeExercise
             mode={exerciseData.mode as string || 'A'}
@@ -226,8 +296,14 @@ const StepView: React.FC = () => {
                     ✅ Completed
                   </Button>
                 ) : (
-                  <Button type="primary" size="large" onClick={handleLessonComplete}>
-                    Mark as Completed
+                  <Button
+                    type="primary"
+                    size="large"
+                    disabled={getStepStatus(step.id) === 'not_started'}
+                    onClick={handleLessonComplete}
+                    icon={<ArrowRightOutlined />}
+                  >
+                    {nextStep ? 'Complete & Continue' : 'Complete'}
                   </Button>
                 )}
               </div>
@@ -267,22 +343,38 @@ const StepView: React.FC = () => {
                 {prevStep.title}
               </Button>
             ) : <div />}
-            {nextStep ? (
-              <Button
-                type="primary"
-                disabled={step.type !== 'lesson' && !isCompleted && !exerciseCompleted}
-                onClick={() => navigate(`/paths/${path.slug}/steps/${nextStep.slug}`)}
-              >
-                {nextStep.title} <ArrowRightOutlined />
-              </Button>
+            {step.type === 'lesson' ? (
+              isCompleted ? (
+                <Button type="primary" disabled icon={<CheckCircleOutlined />}>
+                  ✅ Completed
+                </Button>
+              ) : (
+                <Button
+                  type="primary"
+                  disabled={getStepStatus(step.id) === 'not_started'}
+                  onClick={handleLessonComplete}
+                >
+                  {nextStep ? 'Complete lesson & Continue' : 'Complete lesson'} <ArrowRightOutlined />
+                </Button>
+              )
             ) : (
-              <Button
-                type="primary"
-                disabled={step.type !== 'lesson' && !isCompleted && !exerciseCompleted}
-                onClick={() => navigate(`/paths/${path.slug}`)}
-              >
-                Back to Overview
-              </Button>
+              nextStep ? (
+                <Button
+                  type="primary"
+                  disabled={!isCompleted && !exerciseCompleted}
+                  onClick={() => navigate(`/paths/${path.slug}/steps/${nextStep.slug}`)}
+                >
+                  {nextStep.title} <ArrowRightOutlined />
+                </Button>
+              ) : (
+                <Button
+                  type="primary"
+                  disabled={!isCompleted && !exerciseCompleted}
+                  onClick={() => navigate(`/paths/${path.slug}`)}
+                >
+                  Back to Overview
+                </Button>
+              )
             )}
           </div>
         </div>

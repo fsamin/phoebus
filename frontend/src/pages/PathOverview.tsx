@@ -3,7 +3,7 @@ import {
   Typography, Spin, Card, Collapse, List, Tag, Progress as AntProgress, Button, Breadcrumb, Modal,
 } from 'antd';
 import {
-  CheckCircleOutlined, PlayCircleOutlined,
+  CheckCircleOutlined, ClockCircleOutlined,
   FileTextOutlined, QuestionCircleOutlined, CodeOutlined, DesktopOutlined,
   WarningOutlined, ExclamationCircleOutlined,
 } from '@ant-design/icons';
@@ -184,7 +184,7 @@ const PathOverview: React.FC = () => {
                           {status === 'completed' ? (
                             <CheckCircleOutlined style={{ color: 'var(--color-success)' }} />
                           ) : status === 'in_progress' ? (
-                            <span><PlayCircleOutlined style={{ color: 'var(--color-warning)' }} /> <Typography.Text type="secondary" style={{ fontSize: 12 }}>← current</Typography.Text></span>
+                            <span><ClockCircleOutlined style={{ color: 'var(--color-warning)' }} /> <Typography.Text type="secondary" style={{ fontSize: 12 }}>← in progress</Typography.Text></span>
                           ) : null}
                         </>
                       }

@@ -447,13 +447,13 @@ You may continue, but the content assumes familiarity with these topics.
 3. Steps are displayed sequentially; navigation is **free** (no enforced order)
    - Rationale: self-assessment philosophy — learners choose their own path
 4. Current step is highlighted in the sidebar
-5. "Next" and "Previous" buttons navigate to adjacent steps
-6. Lesson steps: a "Mark as complete" button is shown at the bottom
-7. Exercise steps: completion is automatic upon successful exercise completion
+5. "Next" and "Previous" buttons navigate to adjacent steps (for exercises)
+6. Lesson steps: a unified "Complete & Continue" button is shown at the bottom (replaces the separate "Mark as Completed" and "Next Step" buttons). The button is disabled until the learner has scrolled through at least 75% of the lesson content. When the 75% scroll threshold is reached, the step is automatically marked as `in_progress`. Clicking the button marks the step as `completed` and navigates to the next step. On the last step of the path, clicking the button shows a congratulations modal before redirecting to the path overview
+7. Exercise steps: completion is automatic upon successful exercise completion. Exercises are marked as `in_progress` when the learner first opens them (unchanged behavior)
 
 **Completion Logic:**
 - A step is completed when:
-  - **Lesson**: learner clicks "Mark as complete"
+  - **Lesson**: learner clicks the "Complete & Continue" button (enabled after 75% scroll)
   - **Quiz**: learner submits all answers (regardless of correctness — it's self-assessment)
   - **Terminal Exercise**: learner correctly answers all steps in sequence
   - **Code Exercise**: learner correctly identifies lines (modes A/C) and selects the correct patch
@@ -466,8 +466,8 @@ You may continue, but the content assumes familiarity with these topics.
 
 **Behavior:**
 
-1. Each step has a progress status: `not_started`, `in_progress`, `completed`
-2. `in_progress` is set when the learner first opens the step
+1. Each step has a progress status: `not_started`, `in_progress`, `completed`. `in_progress` is displayed as a distinct third state in all analytics (icon: ⏳ ClockCircleOutlined)
+2. `in_progress` is set when the learner first opens a quiz or exercise step. For lessons, `in_progress` is set only after the learner scrolls through at least 75% of the content (not on page open)
 3. `completed` is set according to the completion logic above
 4. Progress is stored per learner per step in the `progress` table
 5. Module progress = (completed steps / total steps) × 100%
@@ -1510,7 +1510,7 @@ All authenticated views share a common shell layout:
 | Element | Behavior |
 |---|---|
 | Module headers | Expandable/collapsible (Ant Design Menu in inline mode). Title + completion count (e.g., "3/5") |
-| Step entries | Type icon + title + completion indicator (✅ completed, 🔵 in-progress, ○ not started). Click → navigate to that step |
+| Step entries | Type icon + title + completion indicator (✅ completed, ⏳ in-progress, ○ not started). Click → navigate to that step |
 | Current step | Active state (bold, accent background color) |
 | Scroll | Auto-scrolls to keep the current step visible on load |
 | Resize | Sidebar width is adjustable via a drag handle on the right edge (180px–500px range). Handle highlights blue on hover |
@@ -1521,7 +1521,7 @@ All authenticated views share a common shell layout:
 | Element | Behavior |
 |---|---|
 | ← Previous | Navigate to the previous step (across module boundaries). Hidden on first step |
-| Next → | Navigate to the next step. Hidden on last step. Label changes to "Complete Path" on the last step of the last module if all steps are completed |
+| Next → | Navigate to the next step (for exercises). Hidden on last step. Label changes to "Complete Path" on the last step of the last module if all steps are completed |
 
 **Content area — varies by step type:**
 
@@ -1532,10 +1532,13 @@ Renders the Markdown body as rich HTML (see section 2.4 for rendering rules).
 | Element | Behavior |
 |---|---|
 | Rendered content | Full Markdown rendering: headings, code blocks, Mermaid diagrams, admonitions, images |
-| "Mark as Complete" button | Bottom of content. `POST /api/progress/:stepId/complete`. Becomes "✅ Completed" (disabled) after click |
+| "Complete & Continue" button | Unified button at the bottom of content (replaces separate "Mark as Completed" and "Next Step" buttons). **Disabled** until the learner has scrolled through ≥75% of the lesson content. When the scroll threshold is reached, `POST /api/progress` sets status to `in_progress`. Clicking the button calls `POST /api/progress/:stepId/complete` and navigates to the next step. On the last step of the path, a congratulations modal is shown before redirecting to the path overview. Becomes "✅ Completed" (disabled) if already completed |
+
+**Scroll-based progress tracking:** The 75% scroll detection is entirely **client-side** (IntersectionObserver or scroll event). No new API endpoints are needed — it reuses the existing `POST /api/progress` with status `in_progress`.
 
 **API Calls:**
 - `GET /api/learning-paths/:pathId/steps/:stepId` — returns `content_md` + step metadata
+- `POST /api/progress` — updates progress to `in_progress` (triggered by 75% scroll)
 - `POST /api/progress/:stepId/complete` — marks step as completed
 
 #### 10.7.2 Quiz Step

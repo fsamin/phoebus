@@ -106,7 +106,7 @@ const Analytics: React.FC = () => {
                 >
                   {e.display_name || e.username}
                 </Typography.Text>
-                <Typography.Text> {e.event === 'completed' ? '✅ completed' : '▶ started'} </Typography.Text>
+                <Typography.Text> {e.event === 'completed' ? '✅ completed' : '⏳ in progress'} </Typography.Text>
                 <Typography.Text>{e.step_title}</Typography.Text>
                 <br />
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
