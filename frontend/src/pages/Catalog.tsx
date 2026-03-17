@@ -149,9 +149,19 @@ const Catalog: React.FC = () => {
   return (
     <div>
       <OnboardingTour tour="catalog" steps={catalogSteps} />
-      <Typography.Title level={2} data-tour="catalog-title">Catalog</Typography.Title>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <Typography.Title level={2} style={{ margin: 0 }} data-tour="catalog-title">Catalog</Typography.Title>
+        <Segmented
+          value={viewMode}
+          onChange={(v) => setViewMode(v as string)}
+          options={[
+            { value: 'grid', icon: <AppstoreOutlined />, label: 'Grid' },
+            { value: 'dag', icon: <ApartmentOutlined />, label: 'Graph' },
+          ]}
+        />
+      </div>
       <Row gutter={16} style={{ marginBottom: 24 }} data-tour="catalog-filters">
-        <Col xs={24} sm={5}>
+        <Col xs={24} sm={6}>
           <Input
             prefix={<SearchOutlined />}
             placeholder="Search learning paths..."
@@ -196,7 +206,7 @@ const Catalog: React.FC = () => {
             ]}
           />
         </Col>
-        <Col xs={24} sm={5}>
+        <Col xs={24} sm={4}>
           <Select
             style={{ width: '100%' }}
             value={sortBy}
@@ -206,16 +216,6 @@ const Catalog: React.FC = () => {
               { label: 'Z → A', value: 'za' },
               { label: 'Progress ↓', value: 'progress' },
               { label: 'Competency Path', value: 'competency' },
-            ]}
-          />
-        </Col>
-        <Col xs={24} sm={4} style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-          <Segmented
-            value={viewMode}
-            onChange={(v) => setViewMode(v as string)}
-            options={[
-              { value: 'grid', icon: <AppstoreOutlined /> },
-              { value: 'dag', icon: <ApartmentOutlined /> },
             ]}
           />
         </Col>
