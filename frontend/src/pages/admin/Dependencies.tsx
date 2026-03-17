@@ -1,14 +1,34 @@
 import React, { useEffect, useState } from 'react';
-import { Table, Button, Select, Typography, Space, Popconfirm, message, Card, Tag } from 'antd';
+import { Table, Button, Select, Typography, Space, Popconfirm, message, Card, Tag, Divider } from 'antd';
 import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
 import { api } from '../../api/client';
-import type { ManualDependency, LearningPathSummary } from '../../api/client';
+import type { ManualDependency, LearningPathSummary, DependencyEdge } from '../../api/client';
 import { usePageTitle } from '../../hooks/usePageTitle';
+import CatalogDAG from '../../components/CatalogDAG';
+
+interface CatalogPath {
+  id: string;
+  slug: string;
+  title: string;
+  description: string;
+  icon?: string;
+  tags: string[];
+  estimated_duration?: string;
+  prerequisites?: string[];
+  competencies_provided: string[];
+  prerequisites_met: boolean;
+  module_count: number;
+  step_count: number;
+  progress_total?: number;
+  progress_completed?: number;
+  owners: string[];
+}
 
 const Dependencies: React.FC = () => {
   usePageTitle('Admin — Dependencies');
   const [deps, setDeps] = useState<ManualDependency[]>([]);
   const [paths, setPaths] = useState<LearningPathSummary[]>([]);
+  const [depEdges, setDepEdges] = useState<DependencyEdge[]>([]);
   const [loading, setLoading] = useState(true);
   const [sourceId, setSourceId] = useState<string | undefined>();
   const [targetId, setTargetId] = useState<string | undefined>();
@@ -17,9 +37,14 @@ const Dependencies: React.FC = () => {
   const reload = async () => {
     setLoading(true);
     try {
-      const [d, p] = await Promise.all([api.listManualDependencies(), api.listPaths()]);
+      const [d, p, edges] = await Promise.all([
+        api.listManualDependencies(),
+        api.listPaths(),
+        api.listPathDependencies(),
+      ]);
       setDeps(d);
       setPaths(p);
+      setDepEdges(edges.edges || []);
     } finally {
       setLoading(false);
     }
@@ -156,6 +181,16 @@ const Dependencies: React.FC = () => {
         pagination={false}
         locale={{ emptyText: 'No manual or YAML dependencies defined' }}
       />
+
+      <Divider />
+
+      <Typography.Title level={4}>DAG Preview</Typography.Title>
+      <Typography.Paragraph type="secondary">
+        Full dependency graph including auto-detected edges (blue) from competencies and manual/YAML edges (purple).
+      </Typography.Paragraph>
+      {!loading && paths.length > 0 && (
+        <CatalogDAG paths={paths as unknown as CatalogPath[]} edges={depEdges} />
+      )}
     </div>
   );
 };
