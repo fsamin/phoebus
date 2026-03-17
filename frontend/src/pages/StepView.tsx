@@ -286,6 +286,14 @@ const StepView: React.FC = () => {
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
           <Typography.Title level={3}>{step.title}</Typography.Title>
 
+          {/* Completed banner for lessons */}
+          {step.type === 'lesson' && isCompleted && (
+            <div style={{ marginBottom: 16, padding: '8px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 16 }} />
+              <Typography.Text style={{ color: '#52c41a', fontWeight: 500 }}>Completed</Typography.Text>
+            </div>
+          )}
+
           {/* Step content by type */}
           {step.type === 'lesson' && (
             <MarkdownRenderer content={step.content_md} />
@@ -326,9 +334,15 @@ const StepView: React.FC = () => {
             ) : <div />}
             {step.type === 'lesson' ? (
               isCompleted ? (
-                <Button type="primary" disabled icon={<CheckCircleOutlined />}>
-                  ✅ Completed
-                </Button>
+                nextStep ? (
+                  <Button type="primary" onClick={() => navigate(`/paths/${path.slug}/steps/${nextStep.slug}`)}>
+                    Continue <ArrowRightOutlined />
+                  </Button>
+                ) : (
+                  <Button type="primary" onClick={() => navigate(`/paths/${path.slug}`)}>
+                    Back to Overview
+                  </Button>
+                )
               ) : (
                 <Button
                   type="primary"
