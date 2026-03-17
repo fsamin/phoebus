@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Typography, Card, Table, Spin, Tag, Breadcrumb, Row, Col, Progress as AntProgress, Timeline } from 'antd';
-import { CheckCircleOutlined, PlayCircleOutlined } from '@ant-design/icons';
+import { CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { useParams, Link } from 'react-router-dom';
 import { usePageTitle } from '../../hooks/usePageTitle';
 
@@ -120,7 +120,7 @@ const LearnerDetail: React.FC = () => {
                 <Timeline
                   items={items.map((a) => ({
                     color: a.event === 'completed' ? 'green' : 'blue',
-                    dot: a.event === 'completed' ? <CheckCircleOutlined /> : <PlayCircleOutlined />,
+                    dot: a.event === 'completed' ? <CheckCircleOutlined /> : <ClockCircleOutlined />,
                     children: (
                       <div>
                         <Typography.Text>{a.event === 'completed' ? 'Completed' : 'Started'}: {a.step_title}</Typography.Text>

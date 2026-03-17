@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Row, Col, Typography, List, Tag, Spin, Empty, Progress as AntProgress, Timeline, Statistic, Button, message, Space, Tooltip } from 'antd';
 import {
-  CheckCircleOutlined, PlayCircleOutlined, TrophyOutlined,
+  CheckCircleOutlined, ClockCircleOutlined, TrophyOutlined,
   ExperimentOutlined, ArrowRightOutlined, SyncOutlined, UnorderedListOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
@@ -204,7 +204,7 @@ const Dashboard: React.FC = () => {
               <Timeline
                 items={data.recent_activity.map((a) => ({
                   color: a.event === 'completed' ? 'green' : 'blue',
-                  dot: a.event === 'completed' ? <CheckCircleOutlined /> : <PlayCircleOutlined />,
+                  dot: a.event === 'completed' ? <CheckCircleOutlined /> : <ClockCircleOutlined />,
                   children: (
                     <div
                       style={{ cursor: 'pointer' }}
