@@ -6,6 +6,7 @@ import (
 
 	"github.com/fsamin/phoebus/internal/model"
 	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
 )
 
 // --- Learning Paths (public read API) ---
@@ -68,7 +69,7 @@ func (h *Handler) ListLearningPaths(w http.ResponseWriter, r *http.Request) {
 	var paths []learningPathResponse
 	err := h.db.SelectContext(r.Context(), &paths, `
 		SELECT lp.id, lp.repo_id, lp.title, lp.description, lp.icon, lp.tags,
-		       lp.estimated_duration, lp.prerequisites, lp.created_at, lp.updated_at,
+		       lp.estimated_duration, lp.prerequisites, lp.slug, lp.created_at, lp.updated_at,
 		       COUNT(DISTINCT m.id) AS module_count,
 		       COUNT(DISTINCT s.id) AS step_count
 		FROM learning_paths lp
@@ -224,6 +225,7 @@ type moduleWithSteps struct {
 
 type stepSummary struct {
 	ID       string `json:"id" db:"id"`
+	Slug     string `json:"slug" db:"slug"`
 	Title    string `json:"title" db:"title"`
 	Type     string `json:"type" db:"type"`
 	Duration string `json:"estimated_duration,omitempty" db:"estimated_duration"`
@@ -231,13 +233,30 @@ type stepSummary struct {
 }
 
 func (h *Handler) GetLearningPath(w http.ResponseWriter, r *http.Request) {
-	pathID := chi.URLParam(r, "pathId")
+	pathParam := chi.URLParam(r, "pathId")
 
 	var lp model.LearningPath
+	// Detect if param is UUID or slug
+	if _, err := uuid.Parse(pathParam); err == nil {
+		// Param is a UUID — lookup by ID, then redirect to slug URL
+		err = h.db.GetContext(r.Context(), &lp, `
+			SELECT id, repo_id, title, description, icon, tags, estimated_duration, prerequisites, slug, enabled, created_at, updated_at
+			FROM learning_paths WHERE id = $1 AND deleted_at IS NULL AND enabled = true
+		`, pathParam)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "learning path not found"})
+			return
+		}
+		// 301 redirect to slug-based URL
+		http.Redirect(w, r, "/api/learning-paths/"+lp.Slug, http.StatusMovedPermanently)
+		return
+	}
+
+	// Param is a slug — lookup by slug
 	err := h.db.GetContext(r.Context(), &lp, `
-		SELECT id, repo_id, title, description, icon, tags, estimated_duration, prerequisites, created_at, updated_at
-		FROM learning_paths WHERE id = $1 AND deleted_at IS NULL AND enabled = true
-	`, pathID)
+		SELECT id, repo_id, title, description, icon, tags, estimated_duration, prerequisites, slug, enabled, created_at, updated_at
+		FROM learning_paths WHERE slug = $1 AND deleted_at IS NULL AND enabled = true
+	`, pathParam)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "learning path not found"})
 		return
@@ -245,10 +264,10 @@ func (h *Handler) GetLearningPath(w http.ResponseWriter, r *http.Request) {
 
 	var modules []model.Module
 	err = h.db.SelectContext(r.Context(), &modules, `
-		SELECT id, learning_path_id, title, description, competencies, position, file_path, created_at, updated_at
+		SELECT id, learning_path_id, slug, title, description, competencies, position, file_path, created_at, updated_at
 		FROM modules WHERE learning_path_id = $1 AND deleted_at IS NULL
 		ORDER BY position
-	`, pathID)
+	`, lp.ID)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to fetch modules"})
 		return
@@ -258,7 +277,7 @@ func (h *Handler) GetLearningPath(w http.ResponseWriter, r *http.Request) {
 	for _, m := range modules {
 		var steps []stepSummary
 		err = h.db.SelectContext(r.Context(), &steps, `
-			SELECT id, title, type, COALESCE(estimated_duration, '') as estimated_duration, position
+			SELECT id, slug, title, type, COALESCE(estimated_duration, '') as estimated_duration, position
 			FROM steps WHERE module_id = $1 AND deleted_at IS NULL
 			ORDER BY position
 		`, m.ID)
@@ -286,15 +305,51 @@ type stepDetailResponse struct {
 }
 
 func (h *Handler) GetStep(w http.ResponseWriter, r *http.Request) {
-	stepID := chi.URLParam(r, "stepId")
+	pathParam := chi.URLParam(r, "pathId")
+	stepParam := chi.URLParam(r, "stepId")
+
+	// Resolve the learning path first (to build redirect URL if needed)
+	var lpSlug string
+	if _, err := uuid.Parse(pathParam); err == nil {
+		err = h.db.GetContext(r.Context(), &lpSlug, `
+			SELECT slug FROM learning_paths WHERE id = $1 AND deleted_at IS NULL AND enabled = true
+		`, pathParam)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "learning path not found"})
+			return
+		}
+	} else {
+		lpSlug = pathParam
+	}
 
 	var step model.Step
+	if _, err := uuid.Parse(stepParam); err == nil {
+		// Step param is UUID — lookup by ID
+		err = h.db.GetContext(r.Context(), &step, `
+			SELECT id, module_id, slug, title, type, estimated_duration, content_md,
+			       COALESCE(exercise_data, 'null'::jsonb) AS exercise_data,
+			       position, file_path, created_at, updated_at
+			FROM steps WHERE id = $1 AND deleted_at IS NULL
+		`, stepParam)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "step not found"})
+			return
+		}
+		// 301 redirect to slug-based URL
+		http.Redirect(w, r, "/api/learning-paths/"+lpSlug+"/steps/"+step.Slug, http.StatusMovedPermanently)
+		return
+	}
+
+	// Step param is slug — lookup by slug within the learning path
 	err := h.db.GetContext(r.Context(), &step, `
-		SELECT id, module_id, title, type, estimated_duration, content_md,
-		       COALESCE(exercise_data, 'null'::jsonb) AS exercise_data,
-		       position, file_path, created_at, updated_at
-		FROM steps WHERE id = $1 AND deleted_at IS NULL
-	`, stepID)
+		SELECT s.id, s.module_id, s.slug, s.title, s.type, s.estimated_duration, s.content_md,
+		       COALESCE(s.exercise_data, 'null'::jsonb) AS exercise_data,
+		       s.position, s.file_path, s.created_at, s.updated_at
+		FROM steps s
+		JOIN modules m ON m.id = s.module_id AND m.deleted_at IS NULL
+		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL AND lp.enabled = true
+		WHERE s.slug = $1 AND lp.slug = $2 AND s.deleted_at IS NULL
+	`, stepParam, lpSlug)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "step not found"})
 		return
@@ -303,6 +358,7 @@ func (h *Handler) GetStep(w http.ResponseWriter, r *http.Request) {
 	response := map[string]any{
 		"id":                 step.ID,
 		"module_id":          step.ModuleID,
+		"slug":               step.Slug,
 		"title":              step.Title,
 		"type":               step.Type,
 		"estimated_duration": step.Duration,

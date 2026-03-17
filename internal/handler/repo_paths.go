@@ -18,6 +18,7 @@ func (h *Handler) ListRepoPaths(w http.ResponseWriter, r *http.Request) {
 
 	type repoPath struct {
 		ID                string `json:"id" db:"id"`
+		Slug              string `json:"slug" db:"slug"`
 		Title             string `json:"title" db:"title"`
 		Description       string `json:"description" db:"description"`
 		Enabled           bool   `json:"enabled" db:"enabled"`
@@ -27,7 +28,7 @@ func (h *Handler) ListRepoPaths(w http.ResponseWriter, r *http.Request) {
 
 	var paths []repoPath
 	err := h.db.SelectContext(r.Context(), &paths, `
-		SELECT lp.id::text, lp.title, lp.description, lp.enabled,
+		SELECT lp.id::text, lp.slug, lp.title, lp.description, lp.enabled,
 		       COUNT(DISTINCT m.id) AS module_count,
 		       COUNT(DISTINCT s.id) AS step_count
 		FROM learning_paths lp
@@ -51,13 +52,14 @@ func (h *Handler) ListRepoPaths(w http.ResponseWriter, r *http.Request) {
 // ToggleRepoPath enables or disables a learning path.
 func (h *Handler) ToggleRepoPath(w http.ResponseWriter, r *http.Request) {
 	repoID := chi.URLParam(r, "repoId")
-	pathID := chi.URLParam(r, "pathId")
+	pathParam := chi.URLParam(r, "pathId")
 	if _, err := uuid.Parse(repoID); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid repository id"})
 		return
 	}
-	if _, err := uuid.Parse(pathID); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid path id"})
+	pathUUID, err := h.resolvePathSlug(r.Context(), pathParam)
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "learning path not found"})
 		return
 	}
 
@@ -72,7 +74,7 @@ func (h *Handler) ToggleRepoPath(w http.ResponseWriter, r *http.Request) {
 	result, err := h.db.ExecContext(r.Context(), `
 		UPDATE learning_paths SET enabled = $1, updated_at = now()
 		WHERE id = $2 AND repo_id = $3 AND deleted_at IS NULL
-	`, req.Enabled, pathID, repoID)
+	`, req.Enabled, pathUUID, repoID)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to update path"})
 		return
@@ -87,7 +89,7 @@ func (h *Handler) ToggleRepoPath(w http.ResponseWriter, r *http.Request) {
 	if req.Enabled {
 		action = "enable"
 	}
-	h.auditLog(r.Context(), ClaimsFromContext(r.Context()), action, "learning_path", pathID, map[string]any{"repo_id": repoID, "enabled": req.Enabled})
+	h.auditLog(r.Context(), ClaimsFromContext(r.Context()), action, "learning_path", pathUUID.String(), map[string]any{"repo_id": repoID, "enabled": req.Enabled})
 
 	writeJSON(w, http.StatusOK, map[string]any{"status": "updated", "enabled": req.Enabled})
 }

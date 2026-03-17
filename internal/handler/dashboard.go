@@ -28,18 +28,23 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	// Continue learning: most recent in_progress step
 	var continueStep *struct {
 		StepID    string `json:"step_id" db:"step_id"`
+		StepSlug  string `json:"step_slug" db:"step_slug"`
 		StepTitle string `json:"step_title" db:"step_title"`
 		PathID    string `json:"path_id" db:"path_id"`
+		PathSlug  string `json:"path_slug" db:"path_slug"`
 		PathTitle string `json:"path_title" db:"path_title"`
 	}
 	row := struct {
 		StepID    string `json:"step_id" db:"step_id"`
+		StepSlug  string `json:"step_slug" db:"step_slug"`
 		StepTitle string `json:"step_title" db:"step_title"`
 		PathID    string `json:"path_id" db:"path_id"`
+		PathSlug  string `json:"path_slug" db:"path_slug"`
 		PathTitle string `json:"path_title" db:"path_title"`
 	}{}
 	err := h.db.GetContext(r.Context(), &row, `
-		SELECT s.id AS step_id, s.title AS step_title, lp.id AS path_id, lp.title AS path_title
+		SELECT s.id AS step_id, s.slug AS step_slug, s.title AS step_title,
+		       lp.id AS path_id, lp.slug AS path_slug, lp.title AS path_title
 		FROM progress p
 		JOIN steps s ON s.id = p.step_id
 		JOIN modules m ON m.id = s.module_id AND m.deleted_at IS NULL
@@ -54,6 +59,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	// Enrolled paths with progress
 	type pathProgress struct {
 		PathID    string `json:"path_id" db:"path_id"`
+		PathSlug  string `json:"path_slug" db:"path_slug"`
 		PathTitle string `json:"path_title" db:"path_title"`
 		PathIcon  string `json:"path_icon" db:"path_icon"`
 		Total     int    `json:"total" db:"total"`
@@ -61,7 +67,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	var enrolledPaths []pathProgress
 	h.db.SelectContext(r.Context(), &enrolledPaths, `
-		SELECT lp.id AS path_id, lp.title AS path_title, COALESCE(lp.icon, '') AS path_icon,
+		SELECT lp.id AS path_id, lp.slug AS path_slug, lp.title AS path_title, COALESCE(lp.icon, '') AS path_icon,
 		       COUNT(DISTINCT s.id) AS total,
 		       COUNT(DISTINCT CASE WHEN p.status = 'completed' THEN s.id END) AS completed
 		FROM progress p
@@ -69,7 +75,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		JOIN modules m ON m.id = s.module_id AND m.deleted_at IS NULL
 		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL AND lp.enabled = true
 		WHERE p.user_id = $1 AND s.deleted_at IS NULL
-		GROUP BY lp.id, lp.title, lp.icon
+		GROUP BY lp.id, lp.title, lp.slug, lp.icon
 	`, claims.UserID)
 	if enrolledPaths == nil {
 		enrolledPaths = []pathProgress{}
@@ -142,13 +148,17 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		StepTitle string `json:"step_title" db:"step_title"`
 		PathTitle string `json:"path_title" db:"path_title"`
 		PathID    string `json:"path_id" db:"path_id"`
+		PathSlug  string `json:"path_slug" db:"path_slug"`
 		StepID    string `json:"step_id" db:"step_id"`
+		StepSlug  string `json:"step_slug" db:"step_slug"`
 		Event     string `json:"event" db:"event"`
 		Timestamp string `json:"timestamp" db:"timestamp"`
 	}
 	var recentActivity []activity
 	h.db.SelectContext(r.Context(), &recentActivity, `
-		SELECT s.title AS step_title, lp.title AS path_title, lp.id AS path_id, s.id AS step_id,
+		SELECT s.title AS step_title, lp.title AS path_title,
+		       lp.id AS path_id, lp.slug AS path_slug,
+		       s.id AS step_id, s.slug AS step_slug,
 		       p.status AS event, p.updated_at::text AS timestamp
 		FROM progress p
 		JOIN steps s ON s.id = p.step_id

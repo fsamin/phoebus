@@ -10,6 +10,7 @@ import { catalogSteps } from '../tours/steps';
 
 interface CatalogPath {
   id: string;
+  slug: string;
   title: string;
   description: string;
   icon?: string;
@@ -215,8 +216,7 @@ const Catalog: React.FC = () => {
               <Col xs={24} sm={12} lg={8} key={path.id} {...(index === 0 ? { 'data-tour': 'catalog-cards' } : {})}>
                 <Card
                   hoverable
-                  onClick={() => navigate(`/paths/${path.id}`)}
-                  style={{ height: '100%' }}
+                  onClick={() => navigate(`/paths/${path.slug}`)}                  style={{ height: '100%' }}
                 >
                   <Card.Meta
                     title={

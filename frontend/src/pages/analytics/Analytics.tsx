@@ -11,6 +11,7 @@ interface AnalyticsOverviewData {
   total_attempts: number;
   paths: Array<{
     id: string;
+    slug: string;
     title: string;
     enrolled_count: number;
     completion_rate: number;
@@ -82,7 +83,7 @@ const Analytics: React.FC = () => {
             <Table
               dataSource={overview.paths}
               rowKey="id"
-              onRow={(record) => ({ onClick: () => navigate(`/analytics/paths/${record.id}`), style: { cursor: 'pointer' } })}
+              onRow={(record) => ({ onClick: () => navigate(`/analytics/paths/${record.slug}`), style: { cursor: 'pointer' } })}
               columns={[
                 { title: 'Title', dataIndex: 'title' },
                 { title: 'Enrolled', dataIndex: 'enrolled_count', width: 100, sorter: (a, b) => a.enrolled_count - b.enrolled_count },

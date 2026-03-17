@@ -49,9 +49,9 @@ const PathOverview: React.FC = () => {
   if (loading || !path) return <Spin size="large" style={{ display: 'block', marginTop: 100 }} />;
 
   // Find current path in allPaths to get prerequisites_met
-  const currentPathSummary = allPaths.find((p) => p.id === pathId);
+  const currentPathSummary = allPaths.find((p) => p.slug === pathId || p.id === pathId);
   const prerequisitesMet = currentPathSummary?.prerequisites_met ?? true;
-  const dismissedKey = `prereq-dismissed-${pathId}`;
+  const dismissedKey = `prereq-dismissed-${path.slug}`;
   const isDismissed = () => sessionStorage.getItem(dismissedKey) === 'true';
 
   // Compute unmet prerequisites with their provider paths
@@ -65,12 +65,12 @@ const PathOverview: React.FC = () => {
     return { competency: prereq, provider, met: !!providerCompleted };
   });
 
-  const handleStartLearning = (stepId: string) => {
+  const handleStartLearning = (stepSlug: string) => {
     if (!prerequisitesMet && !isDismissed()) {
-      setPendingStepId(stepId);
+      setPendingStepId(stepSlug);
       setPrereqModalOpen(true);
     } else {
-      navigate(`/paths/${pathId}/steps/${stepId}`);
+      navigate(`/paths/${path.slug}/steps/${stepSlug}`);
     }
   };
 
@@ -78,7 +78,7 @@ const PathOverview: React.FC = () => {
     sessionStorage.setItem(dismissedKey, 'true');
     setPrereqModalOpen(false);
     if (pendingStepId) {
-      navigate(`/paths/${pathId}/steps/${pendingStepId}`);
+      navigate(`/paths/${path.slug}/steps/${pendingStepId}`);
     }
   };
 
@@ -121,7 +121,7 @@ const PathOverview: React.FC = () => {
             </Typography.Text>
           </div>
           {!isPathCompleted && nextStep && (
-            <Button type="primary" onClick={() => handleStartLearning(nextStep.id)}>
+            <Button type="primary" onClick={() => handleStartLearning(nextStep.slug)}>
               {completedSteps > 0 ? 'Continue Learning' : 'Start Learning'}
             </Button>
           )}
@@ -178,7 +178,7 @@ const PathOverview: React.FC = () => {
                   return (
                     <List.Item
                       style={{ cursor: 'pointer' }}
-                      onClick={() => handleStartLearning(step.id)}
+                      onClick={() => handleStartLearning(step.slug)}
                       extra={
                         <>
                           {status === 'completed' ? (

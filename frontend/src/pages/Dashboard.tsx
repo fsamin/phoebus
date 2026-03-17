@@ -12,11 +12,11 @@ import OnboardingTour from '../components/OnboardingTour';
 import { dashboardSteps } from '../tours/steps';
 
 interface DashboardData {
-  continue_learning: { step_id: string; step_title: string; path_id: string; path_title: string } | null;
-  enrolled_paths: Array<{ path_id: string; path_title: string; path_icon: string; total: number; completed: number }>;
+  continue_learning: { step_id: string; step_slug: string; step_title: string; path_id: string; path_slug: string; path_title: string } | null;
+  enrolled_paths: Array<{ path_id: string; path_slug: string; path_title: string; path_icon: string; total: number; completed: number }>;
   competencies: Array<{ name: string; acquired: boolean; path_title: string }>;
   stats: { steps_completed: number; total_exercises: number; steps_in_progress: number };
-  recent_activity: Array<{ step_title: string; path_title: string; path_id: string; step_id: string; event: string; timestamp: string }>;
+  recent_activity: Array<{ step_title: string; path_title: string; path_id: string; path_slug: string; step_id: string; step_slug: string; event: string; timestamp: string }>;
   instructor_repos: Array<{ id: string; clone_url: string; branch: string; sync_status: string; sync_error?: string; last_synced_at?: string; path_titles: string[] }>;
 }
 
@@ -67,8 +67,7 @@ const Dashboard: React.FC = () => {
             <Button
               type="primary"
               icon={<ArrowRightOutlined />}
-              onClick={() => navigate(`/paths/${data.continue_learning!.path_id}/steps/${data.continue_learning!.step_id}`)}
-            >
+              onClick={() => navigate(`/paths/${data.continue_learning!.path_slug}/steps/${data.continue_learning!.step_slug}`)}            >
               Resume
             </Button>
           </div>
@@ -167,7 +166,7 @@ const Dashboard: React.FC = () => {
               <List
                 dataSource={data.enrolled_paths}
                 renderItem={(ep) => (
-                  <List.Item style={{ cursor: 'pointer' }} onClick={() => navigate(`/paths/${ep.path_id}`)}>
+                  <List.Item style={{ cursor: 'pointer' }} onClick={() => navigate(`/paths/${ep.path_slug}`)}>
                     <div style={{ width: '100%' }}>
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <Typography.Text strong>
@@ -209,8 +208,7 @@ const Dashboard: React.FC = () => {
                   children: (
                     <div
                       style={{ cursor: 'pointer' }}
-                      onClick={() => navigate(`/paths/${a.path_id}/steps/${a.step_id}`)}
-                    >
+                      onClick={() => navigate(`/paths/${a.path_slug}/steps/${a.step_slug}`)}                    >
                       <Typography.Text>{a.event === 'completed' ? 'Completed' : 'Started'}: {a.step_title}</Typography.Text>
                       <br />
                       <Typography.Text type="secondary" style={{ fontSize: 12 }}>

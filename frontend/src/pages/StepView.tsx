@@ -62,7 +62,7 @@ const StepView: React.FC = () => {
   const allSteps = path?.modules.flatMap((m) =>
     m.steps.map((s) => ({ ...s, moduleTitle: m.title, moduleId: m.id }))
   ) || [];
-  const currentIdx = allSteps.findIndex((s) => s.id === stepId);
+  const currentIdx = allSteps.findIndex((s) => s.slug === stepId || s.id === stepId);
   const prevStep = currentIdx > 0 ? allSteps[currentIdx - 1] : null;
   const nextStep = currentIdx < allSteps.length - 1 ? allSteps[currentIdx + 1] : null;
 
@@ -117,13 +117,13 @@ const StepView: React.FC = () => {
     children: m.steps.map((s) => {
       const status = getStepStatus(s.id);
       return {
-        key: s.id,
+        key: s.slug,
         icon: status === 'completed'
           ? <CheckCircleOutlined style={{ color: 'var(--color-success)' }} />
           : status === 'in_progress'
           ? <PlayCircleOutlined style={{ color: 'var(--color-warning)' }} />
           : stepIcon(s.type),
-        label: <span style={s.id === stepId ? { fontWeight: 'bold' } : undefined}>{s.title}</span>,
+        label: <span style={(s.slug === stepId || s.id === stepId) ? { fontWeight: 'bold' } : undefined}>{s.title}</span>,
       };
     }),
   }));
@@ -149,20 +149,20 @@ const StepView: React.FC = () => {
           />
           {!collapsed && (
             <>
-              <Button type="link" onClick={() => navigate(`/paths/${pathId}`)} style={{ flex: 1, textAlign: 'left', padding: 0 }}>
+              <Button type="link" onClick={() => navigate(`/paths/${path.slug}`)} style={{ flex: 1, textAlign: 'left', padding: 0 }}>
                 ← {path.title}
               </Button>
-              <Button type="text" icon={<CloseOutlined />} size="small" onClick={() => navigate(`/paths/${pathId}`)} />
+              <Button type="text" icon={<CloseOutlined />} size="small" onClick={() => navigate(`/paths/${path.slug}`)} />
             </>
           )}
         </div>
         {!collapsed && (
           <Menu
             mode="inline"
-            selectedKeys={[stepId || '']}
+            selectedKeys={[step.slug || stepId || '']}
             openKeys={path.modules.map((m) => m.id)}
             items={sidebarItems}
-            onClick={({ key }) => navigate(`/paths/${pathId}/steps/${key}`)}
+            onClick={({ key }) => navigate(`/paths/${path.slug}/steps/${key}`)}
           />
         )}
         </div>
@@ -263,7 +263,7 @@ const StepView: React.FC = () => {
           {/* Navigation footer */}
           <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 32, padding: '16px 0', borderTop: '1px solid #f0f0f0' }}>
             {prevStep ? (
-              <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(`/paths/${pathId}/steps/${prevStep.id}`)}>
+              <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(`/paths/${path.slug}/steps/${prevStep.slug}`)}>
                 {prevStep.title}
               </Button>
             ) : <div />}
@@ -271,7 +271,7 @@ const StepView: React.FC = () => {
               <Button
                 type="primary"
                 disabled={step.type !== 'lesson' && !isCompleted && !exerciseCompleted}
-                onClick={() => navigate(`/paths/${pathId}/steps/${nextStep.id}`)}
+                onClick={() => navigate(`/paths/${path.slug}/steps/${nextStep.slug}`)}
               >
                 {nextStep.title} <ArrowRightOutlined />
               </Button>
@@ -279,7 +279,7 @@ const StepView: React.FC = () => {
               <Button
                 type="primary"
                 disabled={step.type !== 'lesson' && !isCompleted && !exerciseCompleted}
-                onClick={() => navigate(`/paths/${pathId}`)}
+                onClick={() => navigate(`/paths/${path.slug}`)}
               >
                 Back to Overview
               </Button>

@@ -17,6 +17,7 @@ type LearningPath struct {
 	Tags              pq.StringArray `json:"tags" db:"tags"`
 	EstimatedDuration *string        `json:"estimated_duration,omitempty" db:"estimated_duration"`
 	Prerequisites     pq.StringArray `json:"prerequisites,omitempty" db:"prerequisites"`
+	Slug              string         `json:"slug" db:"slug"`
 	Enabled           bool           `json:"enabled" db:"enabled"`
 	CreatedAt         time.Time      `json:"created_at" db:"created_at"`
 	UpdatedAt         time.Time      `json:"updated_at" db:"updated_at"`
@@ -25,6 +26,7 @@ type LearningPath struct {
 type Module struct {
 	ID             uuid.UUID      `json:"id" db:"id"`
 	LearningPathID uuid.UUID      `json:"learning_path_id" db:"learning_path_id"`
+	Slug           string         `json:"slug" db:"slug"`
 	Title          string         `json:"title" db:"title"`
 	Description    string         `json:"description" db:"description"`
 	Competencies   pq.StringArray `json:"competencies" db:"competencies"`
@@ -46,6 +48,7 @@ const (
 type Step struct {
 	ID           uuid.UUID       `json:"id" db:"id"`
 	ModuleID     uuid.UUID       `json:"module_id" db:"module_id"`
+	Slug         string          `json:"slug" db:"slug"`
 	Title        string          `json:"title" db:"title"`
 	Type         StepType        `json:"type" db:"type"`
 	Duration     *string         `json:"estimated_duration,omitempty" db:"estimated_duration"`

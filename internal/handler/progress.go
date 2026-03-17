@@ -9,7 +9,6 @@ import (
 
 	"github.com/fsamin/phoebus/internal/model"
 	"github.com/go-chi/chi/v5"
-	"github.com/google/uuid"
 )
 
 // GetProgress returns all progress records for the authenticated user,
@@ -17,18 +16,23 @@ import (
 func (h *Handler) GetProgress(w http.ResponseWriter, r *http.Request) {
 	claims := ClaimsFromContext(r.Context())
 
-	pathID := r.URL.Query().Get("learning_path_id")
-	if pathID != "" {
+	pathParam := r.URL.Query().Get("learning_path_id")
+	if pathParam != "" {
+		pathUUID, err := h.resolvePathSlug(r.Context(), pathParam)
+		if err != nil {
+			writeJSON(w, http.StatusNotFound, map[string]string{"error": "path not found"})
+			return
+		}
 		// Per-path progress: all step progress for steps in this learning path
 		var progress []model.Progress
-		err := h.db.SelectContext(r.Context(), &progress, `
+		err = h.db.SelectContext(r.Context(), &progress, `
 			SELECT p.id, p.user_id, p.step_id, p.status, p.completed_at, p.created_at, p.updated_at
 			FROM progress p
 			JOIN steps s ON s.id = p.step_id
 			JOIN modules m ON m.id = s.module_id AND m.deleted_at IS NULL
 			WHERE p.user_id = $1 AND m.learning_path_id = $2 AND s.deleted_at IS NULL
 			ORDER BY p.created_at
-		`, claims.UserID, pathID)
+		`, claims.UserID, pathUUID)
 		if err != nil {
 			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to fetch progress"})
 			return
@@ -71,7 +75,7 @@ func (h *Handler) UpdateProgress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stepID, err := uuid.Parse(req.StepID)
+	stepUUID, err := h.resolveStepSlug(r.Context(), req.StepID, "")
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid step_id"})
 		return
@@ -81,7 +85,7 @@ func (h *Handler) UpdateProgress(w http.ResponseWriter, r *http.Request) {
 	var step model.Step
 	err = h.db.GetContext(r.Context(), &step, `
 		SELECT id, type FROM steps WHERE id = $1 AND deleted_at IS NULL
-	`, stepID)
+	`, stepUUID)
 	if err != nil {
 		writeJSON(w, http.StatusNotFound, map[string]string{"error": "step not found"})
 		return
@@ -98,7 +102,7 @@ func (h *Handler) UpdateProgress(w http.ResponseWriter, r *http.Request) {
 			ON CONFLICT (user_id, step_id)
 			DO UPDATE SET status = CASE WHEN progress.status = 'completed' THEN 'completed' ELSE 'in_progress' END,
 			             updated_at = now()
-		`, claims.UserID, stepID)
+		`, claims.UserID, stepUUID)
 
 	case model.ProgressCompleted:
 		// Only lessons can be marked completed via this endpoint.
@@ -113,7 +117,7 @@ func (h *Handler) UpdateProgress(w http.ResponseWriter, r *http.Request) {
 			VALUES ($1, $2, 'completed', $3)
 			ON CONFLICT (user_id, step_id)
 			DO UPDATE SET status = 'completed', completed_at = $3, updated_at = now()
-		`, claims.UserID, stepID, now)
+		`, claims.UserID, stepUUID, now)
 		stepsCompletedTotal.Inc()
 
 	default:
@@ -131,7 +135,7 @@ func (h *Handler) UpdateProgress(w http.ResponseWriter, r *http.Request) {
 	err = h.db.GetContext(r.Context(), &progress, `
 		SELECT id, user_id, step_id, status, completed_at, created_at, updated_at
 		FROM progress WHERE user_id = $1 AND step_id = $2
-	`, claims.UserID, stepID)
+	`, claims.UserID, stepUUID)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to fetch progress"})
 		return
@@ -142,10 +146,15 @@ func (h *Handler) UpdateProgress(w http.ResponseWriter, r *http.Request) {
 // GetStepAttempts returns exercise attempts for a specific step for the authenticated user.
 func (h *Handler) GetStepAttempts(w http.ResponseWriter, r *http.Request) {
 	claims := ClaimsFromContext(r.Context())
-	stepID := chi.URLParam(r, "stepId")
+	stepParam := chi.URLParam(r, "stepId")
+	stepID, err := h.resolveStepSlug(r.Context(), stepParam, "")
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "step not found"})
+		return
+	}
 
 	var attempts []model.ExerciseAttempt
-	err := h.db.SelectContext(r.Context(), &attempts, `
+	err = h.db.SelectContext(r.Context(), &attempts, `
 		SELECT id, user_id, step_id, answers, is_correct, created_at
 		FROM exercise_attempts
 		WHERE user_id = $1 AND step_id = $2
@@ -165,11 +174,16 @@ func (h *Handler) GetStepAttempts(w http.ResponseWriter, r *http.Request) {
 // Previous exercise_attempts are preserved (historical data is never deleted).
 func (h *Handler) ResetExercise(w http.ResponseWriter, r *http.Request) {
 	claims := ClaimsFromContext(r.Context())
-	stepID := chi.URLParam(r, "stepId")
+	stepParam := chi.URLParam(r, "stepId")
+	stepID, err := h.resolveStepSlug(r.Context(), stepParam, "")
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "step not found"})
+		return
+	}
 
 	// Verify step exists and is an exercise
 	var step model.Step
-	err := h.db.GetContext(r.Context(), &step, `
+	err = h.db.GetContext(r.Context(), &step, `
 		SELECT id, type FROM steps WHERE id = $1 AND deleted_at IS NULL
 	`, stepID)
 	if err != nil {
@@ -227,12 +241,17 @@ func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
 // The correct answers are never exposed to the client.
 func (h *Handler) SubmitAttempt(w http.ResponseWriter, r *http.Request) {
 	claims := ClaimsFromContext(r.Context())
-	stepID := chi.URLParam(r, "stepId")
+	stepParam := chi.URLParam(r, "stepId")
+	stepID, err := h.resolveStepSlug(r.Context(), stepParam, "")
+	if err != nil {
+		writeJSON(w, http.StatusNotFound, map[string]string{"error": "step not found"})
+		return
+	}
 
 	// Fetch step with exercise data
 	var step model.Step
-	err := h.db.GetContext(r.Context(), &step, `
-		SELECT id, module_id, title, type, estimated_duration, content_md,
+	err = h.db.GetContext(r.Context(), &step, `
+		SELECT id, module_id, slug, title, type, estimated_duration, content_md,
 		       COALESCE(exercise_data, 'null'::jsonb) AS exercise_data,
 		       position, file_path, created_at, updated_at
 		FROM steps WHERE id = $1 AND deleted_at IS NULL

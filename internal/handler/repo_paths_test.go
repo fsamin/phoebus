@@ -29,9 +29,9 @@ func TestListRepoPaths(t *testing.T) {
 	// Insert a learning path for this repo
 	lpID := uuid.New()
 	testDB.Exec(`
-		INSERT INTO learning_paths (id, repo_id, title, description, file_path, enabled)
-		VALUES ($1, $2, 'Test Path', 'A test path', '', true)
-	`, lpID, repoID)
+		INSERT INTO learning_paths (id, repo_id, title, description, file_path, enabled, slug)
+		VALUES ($1, $2, 'Test Path', 'A test path', '', true, 'test-path-' || $3)
+	`, lpID, repoID, lpID.String()[:8])
 
 	// List paths
 	resp = doRequest(t, srv, "GET", "/api/admin/repos/"+repoID+"/paths", nil, cookie)
@@ -74,9 +74,9 @@ func TestToggleRepoPath(t *testing.T) {
 	// Insert a learning path
 	lpID := uuid.New()
 	testDB.Exec(`
-		INSERT INTO learning_paths (id, repo_id, title, description, file_path, enabled)
-		VALUES ($1, $2, 'Toggle Path', 'Test', '', true)
-	`, lpID, repoID)
+		INSERT INTO learning_paths (id, repo_id, title, description, file_path, enabled, slug)
+		VALUES ($1, $2, 'Toggle Path', 'Test', '', true, 'toggle-path-' || $3)
+	`, lpID, repoID, lpID.String()[:8])
 
 	// Disable the path
 	resp = doRequest(t, srv, "PATCH", "/api/admin/repos/"+repoID+"/paths/"+lpID.String(), map[string]bool{"enabled": false}, cookie)
@@ -129,13 +129,13 @@ func TestDisabledPathNotInList(t *testing.T) {
 	lpEnabled := uuid.New()
 	lpDisabled := uuid.New()
 	testDB.Exec(`
-		INSERT INTO learning_paths (id, repo_id, title, description, file_path, enabled)
-		VALUES ($1, $2, 'Enabled Path', 'Visible', 'enabled', true)
-	`, lpEnabled, repoID)
+		INSERT INTO learning_paths (id, repo_id, title, description, file_path, enabled, slug)
+		VALUES ($1, $2, 'Enabled Path', 'Visible', 'enabled', true, 'enabled-path-' || $3)
+	`, lpEnabled, repoID, lpEnabled.String()[:8])
 	testDB.Exec(`
-		INSERT INTO learning_paths (id, repo_id, title, description, file_path, enabled)
-		VALUES ($1, $2, 'Disabled Path', 'Hidden', 'disabled', false)
-	`, lpDisabled, repoID)
+		INSERT INTO learning_paths (id, repo_id, title, description, file_path, enabled, slug)
+		VALUES ($1, $2, 'Disabled Path', 'Hidden', 'disabled', false, 'disabled-path-' || $3)
+	`, lpDisabled, repoID, lpDisabled.String()[:8])
 
 	// List learning paths (public API — should only show enabled)
 	learnerCookie := loginAs(t, "learner")
