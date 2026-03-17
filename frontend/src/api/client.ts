@@ -36,6 +36,7 @@ export const api = {
 
   // Learning paths
   listPaths: () => request<LearningPathSummary[]>('/learning-paths'),
+  listPathDependencies: () => request<PathDependenciesResponse>('/learning-paths/dependencies'),
   getPath: (id: string) => request<LearningPathDetail>(`/learning-paths/${id}`),
   getStep: (pathId: string, stepId: string) =>
     request<StepDetail>(`/learning-paths/${pathId}/steps/${stepId}`),
@@ -91,6 +92,14 @@ export const api = {
       body: JSON.stringify(data),
     }),
   sshPublicKey: () => request<{ public_key: string }>('/admin/ssh-public-key'),
+  listManualDependencies: () => request<ManualDependency[]>('/admin/dependencies'),
+  createDependency: (sourcePathId: string, targetPathId: string) =>
+    request<PathDependencyRecord>('/admin/dependencies', {
+      method: 'POST',
+      body: JSON.stringify({ source_path_id: sourcePathId, target_path_id: targetPathId }),
+    }),
+  deleteDependency: (depId: string) =>
+    request<void>(`/admin/dependencies/${depId}`, { method: 'DELETE' }),
 
   // Instructor repos
   instructorListRepos: () => request<Array<GitRepository & { path_titles: string[] }>>('/instructor/repos'),
@@ -272,4 +281,33 @@ export interface SyncJobLogEntry {
 export interface Competency {
   name: string;
   learning_path_ids: string[];
+}
+
+export interface DependencyEdge {
+  source: string;
+  target: string;
+  type: 'auto' | 'manual' | 'yaml';
+  competencies?: string[];
+}
+
+export interface PathDependenciesResponse {
+  edges: DependencyEdge[];
+}
+
+export interface ManualDependency {
+  id: string;
+  source_path_id: string;
+  target_path_id: string;
+  dep_type: string;
+  created_at: string;
+  source_title: string;
+  target_title: string;
+}
+
+export interface PathDependencyRecord {
+  id: string;
+  source_path_id: string;
+  target_path_id: string;
+  dep_type: string;
+  created_at: string;
 }

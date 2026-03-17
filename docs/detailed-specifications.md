@@ -409,7 +409,7 @@ GET /api/assets/{hash}
   - `yaml`: defined in `phoebus.yaml` via the `depends_on` field (list of path slugs) — rendered in purple (`#b37feb`), animated
 - Edge labels show the matching competency names (deduplicated)
 - **Dark mode**: all DAG elements (node backgrounds, edge labels, canvas, grid, MiniMap) adapt to the current theme via `useTheme()` context
-- **Popover on click**: clicking a node shows a popover with description, competencies provided, prerequisites, and a "View Path" button navigating to `/paths/:slug`
+- **Popover on click**: clicking a node shows a popover with description, competencies provided, prerequisites, and a "View Path" button navigating to `/paths/:pathSlug`
 - **MiniMap**: color-coded by progress status (green/orange/gray)
 - **Controls**: zoom in/out and pan provided by React Flow's built-in Controls component
 

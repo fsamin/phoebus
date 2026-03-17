@@ -69,3 +69,11 @@ type CodebaseFile struct {
 	Language string    `json:"language" db:"language"`
 	Position int       `json:"position" db:"position"`
 }
+
+type PathDependency struct {
+	ID           uuid.UUID `json:"id" db:"id"`
+	SourcePathID uuid.UUID `json:"source_path_id" db:"source_path_id"`
+	TargetPathID uuid.UUID `json:"target_path_id" db:"target_path_id"`
+	DepType      string    `json:"dep_type" db:"dep_type"`
+	CreatedAt    time.Time `json:"created_at" db:"created_at"`
+}

@@ -22,6 +22,7 @@ type phoebusMeta struct {
 	Tags              []string `json:"tags"`
 	EstimatedDuration string   `json:"estimated_duration"`
 	Prerequisites     []string `json:"prerequisites"`
+	DependsOn         []string `json:"depends_on"`
 }
 
 func parsePhoebus(ctx context.Context, repoDir string) (*phoebusMeta, error) {

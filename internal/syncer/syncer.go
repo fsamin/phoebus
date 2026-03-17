@@ -654,6 +654,52 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 	pathHash := computeHash(append(pathHashParts, moduleHashes...)...)
 	tx.ExecContext(ctx, `UPDATE learning_paths SET content_hash = $1, updated_at = now() WHERE id = $2`, pathHash, lpID)
 
+	// Sync YAML-defined dependencies (depends_on field)
+	if len(lpMeta.DependsOn) > 0 {
+		logger.Debug("syncing depends_on", "count", len(lpMeta.DependsOn), "slugs", lpMeta.DependsOn)
+		for _, depSlug := range lpMeta.DependsOn {
+			var sourceID uuid.UUID
+			err := tx.GetContext(ctx, &sourceID,
+				`SELECT id FROM learning_paths WHERE slug = $1 AND id != $2 LIMIT 1`, depSlug, lpID)
+			if err != nil {
+				logger.Warn("depends_on: path not found", "slug", depSlug, "error", err)
+				continue
+			}
+			_, err = tx.ExecContext(ctx, `
+				INSERT INTO path_dependencies (source_path_id, target_path_id, dep_type)
+				VALUES ($1, $2, 'yaml')
+				ON CONFLICT (source_path_id, target_path_id) DO UPDATE SET dep_type = 'yaml'
+			`, sourceID, lpID)
+			if err != nil {
+				logger.Warn("depends_on: failed to upsert dependency", "source", depSlug, "error", err)
+			}
+		}
+	}
+	// Clean up stale YAML dependencies for this path
+	if len(lpMeta.DependsOn) > 0 {
+		var validSourceIDs []uuid.UUID
+		for _, depSlug := range lpMeta.DependsOn {
+			var sid uuid.UUID
+			if err := tx.GetContext(ctx, &sid, `SELECT id FROM learning_paths WHERE slug = $1`, depSlug); err == nil {
+				validSourceIDs = append(validSourceIDs, sid)
+			}
+		}
+		if len(validSourceIDs) > 0 {
+			tx.ExecContext(ctx, `
+				DELETE FROM path_dependencies
+				WHERE target_path_id = $1 AND dep_type = 'yaml' AND source_path_id != ALL($2)
+			`, lpID, pq.Array(validSourceIDs))
+		} else {
+			tx.ExecContext(ctx, `
+				DELETE FROM path_dependencies WHERE target_path_id = $1 AND dep_type = 'yaml'
+			`, lpID)
+		}
+	} else {
+		tx.ExecContext(ctx, `
+			DELETE FROM path_dependencies WHERE target_path_id = $1 AND dep_type = 'yaml'
+		`, lpID)
+	}
+
 	return nil
 }
 
