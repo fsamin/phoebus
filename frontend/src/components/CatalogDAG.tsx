@@ -4,6 +4,7 @@ import {
   Background,
   Controls,
   MiniMap,
+  Handle,
   type Node,
   type Edge,
   Position,
@@ -175,9 +176,13 @@ const PathNode: React.FC<{ data: { path: CatalogPath } }> = ({ data }) => {
   );
 
   return (
-    <Popover content={popoverContent} title={`${path.icon || ''} ${path.title}`} trigger="click" placement="right">
-      {nodeContent}
-    </Popover>
+    <>
+      <Handle type="target" position={Position.Left} style={{ background: '#d9d9d9' }} />
+      <Popover content={popoverContent} title={`${path.icon || ''} ${path.title}`} trigger="click" placement="right">
+        {nodeContent}
+      </Popover>
+      <Handle type="source" position={Position.Right} style={{ background: '#d9d9d9' }} />
+    </>
   );
 };
 
