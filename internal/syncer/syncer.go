@@ -460,6 +460,9 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 	pathHashParts := []string{lpMeta.Title, lpMeta.Description, strings.Join(lpMeta.Tags, ",")}
 	var moduleHashes []string
 
+	// Reset positions to avoid unique constraint violations when modules are reordered
+	tx.ExecContext(ctx, `UPDATE modules SET position = -1 - position WHERE learning_path_id = $1 AND deleted_at IS NULL`, lpID)
+
 	existingModulePaths := map[string]bool{}
 
 	for position, moduleDir := range moduleDirs {
