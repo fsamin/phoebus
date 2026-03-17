@@ -22,6 +22,7 @@ import {
   RightOutlined,
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../contexts/ThemeContext';
 import type { DependencyEdge } from '../api/client';
 
 interface CatalogPath {
@@ -97,6 +98,7 @@ const PathNode: React.FC<{ data: { path: CatalogPath } }> = ({ data }) => {
   const status = getProgressStatus(path);
   const percent = getProgressPercent(path);
   const navigate = useNavigate();
+  const { isDark } = useTheme();
 
   const nodeContent = (
     <div
@@ -104,14 +106,14 @@ const PathNode: React.FC<{ data: { path: CatalogPath } }> = ({ data }) => {
         width: NODE_WIDTH,
         height: NODE_HEIGHT,
         padding: 12,
-        background: '#fff',
+        background: isDark ? '#1f1f1f' : '#fff',
         borderRadius: 8,
         border: `2px solid ${borderColors[status]}`,
         cursor: 'pointer',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        boxShadow: isDark ? '0 2px 8px rgba(0,0,0,0.3)' : '0 2px 8px rgba(0,0,0,0.08)',
       }}
     >
       <div>
@@ -136,7 +138,7 @@ const PathNode: React.FC<{ data: { path: CatalogPath } }> = ({ data }) => {
           </div>
         )}
         <AntProgress percent={percent} size="small" showInfo={false} strokeColor={borderColors[status]} />
-        <div style={{ fontSize: 11, color: '#8c8c8c' }}>
+        <div style={{ fontSize: 11, color: isDark ? '#a0a0a0' : '#8c8c8c' }}>
           {path.module_count} modules · {path.step_count} steps
           {path.estimated_duration && ` · ${path.estimated_duration}`}
         </div>
@@ -177,11 +179,11 @@ const PathNode: React.FC<{ data: { path: CatalogPath } }> = ({ data }) => {
 
   return (
     <>
-      <Handle type="target" position={Position.Left} style={{ background: '#d9d9d9' }} />
+      <Handle type="target" position={Position.Left} style={{ background: isDark ? '#555' : '#d9d9d9' }} />
       <Popover content={popoverContent} title={`${path.icon || ''} ${path.title}`} trigger="click" placement="right">
         {nodeContent}
       </Popover>
-      <Handle type="source" position={Position.Right} style={{ background: '#d9d9d9' }} />
+      <Handle type="source" position={Position.Right} style={{ background: isDark ? '#555' : '#d9d9d9' }} />
     </>
   );
 };
@@ -191,6 +193,7 @@ const nodeTypes = { pathNode: PathNode };
 const CatalogDAG: React.FC<CatalogDAGProps> = ({ paths, edges: depEdges }) => {
   const pathMap = useMemo(() => new Map(paths.map((p) => [p.id, p])), [paths]);
   const pathIds = useMemo(() => new Set(paths.map((p) => p.id)), [paths]);
+  const { isDark } = useTheme();
 
   // Build nodes and edges
   const { initialNodes, initialEdges } = useMemo(() => {
@@ -210,15 +213,17 @@ const CatalogDAG: React.FC<CatalogDAGProps> = ({ paths, edges: depEdges }) => {
         source: e.source,
         target: e.target,
         animated: e.type !== 'auto',
-        style: { stroke: e.type === 'auto' ? '#91d5ff' : '#b37feb', strokeWidth: 2 },
-        markerEnd: { type: MarkerType.ArrowClosed, color: e.type === 'auto' ? '#91d5ff' : '#b37feb' },
+        style: { stroke: e.type === 'auto' ? '#ff7a45' : '#d3adf7', strokeWidth: 2, opacity: 0.7 },
+        markerEnd: { type: MarkerType.ArrowClosed, color: e.type === 'auto' ? '#ff7a45' : '#d3adf7' },
         label: e.competencies?.join(', '),
-        labelStyle: { fontSize: 10, fill: '#8c8c8c' },
+        labelStyle: { fontSize: 10, fill: isDark ? '#b0b0b0' : '#8c8c8c', fontWeight: 500 },
+        labelBgStyle: { fill: isDark ? '#1f1f1f' : '#fff', fillOpacity: 0.85 },
+        labelBgPadding: [4, 2] as [number, number],
       }));
 
     const layoutNodes = getLayout(rfNodes, rfEdges);
     return { initialNodes: layoutNodes, initialEdges: rfEdges };
-  }, [paths, depEdges, pathIds]);
+  }, [paths, depEdges, pathIds, isDark]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edgesState, setEdges, onEdgesChange] = useEdgesState(initialEdges);
@@ -238,7 +243,7 @@ const CatalogDAG: React.FC<CatalogDAGProps> = ({ paths, edges: depEdges }) => {
   }
 
   return (
-    <div style={{ width: '100%', height: 'calc(100vh - 280px)', minHeight: 400, border: '1px solid #f0f0f0', borderRadius: 8 }}>
+    <div style={{ width: '100%', height: 'calc(100vh - 280px)', minHeight: 400, border: `1px solid ${isDark ? '#303030' : '#f0f0f0'}`, borderRadius: 8, background: isDark ? '#141414' : undefined }}>
       <ReactFlow
         nodes={nodes}
         edges={edgesState}
@@ -250,8 +255,9 @@ const CatalogDAG: React.FC<CatalogDAGProps> = ({ paths, edges: depEdges }) => {
         minZoom={0.3}
         maxZoom={1.5}
         proOptions={{ hideAttribution: true }}
+        style={{ background: isDark ? '#141414' : undefined }}
       >
-        <Background />
+        <Background color={isDark ? '#303030' : undefined} />
         <Controls />
         <MiniMap
           nodeColor={(node) => {
@@ -259,7 +265,7 @@ const CatalogDAG: React.FC<CatalogDAGProps> = ({ paths, edges: depEdges }) => {
             if (!path) return '#d9d9d9';
             return borderColors[getProgressStatus(path)];
           }}
-          style={{ borderRadius: 4 }}
+          style={{ borderRadius: 4, background: isDark ? '#1f1f1f' : undefined }}
         />
       </ReactFlow>
     </div>
