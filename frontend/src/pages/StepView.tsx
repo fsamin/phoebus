@@ -288,26 +288,7 @@ const StepView: React.FC = () => {
 
           {/* Step content by type */}
           {step.type === 'lesson' && (
-            <>
-              <MarkdownRenderer content={step.content_md} />
-              <div style={{ marginTop: 24, textAlign: 'center' }}>
-                {isCompleted ? (
-                  <Button type="primary" size="large" disabled icon={<CheckCircleOutlined />}>
-                    ✅ Completed
-                  </Button>
-                ) : (
-                  <Button
-                    type="primary"
-                    size="large"
-                    disabled={getStepStatus(step.id) === 'not_started'}
-                    onClick={handleLessonComplete}
-                    icon={<ArrowRightOutlined />}
-                  >
-                    {nextStep ? 'Complete & Continue' : 'Complete'}
-                  </Button>
-                )}
-              </div>
-            </>
+            <MarkdownRenderer content={step.content_md} />
           )}
 
           {step.type === 'quiz' && exerciseData && (
