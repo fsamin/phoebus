@@ -346,7 +346,6 @@ const StepView: React.FC = () => {
               ) : (
                 <Button
                   type="primary"
-                  disabled={getStepStatus(step.id) === 'not_started'}
                   onClick={handleLessonComplete}
                 >
                   {nextStep ? 'Complete lesson & Continue' : 'Complete lesson'} <ArrowRightOutlined />
