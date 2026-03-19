@@ -11,8 +11,8 @@ test.describe('Exercises & Progress', () => {
     // Find a quiz step via the API
     const pathsRes = await request.get('/api/learning-paths');
     const paths = await pathsRes.json();
-    let quizStepId: string | null = null;
-    let quizPathId: string | null = null;
+    let quizStepSlug: string | null = null;
+    let quizPathSlug: string | null = null;
 
     for (const p of paths) {
       const pathRes = await request.get(`/api/learning-paths/${p.id}`);
@@ -20,20 +20,20 @@ test.describe('Exercises & Progress', () => {
       for (const mod of pathData.modules || []) {
         for (const step of mod.steps || []) {
           if (step.type === 'quiz') {
-            quizStepId = step.id;
-            quizPathId = p.id;
+            quizStepSlug = step.slug;
+            quizPathSlug = p.slug;
             break;
           }
         }
-        if (quizStepId) break;
+        if (quizStepSlug) break;
       }
-      if (quizStepId) break;
+      if (quizStepSlug) break;
     }
 
-    test.skip(!quizStepId, 'No quiz step found in synced content');
+    test.skip(!quizStepSlug, 'No quiz step found in synced content');
 
-    // Navigate to the quiz step
-    await page.goto(`/paths/${quizPathId}/steps/${quizStepId}`);
+    // Navigate to the quiz step using slug-based URL
+    await page.goto(`/paths/${quizPathSlug}/steps/${quizStepSlug}`);
     await page.waitForTimeout(2000);
 
     // A quiz should have radio buttons or checkboxes for answers
@@ -52,7 +52,7 @@ test.describe('Exercises & Progress', () => {
     const pathsRes = await request.get('/api/learning-paths');
     const paths = await pathsRes.json();
     let lessonStepId: string | null = null;
-    let lessonPathId: string | null = null;
+    let lessonPathSlug: string | null = null;
 
     for (const p of paths) {
       const pathRes = await request.get(`/api/learning-paths/${p.id}`);
@@ -61,7 +61,7 @@ test.describe('Exercises & Progress', () => {
         for (const step of mod.steps || []) {
           if (step.type === 'lesson') {
             lessonStepId = step.id;
-            lessonPathId = p.id;
+            lessonPathSlug = p.slug;
             break;
           }
         }
@@ -79,7 +79,7 @@ test.describe('Exercises & Progress', () => {
     expect(res.ok()).toBeTruthy();
 
     // Navigate to path overview and verify progress is visible
-    await page.goto(`/paths/${lessonPathId}`);
+    await page.goto(`/paths/${lessonPathSlug}`);
     await page.waitForTimeout(2000);
     const body = await page.textContent('body');
     expect(body).toBeTruthy();
