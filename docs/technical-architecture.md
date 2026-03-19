@@ -65,7 +65,8 @@ Markdown rendering happens **client-side**: the backend sends raw Markdown to th
 | Terminal Simulator | React (custom component) | Terminal-like UI for command-selection exercises (prompt, output, command proposals) |
 | Code Viewer | Monaco Editor (read-only) | VS Code-like IDE layout: file tree, syntax highlighting, line selection, resizable panels |
 | Quiz UI | React + Ant Design | Multiple-choice and short-answer question rendering with feedback |
-| Admin UI | React + Ant Design | Git repo management, user management, analytics dashboards |
+| Catalog DAG | React + @xyflow/react + dagre | DAG visualization of learning path dependencies with custom nodes, smoothstep edges, dark mode support, progress coloring, MiniMap, and Controls |
+| Admin UI | React + Ant Design | Git repo management, user management, dependency management, analytics dashboards |
 | Markdown Renderer | React + remark/rehype | Render lesson content with syntax highlighting, Mermaid diagrams, embedded media |
 | Theme System | React Context + CSS Variables | Light/dark mode with system detection, user toggle, and localStorage persistence |
 
@@ -91,6 +92,9 @@ The backend has no code execution, no infrastructure orchestration, and no WebSo
 | `GET /api/learning-paths` | List learning paths with metadata, aggregated competencies (`competencies_provided`), and `prerequisites_met` status for the authenticated learner. Supports `?sort=competency-path` for topological ordering |
 | `GET /api/learning-paths/{id}` | Retrieve learning path detail with modules (including competencies) and step summaries |
 | `GET /api/learning-paths/{id}/steps/{id}` | Retrieve step content including exercise data (proposals, patches, codebase files) |
+
+API endpoints that reference path or step IDs accept both UUIDs and slugs. When a UUID is provided, the API returns a 301 redirect to the slug-based URL for backward compatibility.
+
 | `GET /api/competencies` | List all distinct competencies across all modules (for catalog filter). Returns `[{ name, learning_path_ids }]` |
 | `POST /api/auth/login` | Local/LDAP authentication (sets httpOnly JWT cookie) |
 | `POST /api/auth/register` | Self-registration for local auth (creates learner, sets JWT cookie) |
@@ -102,6 +106,10 @@ The backend has no code execution, no infrastructure orchestration, and no WebSo
 | `POST /api/admin/repos/{id}/sync` | Manually trigger content sync for a repository |
 | `GET /api/admin/instructor-users` | List users with instructor/admin role (for owner selection) |
 | `POST /api/admin/users` | Create a local user (admin only, local auth must be enabled) |
+| `GET /api/learning-paths/dependencies` | Returns all dependency edges (auto + manual + yaml) between learning paths for DAG visualization |
+| `GET /api/admin/dependencies` | List manual/yaml dependencies with path titles (admin only) |
+| `POST /api/admin/dependencies` | Create a manual dependency between two learning paths (admin only) |
+| `DELETE /api/admin/dependencies/{depId}` | Delete a manual dependency (admin only) |
 | `GET /api/analytics/*` | Learner and instructor analytics |
 | `GET /api/instructor/repos` | List repositories owned by the authenticated instructor |
 | `GET /api/instructor/repos/{id}` | View owned repo details (ownership verified) |
@@ -117,7 +125,7 @@ The backend has no code execution, no infrastructure orchestration, and no WebSo
 
 | Service | Responsibility |
 |---|---|
-| **Content Syncer** | Consumes sync jobs, clones Git repos (ephemeral), parses content structure (front matter + Markdown), syncs binary assets (images, videos) to the asset store, stores codebase files, updates database |
+| **Content Syncer** | Consumes sync jobs, clones Git repos (ephemeral), parses content structure (front matter + Markdown), syncs binary assets (images, videos) to the asset store, stores codebase files, resolves `depends_on` slugs to path IDs and upserts YAML dependencies (cleaning stale ones), updates database |
 | **Auth Service** | Handles OIDC/LDAP authentication (with local auth fallback), session management, RBAC |
 | **Progress Service** | Tracks learner progress, exercise attempts, competency acquisition |
 | **Analytics Service** | Aggregates progress data for instructor dashboards (completion rates, failure points, attempt distributions) |
@@ -139,6 +147,7 @@ The `content_md` column stores **raw Markdown**, consistent with client-side ren
 │ id (PK)          │     │ id (PK)          │     │ id (PK)          │
 │ repo_id (FK)     │     │ learning_path_id │     │ module_id (FK)   │
 │ title            │     │ title            │     │ title            │
+│ slug             │     │ slug             │     │ slug             │
 │ description      │     │ description      │     │ type (enum)      │
 │ metadata (JSONB) │     │ position         │     │ position         │
 │ content_hash     │     │ competencies     │     │ content_md       │
@@ -198,6 +207,18 @@ The `content_md` column stores **raw Markdown**, consistent with client-side ren
 └─────────────────┘     │ created_at           │
                          └─────────────────────┘
 
+┌─────────────────────┐     ┌─────────────────────┐
+│ path_dependencies    │     │ learning_paths       │
+│                      │     │   (referenced)       │
+│ id (PK)              │     │                      │
+│ source_path_id (FK)  │────▶│                      │
+│ target_path_id (FK)  │────▶│                      │
+│ dep_type             │     └─────────────────────┘
+│   CHECK(manual|yaml) │
+│ created_at           │
+│ UNIQUE(source,target)│
+└─────────────────────┘
+
 ┌─────────────────────┐
 │ sync_jobs            │
 │                      │
@@ -222,6 +243,7 @@ The `content_md` column stores **raw Markdown**, consistent with client-side ren
 - **`steps.content_md`** — raw Markdown body (the content after front matter), rendered client-side by remark/rehype
 - **`content_hash`** (on `learning_paths`, `modules`, `steps`) — `TEXT` column storing the SHA-256 content hash. Used by the Content Syncer to skip unchanged elements during re-sync (zero DB writes for unchanged content). Step hash = `SHA256(title + type + duration + content_md + exercise_data)`; module hash = `SHA256(metadata + concatenated step hashes)`; path hash = `SHA256(metadata + concatenated module hashes)`
 - **`deleted_at`** (on `learning_paths`, `modules`, `steps`) — nullable `TIMESTAMPTZ` for soft-delete. Content removed from the repo during sync is flagged (`deleted_at = NOW()`), never physically deleted. If an item reappears at the same path, it is auto-restored (`deleted_at = NULL`). Learner APIs filter `WHERE deleted_at IS NULL`; analytics include deleted items with a visual indicator
+- **`slug`** (on `learning_paths`, `modules`, `steps`) — `TEXT NOT NULL` column storing a URL-friendly identifier auto-generated from titles during sync. Generation rules: lowercase, spaces replaced with hyphens, special characters removed. Duplicate slugs within the same scope are deduplicated with `-2`, `-3`, etc. suffixes. Unique indexes: `idx_learning_paths_slug` (globally unique), `idx_modules_slug` (unique per `learning_path_id`), `idx_steps_slug` (unique per `module_id`)
 - **`progress.step_id`** and **`exercise_attempts.step_id`** — FK changed from `ON DELETE CASCADE` to `ON DELETE SET NULL` (step_id is nullable). Learner progress is **never** lost, even if a step is eventually purged. Migration: `007_content_hash_sync.up.sql`
 - **`exercise_attempts`** — records every attempt a learner makes on an exercise. The `answers` JSONB stores the learner's selections (which command, which patch, which quiz answers). This enables instructors to analyze how learners approach problems.
 - **`codebase_files`** — stores the file contents from code exercise `codebase/` directories inline in PostgreSQL, keyed by step and file path. Served to the frontend for Monaco Editor rendering.
@@ -231,12 +253,13 @@ The `content_md` column stores **raw Markdown**, consistent with client-side ren
 - **`sync_jobs`** — PostgreSQL-based job queue for content sync. Webhook inserts a row; a worker goroutine consumes via `SELECT FOR UPDATE SKIP LOCKED`. Tracks status (`pending`, `running`, `completed`, `failed`), attempt count, and error messages. Provides retry semantics, sync history for the admin UI, and multi-replica coordination.
 - **`users.onboarding_tours_seen`** — `JSONB NOT NULL DEFAULT '{}'` column tracking which onboarding tours the user has completed (e.g., `{"dashboard": true, "catalog": true}`). Added in migration `011`. Used by `GET/PATCH/DELETE /api/me/onboarding` endpoints.
 - **`repository_owners`** — N:N join table between `git_repositories` and `users`. Composite primary key `(repo_id, user_id)` with cascading deletes. Tracks which instructors own which repositories, enabling ownership-based access control on instructor routes. Added in migration `012`.
+- **`path_dependencies`** — stores explicit dependencies between learning paths. Columns: `id` (PK, UUID), `source_path_id` (FK → learning_paths), `target_path_id` (FK → learning_paths), `dep_type` (TEXT with CHECK constraint: `'manual'` or `'yaml'`), `created_at`. UNIQUE constraint on `(source_path_id, target_path_id)`. Manual dependencies are managed via the admin UI; YAML dependencies are upserted by the Content Syncer from `phoebus.yaml` `depends_on` fields.
 
 ### 3.4 Content Syncer
 
 The Content Syncer is responsible for keeping the database in sync with Git repositories. It runs as a worker goroutine that consumes jobs from the `sync_jobs` table.
 
-Git repos are cloned into **`/tmp` (ephemeral)**, parsed, their content stored in PostgreSQL, and then the clone is deleted. There is no persistent disk state for content text, no shared filesystem, and no PVC needed. A full clone of a pedagogical content repo (few MB) takes 5–15 seconds — acceptable for occasional syncs.
+Git repos are cloned into **`/tmp` (ephemeral)**, parsed, their content stored in PostgreSQL, and then the clone is deleted. There is no persistent disk state for content text, no shared filesystem, and no PVC needed. A full clone of a pedagogical content repo (few MB) takes 5–15 seconds — acceptable for occasional syncs. Stderr output from git operations (clone, fetch) is captured via `io.MultiWriter` and included in the sync logs, ensuring that git warnings and errors are visible to administrators.
 
 Binary assets (images, videos, PDFs) discovered in `assets/` directories are uploaded to the **Asset Store** — a pluggable storage backend implementing the `assets.Store` interface:
 

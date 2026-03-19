@@ -116,6 +116,13 @@ Hash values are stored in a `content_hash TEXT` column on `learning_paths`, `mod
 - Deleted steps (files removed from repo): the `steps` record is soft-deleted (flagged, not removed), preserving associated progress
 - Deleted modules and learning paths are likewise soft-deleted (`deleted_at` column)
 - New steps are inserted at the position determined by their numeric prefix
+- Module positions are **not** enforced by a unique database constraint — the syncer manages ordering based on the numeric prefix convention
+
+**Slug Columns:**
+
+- `slug TEXT NOT NULL` column on `learning_paths`, `modules`, and `steps`
+- Auto-generated from titles during sync: lowercase, spaces replaced with hyphens, special characters removed. Duplicate slugs within the same scope are deduplicated with `-2`, `-3`, etc. suffixes
+- Unique indexes: `idx_learning_paths_slug` (globally unique), `idx_modules_slug` (unique per `learning_path_id`), `idx_steps_slug` (unique per `module_id`)
 
 **Edge Cases:**
 - Webhook storms (multiple pushes in quick succession): debounced by checking `sync_status = syncing`
@@ -351,6 +358,8 @@ step_assets (
 
 **Deduplication:** The same file used across multiple steps is stored only once (keyed by content hash).
 
+**Slug-based API routing:** API endpoints that reference path or step IDs accept both UUIDs and slugs. When a UUID is provided, the API returns a 301 redirect to the slug-based URL for backward compatibility.
+
 **API endpoint:**
 
 ```
@@ -384,6 +393,25 @@ GET /api/assets/{hash}
 3. Filtering: by tag, by enrollment status (enrolled, not enrolled, completed), **by competency** (multi-select)
 4. Sorting: alphabetical, by progress, by most recently accessed, **by competency path** (topological order — **default**)
 5. Search: full-text search on title, description, tags
+6. **View mode toggle:** A `Segmented` control (Ant Design) lets the user switch between:
+   - **Grid view** (AppstoreOutlined icon) — the default card layout described below
+   - **DAG view** (ApartmentOutlined icon) — a directed acyclic graph visualization of learning paths and their dependencies
+   - The selected view mode is persisted in `localStorage` (`catalog-view` key)
+7. All filters (search, tags, competencies, status, sort) apply to both grid and DAG views
+
+**DAG view behavior:**
+- Uses `@xyflow/react` (React Flow) with `dagre` layout (horizontal left-to-right)
+- **Toggle** is a `Segmented` control placed next to the page title (not in the filter bar), with labels "Grid" and "Graph"
+- **Nodes** represent learning paths with: title, icon, progress border color (green = completed, orange = in_progress, gray = not_started), and tag badges
+- **Edges** use `smoothstep` type (orthogonal routing with rounded corners, `borderRadius: 12`). Three dependency types are combined:
+  - `auto`: computed from `path.prerequisites` matching other paths' `competencies_provided` — rendered in neutral gray (`#8c8c8c`)
+  - `manual`: administrator-created via the Admin UI (see §8.4) — rendered in purple (`#b37feb`), animated
+  - `yaml`: defined in `phoebus.yaml` via the `depends_on` field (list of path slugs) — rendered in purple (`#b37feb`), animated
+- Edge labels show the matching competency names (deduplicated)
+- **Dark mode**: all DAG elements (node backgrounds, edge labels, canvas, grid, MiniMap) adapt to the current theme via `useTheme()` context
+- **Popover on click**: clicking a node shows a popover with description, competencies provided, prerequisites, and a "View Path" button navigating to `/paths/:slug`
+- **MiniMap**: color-coded by progress status (green/orange/gray)
+- **Controls**: zoom in/out and pan provided by React Flow's built-in Controls component
 
 **Competency path sorting (topological order):**
 Learning paths are ordered based on their competency dependencies:
@@ -564,6 +592,7 @@ You may continue, but the content assumes familiarity with these topics.
 4. When the last step is answered correctly:
    - The exercise is marked as completed
    - A summary is shown (all steps with the correct commands and outputs)
+   - The `TerminalExercise` component emits an `onComplete` callback when all steps are answered correctly
 
 **Attempt Recording:**
 
@@ -718,6 +747,8 @@ Each attempt records the learner's action:
 - Binary files in `codebase/`: skipped (not shown in the file tree)
 - Diff references lines that don't exist: the diff is displayed as-is (the content syncer does not validate diff applicability)
 
+The `CodeExercise` component emits an `onComplete` callback when the learner successfully completes both phases (line identification and patch selection).
+
 ---
 
 ## 6. Quizzes
@@ -778,6 +809,7 @@ Each attempt records the learner's action:
 **Completion logic:**
 - A quiz is marked as completed once all questions have been submitted (regardless of correctness)
 - Rationale: self-assessment — the learner sees their results and decides if they need to review
+- The `Quiz` component emits an `onComplete` callback when all questions have been submitted
 
 ### 6.4 Attempt Recording
 
@@ -943,6 +975,27 @@ See section 2.1 (Git Repository Registration). The admin UI provides:
 **Database:**
 - `repository_owners` table: `repo_id UUID FK`, `user_id UUID FK`, `created_at`, composite primary key `(repo_id, user_id)`
 - Cascading delete: removing a repository or user automatically removes the ownership associations
+
+### 8.4 Dependency Management
+
+**Description:** Administrators manage manual dependencies between learning paths, complementing auto-detected (competency-based) and YAML-declared dependencies.
+
+**Route:** `/admin/dependencies`
+
+**Menu entry:** "Dependencies" with ApartmentOutlined icon in the admin sidebar.
+
+**Behavior:**
+
+1. The page lists all manual and YAML dependencies with source/target path titles and dependency type
+2. Administrators can create a new manual dependency by selecting a source and target learning path
+3. Administrators can delete manual dependencies (YAML dependencies are read-only — managed via `phoebus.yaml`)
+4. Duplicate dependencies (same source + target) are rejected by UNIQUE constraint
+
+**API:**
+
+- `GET /api/admin/dependencies` — list manual and YAML dependencies with path titles. Returns `[{ id, source_path_id, target_path_id, source_title, target_title, dep_type }]`
+- `POST /api/admin/dependencies` — create a manual dependency. Body: `{ "source_path_id": "<uuid>", "target_path_id": "<uuid>" }`. Returns 201 with the created dependency. Returns 409 if duplicate.
+- `DELETE /api/admin/dependencies/{depId}` — delete a manual dependency. Returns 404 if not found or if `dep_type` is `yaml`.
 
 ### 8.3 Platform Health
 
@@ -1166,7 +1219,7 @@ All authenticated views share a common shell layout:
 
 **Unauthenticated views** (Login) render without the header — they use a centered, minimal layout.
 
-**Learning Path views** (`/paths/:pathId/steps/:stepId`) replace the global header with a learning-specific header that includes a sidebar (see section 10.7).
+**Learning Path views** (`/paths/:pathSlug/steps/:stepSlug`) replace the global header with a learning-specific header that includes a sidebar (see section 10.7).
 
 ### 10.2 Route Table
 
@@ -1175,10 +1228,10 @@ All authenticated views share a common shell layout:
 | `/login` | Login | — (public) | Centered | 10.3 |
 | `/` | Dashboard | `learner` | Global shell | 10.4 |
 | `/catalog` | Catalog | `learner` | Global shell | 10.5 |
-| `/paths/:pathId` | Learning Path Overview | `learner` | Global shell | 10.6 |
-| `/paths/:pathId/steps/:stepId` | Step View | `learner` | Learning layout | 10.7 |
+| `/paths/:pathSlug` | Learning Path Overview | `learner` | Global shell | 10.6 |
+| `/paths/:pathSlug/steps/:stepSlug` | Step View | `learner` | Learning layout | 10.7 |
 | `/analytics` | Analytics Dashboard | `instructor` | Global shell | 10.8 |
-| `/analytics/paths/:pathId` | Learning Path Analytics | `instructor` | Global shell | 10.9 |
+| `/analytics/paths/:pathSlug` | Learning Path Analytics | `instructor` | Global shell | 10.9 |
 | `/analytics/learners/:learnerId` | Learner Detail | `instructor` | Global shell | 10.10 |
 | `/admin/repositories` | Repository Management | `admin` | Global shell | 10.11 |
 | `/admin/repositories/new` | Add Repository | `admin` | Global shell | 10.12 |
@@ -1311,8 +1364,8 @@ All authenticated views share a common shell layout:
 
 | Section | Data Source | Behavior |
 |---|---|---|
-| Continue Learning | Last accessed step (`progress` table, most recent `updated_at` where status = `in_progress`) | Click → `/paths/:pathId/steps/:stepId`. Hidden if no in-progress step |
-| My Learning Paths | `progress` aggregated by learning path | Progress bars. Click → `/paths/:pathId`. Shows only enrolled paths (at least one step accessed) |
+| Continue Learning | Last accessed step (`progress` table, most recent `updated_at` where status = `in_progress`) | Click → `/paths/:pathSlug/steps/:stepSlug`. Hidden if no in-progress step |
+| My Learning Paths | `progress` aggregated by learning path | Progress bars. Click → `/paths/:pathSlug`. Shows only enrolled paths (at least one step accessed) |
 | Competencies | `modules.competencies` for completed modules | ✅ for acquired, ⬜ for pending |
 | Statistics | Aggregated from `progress` + `exercise_attempts` | Total steps completed, total exercises attempted, estimated time (sum of `estimated_duration` for completed steps) |
 | Recent Activity | `progress` + `exercise_attempts` ordered by timestamp | Last 10 activities. Each links to the relevant step |
@@ -1321,9 +1374,9 @@ All authenticated views share a common shell layout:
 - `GET /api/me/dashboard` — returns all dashboard data in a single call (enrolled paths with progress, last step, competencies, stats, recent activity)
 
 **Navigation targets:**
-- Continue Learning card → `/paths/:pathId/steps/:stepId`
-- Learning path row → `/paths/:pathId`
-- Activity item → `/paths/:pathId/steps/:stepId`
+- Continue Learning card → `/paths/:pathSlug/steps/:stepSlug`
+- Learning path row → `/paths/:pathSlug`
+- Activity item → `/paths/:pathSlug/steps/:stepSlug`
 - If no enrolled paths → show a call-to-action: "Start learning → Browse catalog" → `/catalog`
 
 ### 10.5 Catalog (`/catalog`)
@@ -1332,7 +1385,7 @@ All authenticated views share a common shell layout:
 
 **Required role:** `learner` (all authenticated users)
 
-**Layout:** Global shell. Grid of learning path cards with filter/search controls.
+**Layout:** Global shell. Segmented view toggle (Grid / DAG) above the filter bar. Grid of learning path cards (default) or DAG visualization, with filter/search controls.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -1388,12 +1441,14 @@ All authenticated views share a common shell layout:
 **API Calls:**
 - `GET /api/learning-paths` — returns all learning paths with metadata, `competencies_provided` (aggregated), and `prerequisites_met` (boolean)
 - `GET /api/competencies` — returns the list of all competencies across all modules (for the filter dropdown)
+- `GET /api/learning-paths/dependencies` — returns all dependency edges (auto + manual + yaml). Each edge: `{ source_path_id, target_path_id, dep_type }`. Used by the DAG view to render edges.
 
 **Navigation targets:**
-- Click a card → `/paths/:pathId`
+- Click a card → `/paths/:pathSlug`
 - "Browse Prerequisite Paths" (from popup) → `/catalog?competencies=...`
+- Click "View Path" in DAG popover → `/paths/:pathSlug`
 
-### 10.6 Learning Path Overview (`/paths/:pathId`)
+### 10.6 Learning Path Overview (`/paths/:pathSlug`)
 
 **Purpose:** Display learning path details, module structure, and allow the learner to start or continue.
 
@@ -1462,12 +1517,12 @@ All authenticated views share a common shell layout:
 - `GET /api/me/progress?path_id=:pathId` — returns learner's progress for all steps in this path
 
 **Navigation targets:**
-- Click any step → `/paths/:pathId/steps/:stepId`
-- Continue Learning → `/paths/:pathId/steps/:stepId` (next incomplete step)
+- Click any step → `/paths/:pathSlug/steps/:stepSlug`
+- Continue Learning → `/paths/:pathSlug/steps/:stepSlug` (next incomplete step)
 - Prerequisite link → `/paths/:prerequisitePathId`
 - ← Back to Catalog → `/catalog`
 
-### 10.7 Step View (`/paths/:pathId/steps/:stepId`)
+### 10.7 Step View (`/paths/:pathSlug/steps/:stepSlug`)
 
 **Purpose:** Display and interact with a single learning step (lesson, quiz, terminal exercise, or code exercise).
 
@@ -1501,9 +1556,9 @@ All authenticated views share a common shell layout:
 
 | Element | Behavior |
 |---|---|
-| ← Path title | Click → back to `/paths/:pathId` (learning path overview) |
+| ← Path title | Click → back to `/paths/:pathSlug` (learning path overview) |
 | ☰ (hamburger) | Toggle sidebar visibility. Default: expanded on desktop (≥1024px), collapsed on mobile |
-| ✕ (close) | Exit learning mode → `/paths/:pathId` |
+| ✕ (close) | Exit learning mode → `/paths/:pathSlug` |
 
 **Sidebar:**
 
@@ -1670,7 +1725,7 @@ Renders a VS Code-like IDE layout with full-bleed display (no padding, no max-wi
 | Section | Data |
 |---|---|
 | Summary cards (Ant Design Statistic) | Total published paths, total enrolled learners, average completion rate, total exercise attempts |
-| Learning paths table (Ant Design Table) | Per-path: title, enrolled count, completion rate, average exercise score. Sortable columns. Click row → `/analytics/paths/:pathId` |
+| Learning paths table (Ant Design Table) | Per-path: title, enrolled count, completion rate, average exercise score. Sortable columns. Click row → `/analytics/paths/:pathSlug` |
 | Recent activity | Last 10 enrollment/completion events with timestamps. Click learner name → `/analytics/learners/:learnerId` |
 
 **API Calls:**
@@ -1678,10 +1733,10 @@ Renders a VS Code-like IDE layout with full-bleed display (no padding, no max-wi
 - `GET /api/analytics/activity?limit=10` — returns recent enrollment/completion events
 
 **Navigation targets:**
-- Click learning path row → `/analytics/paths/:pathId`
+- Click learning path row → `/analytics/paths/:pathSlug`
 - Click learner name → `/analytics/learners/:learnerId`
 
-### 10.9 Learning Path Analytics (`/analytics/paths/:pathId`)
+### 10.9 Learning Path Analytics (`/analytics/paths/:pathSlug`)
 
 **Purpose:** Detailed analytics for a specific learning path: step-level performance, failure points, common wrong answers.
 
@@ -1799,7 +1854,7 @@ Renders a VS Code-like IDE layout with full-bleed display (no padding, no max-wi
 
 **Navigation:**
 - ← Analytics breadcrumb → `/analytics`
-- Click on enrolled path → `/analytics/paths/:pathId`
+- Click on enrolled path → `/analytics/paths/:pathSlug`
 
 ### 10.11 Repository Management (`/admin/repositories`)
 
@@ -2001,7 +2056,7 @@ The instance SSH public key is always displayed above the repository table. It i
 | Message | Log message text |
 | Details | Structured fields (key=value pairs), excluding repo_id and job_id |
 
-Log entries are captured during sync by a dual-write collector: they are emitted to stdout in the configured format AND accumulated in memory. At the end of the sync job (success or failure), the accumulated entries are persisted as JSONB in the `sync_jobs.logs` column.
+Log entries are captured during sync by a dual-write collector: they are emitted to stdout in the configured format AND accumulated in memory. Additionally, stderr output from git operations (clone, fetch) is captured via `io.MultiWriter` and included in the sync logs, ensuring that git warnings and errors are visible to administrators. At the end of the sync job (success or failure), the accumulated entries are persisted as JSONB in the `sync_jobs.logs` column.
 
 **API Calls:**
 - `GET /api/admin/repos/:repoId/sync-logs` — returns array of sync jobs for this repository, ordered by `created_at DESC`
@@ -2224,7 +2279,7 @@ graph TD
     PATH_OVERVIEW["/paths/:id<br>Path Overview"] --> STEP
     PATH_OVERVIEW --> CATALOG
 
-    STEP["/paths/:pathId/steps/:stepId<br>Step View"] --> PATH_OVERVIEW
+    STEP["/paths/:pathSlug/steps/:stepSlug<br>Step View"] --> PATH_OVERVIEW
     STEP -->|sidebar nav| STEP
 
     ANALYTICS["/analytics<br>Analytics Dashboard"] --> PATH_ANALYTICS
