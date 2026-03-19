@@ -10,3 +10,4 @@ e2e/test-results/
 e2e/storage-state/
 phoebus
 .DS_Store
+cookie.txt
