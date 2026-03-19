@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Card, Row, Col, Typography, Tag, Input, Empty, Spin, Select, Progress as AntProgress } from 'antd';
-import { SearchOutlined, CheckCircleOutlined, WarningOutlined } from '@ant-design/icons';
+import { Card, Row, Col, Typography, Tag, Input, Empty, Spin, Select, Progress as AntProgress, Segmented } from 'antd';
+import { SearchOutlined, CheckCircleOutlined, WarningOutlined, AppstoreOutlined, ApartmentOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
-import type { Competency } from '../api/client';
+import type { Competency, DependencyEdge } from '../api/client';
 import { usePageTitle } from '../hooks/usePageTitle';
 import OnboardingTour from '../components/OnboardingTour';
 import { catalogSteps } from '../tours/steps';
+import CatalogDAG from '../components/CatalogDAG';
 
 interface CatalogPath {
   id: string;
@@ -41,6 +42,8 @@ const Catalog: React.FC = () => {
   );
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('competency');
+  const [viewMode, setViewMode] = useState<string>(() => localStorage.getItem('catalog-view') || 'grid');
+  const [depEdges, setDepEdges] = useState<DependencyEdge[]>([]);
 
   // Debounce search 300ms
   useEffect(() => {
@@ -49,13 +52,18 @@ const Catalog: React.FC = () => {
   }, [searchInput]);
 
   useEffect(() => {
-    Promise.all([api.listPaths(), api.listCompetencies()])
-      .then(([p, c]) => {
+    Promise.all([api.listPaths(), api.listCompetencies(), api.listPathDependencies()])
+      .then(([p, c, d]) => {
         setPaths(p as unknown as CatalogPath[]);
         setCompetencies(c);
+        setDepEdges(d.edges || []);
       })
       .finally(() => setLoading(false));
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem('catalog-view', viewMode);
+  }, [viewMode]);
 
   const allTags = [...new Set(paths.flatMap((p) => p.tags || []))].sort();
   const allCompetencies = [...new Set(competencies.map((c) => c.name))].sort();
@@ -141,9 +149,19 @@ const Catalog: React.FC = () => {
   return (
     <div>
       <OnboardingTour tour="catalog" steps={catalogSteps} />
-      <Typography.Title level={2} data-tour="catalog-title">Catalog</Typography.Title>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <Typography.Title level={2} style={{ margin: 0 }} data-tour="catalog-title">Catalog</Typography.Title>
+        <Segmented
+          value={viewMode}
+          onChange={(v) => setViewMode(v as string)}
+          options={[
+            { value: 'grid', icon: <AppstoreOutlined />, label: 'Grid' },
+            { value: 'dag', icon: <ApartmentOutlined />, label: 'Graph' },
+          ]}
+        />
+      </div>
       <Row gutter={16} style={{ marginBottom: 24 }} data-tour="catalog-filters">
-        <Col xs={24} sm={5}>
+        <Col xs={24} sm={6}>
           <Input
             prefix={<SearchOutlined />}
             placeholder="Search learning paths..."
@@ -188,7 +206,7 @@ const Catalog: React.FC = () => {
             ]}
           />
         </Col>
-        <Col xs={24} sm={5}>
+        <Col xs={24} sm={4}>
           <Select
             style={{ width: '100%' }}
             value={sortBy}
@@ -203,7 +221,9 @@ const Catalog: React.FC = () => {
         </Col>
       </Row>
 
-      {filtered.length === 0 ? (
+      {viewMode === 'dag' ? (
+        <CatalogDAG paths={filtered as unknown as any[]} edges={depEdges} />
+      ) : filtered.length === 0 ? (
         <Empty description="No learning paths match your search" />
       ) : (
         <Row gutter={[16, 16]}>

@@ -14,6 +14,7 @@ import RepoForm from './pages/admin/RepoForm';
 import Users from './pages/admin/Users';
 import Health from './pages/admin/Health';
 import SyncLogs from './pages/admin/SyncLogs';
+import Dependencies from './pages/admin/Dependencies';
 import InstructorSyncLogs from './pages/instructor/InstructorSyncLogs';
 import Analytics from './pages/analytics/Analytics';
 import PathAnalyticsView from './pages/analytics/PathAnalytics';
@@ -56,6 +57,7 @@ function ThemedApp() {
               <Route path="/admin/repositories/:repoId/sync-logs" element={<RequireRole role="admin"><SyncLogs /></RequireRole>} />
               <Route path="/admin/users" element={<RequireRole role="admin"><Users /></RequireRole>} />
               <Route path="/admin/health" element={<RequireRole role="admin"><Health /></RequireRole>} />
+              <Route path="/admin/dependencies" element={<RequireRole role="admin"><Dependencies /></RequireRole>} />
             </Route>
           </Routes>
         </BrowserRouter>

@@ -98,6 +98,7 @@ func (h *Handler) RegisterRoutes(ctx context.Context, r chi.Router) {
 
 		// Learning paths (all authenticated users)
 		r.Get("/api/learning-paths", h.ListLearningPaths)
+		r.Get("/api/learning-paths/dependencies", h.ListPathDependencies)
 		r.Get("/api/learning-paths/{pathId}", h.GetLearningPath)
 		r.Get("/api/learning-paths/{pathId}/steps/{stepId}", h.GetStep)
 		r.Get("/api/competencies", h.ListCompetencies)
@@ -148,6 +149,9 @@ func (h *Handler) RegisterRoutes(ctx context.Context, r chi.Router) {
 			r.Patch("/api/admin/repos/{repoId}/paths/{pathId}", h.ToggleRepoPath)
 			r.Get("/api/admin/health", h.AdminHealth)
 			r.Get("/api/admin/ssh-public-key", h.SSHPublicKey)
+			r.Get("/api/admin/dependencies", h.ListManualDependencies)
+			r.Post("/api/admin/dependencies", h.CreatePathDependency)
+			r.Delete("/api/admin/dependencies/{depId}", h.DeletePathDependency)
 		})
 	})
 
