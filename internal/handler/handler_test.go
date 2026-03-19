@@ -558,6 +558,152 @@ func seedContentForCompetencyTests(t *testing.T) (string, string, string) {
 	return pathAID.String(), pathBID.String(), repoID.String()
 }
 
+// --- Slug Resolution ---
+
+// seedContentForSlugTests creates a learning path with a module and step, all with slugs.
+// Returns (pathID, pathSlug, moduleID, moduleSlug, stepID, stepSlug, repoID).
+func seedContentForSlugTests(t *testing.T) (string, string, string, string, string, string, string) {
+	t.Helper()
+	repoID := uuid.New()
+	pathID := uuid.New()
+	modID := uuid.New()
+	stepID := uuid.New()
+	suffix := pathID.String()[:8]
+
+	pathSlug := "slug-test-path-" + suffix
+	modSlug := "slug-test-module-" + suffix
+	stepSlug := "slug-test-step-" + suffix
+
+	testDB.MustExec(`INSERT INTO git_repositories (id, clone_url, branch, auth_type, webhook_uuid, sync_status, created_at, updated_at)
+		VALUES ($1, 'https://github.com/test/slug-test.git', 'main', 'none', $2, 'synced', now(), now())`, repoID, uuid.New())
+
+	testDB.MustExec(`INSERT INTO learning_paths (id, repo_id, title, description, tags, prerequisites, file_path, slug, enabled, created_at, updated_at)
+		VALUES ($1, $2, 'Slug Test Path', 'Testing slug resolution', '{}', '{}', 'slug-test/', $3, true, now(), now())`, pathID, repoID, pathSlug)
+
+	testDB.MustExec(`INSERT INTO modules (id, learning_path_id, title, description, competencies, position, file_path, slug, created_at, updated_at)
+		VALUES ($1, $2, 'Slug Test Module', 'Module for slug tests', '{}', 0, 'slug-test/mod/', $3, now(), now())`, modID, pathID, modSlug)
+
+	testDB.MustExec(`INSERT INTO steps (id, module_id, title, type, content_md, position, file_path, slug, created_at, updated_at)
+		VALUES ($1, $2, 'Slug Test Step', 'lesson', '# Slug Test', 0, 'slug-test/mod/01.md', $3, now(), now())`, stepID, modID, stepSlug)
+
+	return pathID.String(), pathSlug, modID.String(), modSlug, stepID.String(), stepSlug, repoID.String()
+}
+
+func TestGetLearningPathBySlug(t *testing.T) {
+	srv, cleanup := setupTest(t)
+	defer cleanup()
+
+	_, pathSlug, _, _, _, _, _ := seedContentForSlugTests(t)
+	cookie := loginAs(t, model.RoleLearner)
+
+	resp := doRequest(t, srv, "GET", "/api/learning-paths/"+pathSlug, nil, cookie)
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("GET /api/learning-paths/%s: status = %d, body = %s", pathSlug, resp.StatusCode, body)
+	}
+	data := readJSON(t, resp)
+	if data["slug"] != pathSlug {
+		t.Errorf("slug = %v, want %s", data["slug"], pathSlug)
+	}
+	if data["title"] != "Slug Test Path" {
+		t.Errorf("title = %v, want 'Slug Test Path'", data["title"])
+	}
+	// Should include modules
+	mods, ok := data["modules"].([]any)
+	if !ok || len(mods) == 0 {
+		t.Error("expected at least 1 module in response")
+	}
+}
+
+func TestGetLearningPathByUUID_Redirects(t *testing.T) {
+	srv, cleanup := setupTest(t)
+	defer cleanup()
+
+	pathID, pathSlug, _, _, _, _, _ := seedContentForSlugTests(t)
+	cookie := loginAs(t, model.RoleLearner)
+
+	resp := doRequest(t, srv, "GET", "/api/learning-paths/"+pathID, nil, cookie)
+	if resp.StatusCode != 301 {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("GET /api/learning-paths/%s: status = %d, want 301, body = %s", pathID, resp.StatusCode, body)
+	}
+	loc := resp.Header.Get("Location")
+	expected := "/api/learning-paths/" + pathSlug
+	if loc != expected {
+		t.Errorf("Location = %q, want %q", loc, expected)
+	}
+}
+
+func TestGetStepBySlug(t *testing.T) {
+	srv, cleanup := setupTest(t)
+	defer cleanup()
+
+	_, pathSlug, _, _, _, stepSlug, _ := seedContentForSlugTests(t)
+	cookie := loginAs(t, model.RoleLearner)
+
+	resp := doRequest(t, srv, "GET", fmt.Sprintf("/api/learning-paths/%s/steps/%s", pathSlug, stepSlug), nil, cookie)
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("GET step by slug: status = %d, body = %s", resp.StatusCode, body)
+	}
+	data := readJSON(t, resp)
+	if data["slug"] != stepSlug {
+		t.Errorf("step slug = %v, want %s", data["slug"], stepSlug)
+	}
+	if data["title"] != "Slug Test Step" {
+		t.Errorf("title = %v, want 'Slug Test Step'", data["title"])
+	}
+}
+
+func TestGetStepByUUID_Redirects(t *testing.T) {
+	srv, cleanup := setupTest(t)
+	defer cleanup()
+
+	_, pathSlug, _, _, stepID, stepSlug, _ := seedContentForSlugTests(t)
+	cookie := loginAs(t, model.RoleLearner)
+
+	resp := doRequest(t, srv, "GET", fmt.Sprintf("/api/learning-paths/%s/steps/%s", pathSlug, stepID), nil, cookie)
+	if resp.StatusCode != 301 {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("GET step by UUID: status = %d, want 301, body = %s", resp.StatusCode, body)
+	}
+	loc := resp.Header.Get("Location")
+	expected := fmt.Sprintf("/api/learning-paths/%s/steps/%s", pathSlug, stepSlug)
+	if loc != expected {
+		t.Errorf("Location = %q, want %q", loc, expected)
+	}
+}
+
+func TestUpdateProgressWithSlug(t *testing.T) {
+	srv, cleanup := setupTest(t)
+	defer cleanup()
+
+	_, _, _, _, _, stepSlug, _ := seedContentForSlugTests(t)
+	cookie := loginAs(t, model.RoleLearner)
+
+	resp := doRequest(t, srv, "POST", "/api/progress", map[string]string{
+		"step_id": stepSlug,
+		"status":  "in_progress",
+	}, cookie)
+	if resp.StatusCode != 200 {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("UpdateProgress with slug: status = %d, body = %s", resp.StatusCode, body)
+	}
+}
+
+func TestGetLearningPathBySlug_NotFound(t *testing.T) {
+	srv, cleanup := setupTest(t)
+	defer cleanup()
+
+	cookie := loginAs(t, model.RoleLearner)
+	resp := doRequest(t, srv, "GET", "/api/learning-paths/nonexistent-slug-xyz", nil, cookie)
+	if resp.StatusCode != 404 {
+		t.Fatalf("status = %d, want 404", resp.StatusCode)
+	}
+}
+
+// --- Competencies & Prerequisites ---
+
 func TestListCompetencies(t *testing.T) {
 	srv, cleanup := setupTest(t)
 	defer cleanup()
