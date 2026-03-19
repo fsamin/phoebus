@@ -303,7 +303,10 @@ const StepView: React.FC = () => {
             <Quiz
               questions={(exerciseData.questions as Record<string, unknown>[]).map((q) => q as any)}
               onSubmit={handleSubmitAttempt}
-              onComplete={() => setExerciseCompleted(true)}
+              onComplete={() => {
+                setExerciseCompleted(true);
+                if (pathId) api.getProgress(pathId).then(setProgress).catch(() => {});
+              }}
             />
           )}
 
@@ -312,7 +315,10 @@ const StepView: React.FC = () => {
               introduction={exerciseData.introduction as string || ''}
               steps={(exerciseData.steps as Record<string, unknown>[]).map((s) => s as any)}
               onSubmit={handleSubmitAttempt}
-              onComplete={() => setExerciseCompleted(true)}
+              onComplete={() => {
+                setExerciseCompleted(true);
+                if (pathId) api.getProgress(pathId).then(setProgress).catch(() => {});
+              }}
             />
           )}
 
