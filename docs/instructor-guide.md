@@ -108,6 +108,22 @@ The order of modules and steps is determined by the **numeric prefix** of the fi
 
 > 💡 **Recommended convention**: use two-digit prefixes (`01-`, `02-`, ..., `99-`) for clear ordering.
 
+### URL Slugs
+
+During synchronization, Phœbus generates a **URL slug** for each learning path, module, and step from its title. Slugs are used in the frontend URLs for human-readable navigation:
+
+```
+/paths/getting-started-with-docker/steps/introduction-to-containers
+```
+
+| Title | Generated Slug |
+|-------|---------------|
+| "Getting Started with Docker" | `getting-started-with-docker` |
+| "Linux Basics Quiz" | `linux-basics-quiz` |
+| "Fix the Dockerfile" | `fix-the-dockerfile` |
+
+If two items at the same level have the same title, a numeric suffix is appended (`-2`, `-3`, etc.) to ensure uniqueness.
+
 ---
 
 ## 3. The `phoebus.yaml` File

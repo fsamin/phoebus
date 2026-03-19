@@ -27,6 +27,7 @@ Phœbus follows a **content-as-code** philosophy: learning paths are authored in
 - 🔐 **Authentication** — Local accounts, OIDC, LDAP, proxy auth with role-based access (learner / instructor / admin)
 - 🎨 **Modern UI** — React 19 + Ant Design SPA with dark/light mode, syntax highlighting, Mermaid diagrams, and admonitions
 - 📦 **Single Binary** — Frontend embedded via `go:embed`, deploy with Docker Compose
+- 🔑 **SSH Git Auth** — Docker image includes `openssh-client` for SSH-based repository authentication
 
 ## Quick Start
 
@@ -337,6 +338,18 @@ go build -o phoebus ./cmd/phoebus
 | `GET` | `/metrics` | — | Prometheus metrics |
 
 Roles: ✅ = any authenticated user, 👨‍🏫 = instructor+ (ownership verified for repos), 🔑 = admin only
+
+### Frontend Routes
+
+The frontend uses **human-readable slugs** for navigation instead of UUIDs:
+
+```
+/paths/:pathSlug/steps/:stepSlug
+```
+
+Slugs are auto-generated from content titles during sync (e.g., "Getting Started with Docker" → `getting-started-with-docker`). If two items share the same title, a numeric suffix is appended (`-2`, `-3`, etc.).
+
+API endpoints that accept `{id}` or `{stepId}` work with **both UUIDs and slugs**. When accessed via UUID, the API returns a **301 redirect** to the canonical slug-based URL.
 
 ## Documentation
 
