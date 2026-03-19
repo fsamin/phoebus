@@ -58,7 +58,7 @@ const StepView: React.FC = () => {
         setProgress(pr);
         // Auto in_progress only for non-lesson steps (exercises/quizzes)
         if (s.type !== 'lesson') {
-          api.updateProgress(stepId, 'in_progress').catch(() => {});
+          api.updateProgress(s.id, 'in_progress').catch(() => {});
         }
       })
       .finally(() => setLoading(false));
@@ -66,7 +66,7 @@ const StepView: React.FC = () => {
 
   // Scroll tracking for lessons: mark in_progress at 75% scroll
   useEffect(() => {
-    if (!step || step.type !== 'lesson' || !stepId) return;
+    if (!step || step.type !== 'lesson') return;
     const status = getStepStatus(step.id);
     if (status === 'completed' || status === 'in_progress') return;
 
@@ -81,13 +81,13 @@ const StepView: React.FC = () => {
       const scrollPercent = scrollTop / scrollableHeight;
       if (scrollPercent >= 0.75) {
         scrollTrackedRef.current = true;
-        api.updateProgress(stepId, 'in_progress').catch(() => {});
+        api.updateProgress(step.id, 'in_progress').catch(() => {});
         setProgress((prev) => {
-          const existing = prev.find((p) => p.step_id === stepId);
+          const existing = prev.find((p) => p.step_id === step.id);
           if (existing) {
-            return prev.map((p) => p.step_id === stepId ? { ...p, status: 'in_progress' as const } : p);
+            return prev.map((p) => p.step_id === step.id ? { ...p, status: 'in_progress' as const } : p);
           }
-          return [...prev, { id: '', user_id: '', step_id: stepId, status: 'in_progress' as const }];
+          return [...prev, { id: '', user_id: '', step_id: step.id, status: 'in_progress' as const }];
         });
       }
     };
@@ -98,13 +98,13 @@ const StepView: React.FC = () => {
       const { scrollHeight, clientHeight } = container;
       if (scrollHeight <= clientHeight) {
         scrollTrackedRef.current = true;
-        api.updateProgress(stepId, 'in_progress').catch(() => {});
+        api.updateProgress(step.id, 'in_progress').catch(() => {});
         setProgress((prev) => {
-          const existing = prev.find((p) => p.step_id === stepId);
+          const existing = prev.find((p) => p.step_id === step.id);
           if (existing) {
-            return prev.map((p) => p.step_id === stepId ? { ...p, status: 'in_progress' as const } : p);
+            return prev.map((p) => p.step_id === step.id ? { ...p, status: 'in_progress' as const } : p);
           }
-          return [...prev, { id: '', user_id: '', step_id: stepId, status: 'in_progress' as const }];
+          return [...prev, { id: '', user_id: '', step_id: step.id, status: 'in_progress' as const }];
         });
       }
     };
@@ -131,14 +131,14 @@ const StepView: React.FC = () => {
   };
 
   const handleLessonComplete = async () => {
-    if (!stepId) return;
-    await api.updateProgress(stepId, 'completed');
+    if (!step) return;
+    await api.updateProgress(step.id, 'completed');
     setProgress((prev) => {
-      const existing = prev.find((p) => p.step_id === stepId);
+      const existing = prev.find((p) => p.step_id === step.id);
       if (existing) {
-        return prev.map((p) => p.step_id === stepId ? { ...p, status: 'completed' as const } : p);
+        return prev.map((p) => p.step_id === step.id ? { ...p, status: 'completed' as const } : p);
       }
-      return [...prev, { id: '', user_id: '', step_id: stepId, status: 'completed' as const }];
+      return [...prev, { id: '', user_id: '', step_id: step.id, status: 'completed' as const }];
     });
 
     if (nextStep && path) {
@@ -155,18 +155,18 @@ const StepView: React.FC = () => {
   };
 
   const handleSubmitAttempt = useCallback(async (body: Record<string, unknown>) => {
-    if (!stepId) throw new Error('No step ID');
-    const result = await api.submitAttempt(stepId, body);
+    if (!step) throw new Error('No step');
+    const result = await api.submitAttempt(step.id, body);
     // Refresh progress after attempt
     if (pathId) {
       api.getProgress(pathId).then(setProgress);
     }
     return result;
-  }, [stepId, pathId]);
+  }, [step, pathId]);
 
   const handleReset = async () => {
-    if (!stepId) return;
-    await api.resetExercise(stepId);
+    if (!step) return;
+    await api.resetExercise(step.id);
     message.info('Exercise reset');
     // Force reload the step
     window.location.reload();
