@@ -1,16 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import {
-  Typography, Spin, Card, Collapse, List, Tag, Progress as AntProgress, Button, Breadcrumb, Modal,
+  Typography, Spin, Card, Collapse, List, Tag, Progress as AntProgress, Button, Breadcrumb, Modal, Row, Col,
 } from 'antd';
 import {
   CheckCircleOutlined, ClockCircleOutlined,
   FileTextOutlined, QuestionCircleOutlined, CodeOutlined, DesktopOutlined,
-  WarningOutlined, ExclamationCircleOutlined,
+  WarningOutlined, ExclamationCircleOutlined, ArrowRightOutlined,
 } from '@ant-design/icons';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api/client';
 import { usePageTitle } from '../hooks/usePageTitle';
-import type { LearningPathDetail, Progress, StepSummary, LearningPathSummary } from '../api/client';
+import type { LearningPathDetail, Progress, StepSummary, LearningPathSummary, DependencyEdge } from '../api/client';
 
 const stepIcon = (type: string) => {
   switch (type) {
@@ -37,12 +37,13 @@ const PathOverview: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [prereqModalOpen, setPrereqModalOpen] = useState(false);
   const [pendingStepId, setPendingStepId] = useState<string | null>(null);
+  const [depEdges, setDepEdges] = useState<DependencyEdge[]>([]);
   usePageTitle(path ? path.title : 'Learning Path');
 
   useEffect(() => {
     if (!pathId) return;
-    Promise.all([api.getPath(pathId), api.getProgress(pathId), api.listPaths()])
-      .then(([p, pr, ap]) => { setPath(p); setProgress(pr); setAllPaths(ap); })
+    Promise.all([api.getPath(pathId), api.getProgress(pathId), api.listPaths(), api.listPathDependencies()])
+      .then(([p, pr, ap, d]) => { setPath(p); setProgress(pr); setAllPaths(ap); setDepEdges(d.edges || []); })
       .finally(() => setLoading(false));
   }, [pathId]);
 
@@ -98,6 +99,11 @@ const PathOverview: React.FC = () => {
   const nextStep = allSteps.find((s) => stepStatus(s.id, progress) !== 'completed');
   const isPathCompleted = allSteps.length > 0 && !nextStep;
 
+  // Paths that depend on this one (this path is their prerequisite)
+  const dependentPaths = path ? allPaths.filter((p) => {
+    return depEdges.some((e) => e.source === path.id && e.target === p.id);
+  }) : [];
+
   return (
     <div>
       <Breadcrumb items={[
@@ -110,48 +116,50 @@ const PathOverview: React.FC = () => {
       </Typography.Title>
       <Typography.Paragraph type="secondary">{path.description}</Typography.Paragraph>
 
-      <Card style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-          <div style={{ flex: 1 }}>
-            <AntProgress percent={pct} />
-            <Typography.Text type="secondary">
-              {completedSteps}/{allSteps.length} steps completed
-              {' · '}{path.modules.length} modules
-              {path.estimated_duration ? ` · ⏱ ${path.estimated_duration}` : ''}
-            </Typography.Text>
-          </div>
-          {!isPathCompleted && nextStep && (
-            <Button type="primary" onClick={() => handleStartLearning(nextStep.slug)}>
-              {completedSteps > 0 ? 'Continue Learning' : 'Start Learning'}
-            </Button>
-          )}
-          {isPathCompleted && <Tag color="green" icon={<CheckCircleOutlined />}>Path Completed</Tag>}
-        </div>
-        <div style={{ marginTop: 12 }}>
-          {path.tags?.map((tag) => <Tag key={tag}>{tag}</Tag>)}
-        </div>
-        {path.prerequisites && path.prerequisites.length > 0 && (
-          <div style={{ marginTop: 12 }}>
-            <Typography.Text type="secondary">Prerequisites: </Typography.Text>
-            {unmetPrereqs.map((p) => (
-              <Tag
-                key={p.competency}
-                icon={p.met ? <CheckCircleOutlined /> : <WarningOutlined />}
-                color={p.met ? 'success' : 'warning'}
-              >
-                {p.competency}
-                {p.provider && (
-                  <Typography.Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>
-                    ({p.provider.title})
-                  </Typography.Text>
-                )}
-              </Tag>
-            ))}
-          </div>
-        )}
-      </Card>
+      <Row gutter={24}>
+        <Col xs={24} lg={dependentPaths.length > 0 ? 17 : 24}>
+          <Card style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
+              <div style={{ flex: 1 }}>
+                <AntProgress percent={pct} />
+                <Typography.Text type="secondary">
+                  {completedSteps}/{allSteps.length} steps completed
+                  {' · '}{path.modules.length} modules
+                  {path.estimated_duration ? ` · ⏱ ${path.estimated_duration}` : ''}
+                </Typography.Text>
+              </div>
+              {!isPathCompleted && nextStep && (
+                <Button type="primary" onClick={() => handleStartLearning(nextStep.slug)}>
+                  {completedSteps > 0 ? 'Continue Learning' : 'Start Learning'}
+                </Button>
+              )}
+              {isPathCompleted && <Tag color="green" icon={<CheckCircleOutlined />}>Path Completed</Tag>}
+            </div>
+            <div style={{ marginTop: 12 }}>
+              {path.tags?.map((tag) => <Tag key={tag}>{tag}</Tag>)}
+            </div>
+            {path.prerequisites && path.prerequisites.length > 0 && (
+              <div style={{ marginTop: 12 }}>
+                <Typography.Text type="secondary">Prerequisites: </Typography.Text>
+                {unmetPrereqs.map((p) => (
+                  <Tag
+                    key={p.competency}
+                    icon={p.met ? <CheckCircleOutlined /> : <WarningOutlined />}
+                    color={p.met ? 'success' : 'warning'}
+                  >
+                    {p.competency}
+                    {p.provider && (
+                      <Typography.Text type="secondary" style={{ fontSize: 11, marginLeft: 4 }}>
+                        ({p.provider.title})
+                      </Typography.Text>
+                    )}
+                  </Tag>
+                ))}
+              </div>
+            )}
+          </Card>
 
-      <Collapse
+          <Collapse
         defaultActiveKey={path.modules.map((m) => m.id)}
         items={path.modules.map((mod) => {
           const modCompleted = mod.steps.filter((s) => stepStatus(s.id, progress) === 'completed').length;
@@ -211,6 +219,57 @@ const PathOverview: React.FC = () => {
           };
         })}
       />
+        </Col>
+
+        {dependentPaths.length > 0 && (
+          <Col xs={24} lg={7}>
+            <Card
+              title={<Typography.Text strong>Unlocks</Typography.Text>}
+              size="small"
+              style={{ marginBottom: 24 }}
+            >
+              <Typography.Text type="secondary" style={{ fontSize: 12, display: 'block', marginBottom: 12 }}>
+                Completing this path unlocks the following:
+              </Typography.Text>
+              <List
+                size="small"
+                dataSource={dependentPaths}
+                renderItem={(dep) => {
+                  const depProgress = dep.progress_total
+                    ? Math.round(((dep.progress_completed ?? 0) / dep.progress_total) * 100)
+                    : 0;
+                  const depStatus = !dep.progress_total ? 'not_started'
+                    : dep.progress_completed === dep.progress_total ? 'completed' : 'in_progress';
+                  return (
+                    <List.Item style={{ padding: '8px 0', cursor: 'pointer' }} onClick={() => navigate(`/paths/${dep.slug}`)}>
+                      <div style={{ width: '100%' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          {dep.icon && <span>{dep.icon}</span>}
+                          <Typography.Text strong style={{ fontSize: 13 }}>
+                            {dep.title}
+                          </Typography.Text>
+                          <ArrowRightOutlined style={{ fontSize: 10, color: '#8c8c8c', marginLeft: 'auto' }} />
+                        </div>
+                        <div style={{ marginTop: 4 }}>
+                          <AntProgress
+                            percent={depProgress}
+                            size="small"
+                            showInfo={false}
+                            strokeColor={depStatus === 'completed' ? '#52c41a' : depStatus === 'in_progress' ? '#fa8c16' : '#d9d9d9'}
+                          />
+                          <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                            {dep.module_count} modules · {dep.step_count} steps
+                          </Typography.Text>
+                        </div>
+                      </div>
+                    </List.Item>
+                  );
+                }}
+              />
+            </Card>
+          </Col>
+        )}
+      </Row>
 
       <Modal
         title={
