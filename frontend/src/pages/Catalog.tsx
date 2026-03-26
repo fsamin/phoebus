@@ -1,13 +1,13 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Card, Row, Col, Typography, Tag, Input, Empty, Spin, Select, Progress as AntProgress, Segmented } from 'antd';
-import { SearchOutlined, CheckCircleOutlined, WarningOutlined, AppstoreOutlined, ApartmentOutlined } from '@ant-design/icons';
+import { SearchOutlined, CheckCircleOutlined, WarningOutlined, AppstoreOutlined, UnorderedListOutlined } from '@ant-design/icons';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Competency, DependencyEdge } from '../api/client';
 import { usePageTitle } from '../hooks/usePageTitle';
 import OnboardingTour from '../components/OnboardingTour';
 import { catalogSteps } from '../tours/steps';
-import CatalogDAG from '../components/CatalogDAG';
+import CatalogTree from '../components/CatalogTree';
 
 interface CatalogPath {
   id: string;
@@ -42,7 +42,10 @@ const Catalog: React.FC = () => {
   );
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [sortBy, setSortBy] = useState<string>('competency');
-  const [viewMode, setViewMode] = useState<string>(() => localStorage.getItem('catalog-view') || 'grid');
+  const [viewMode, setViewMode] = useState<string>(() => {
+    const stored = localStorage.getItem('catalog-view');
+    return stored === 'dag' ? 'tree' : (stored || 'grid');
+  });
   const [depEdges, setDepEdges] = useState<DependencyEdge[]>([]);
 
   // Debounce search 300ms
@@ -156,7 +159,7 @@ const Catalog: React.FC = () => {
           onChange={(v) => setViewMode(v as string)}
           options={[
             { value: 'grid', icon: <AppstoreOutlined />, label: 'Grid' },
-            { value: 'dag', icon: <ApartmentOutlined />, label: 'Graph' },
+            { value: 'tree', icon: <UnorderedListOutlined />, label: 'Tree' },
           ]}
         />
       </div>
@@ -221,8 +224,8 @@ const Catalog: React.FC = () => {
         </Col>
       </Row>
 
-      {viewMode === 'dag' ? (
-        <CatalogDAG paths={filtered as unknown as any[]} edges={depEdges} />
+      {viewMode === 'tree' ? (
+        <CatalogTree paths={filtered as unknown as any[]} edges={depEdges} />
       ) : filtered.length === 0 ? (
         <Empty description="No learning paths match your search" />
       ) : (
