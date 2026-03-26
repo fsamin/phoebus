@@ -30,7 +30,7 @@ const sanitizeSchema = {
   },
   tagNames: [...(defaultSchema.tagNames || []).filter(
     (tag: string) => !['script', 'style', 'iframe', 'object', 'embed', 'form', 'textarea'].includes(tag)
-  ), 'video', 'audio', 'source'],
+  ), 'video', 'audio', 'source', 'tip', 'warning', 'danger', 'info', 'note', 'caution'],
   // Only allow safe URL protocols
   protocols: {
     ...defaultSchema.protocols,
