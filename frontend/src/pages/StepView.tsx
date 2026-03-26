@@ -284,7 +284,6 @@ const StepView: React.FC = () => {
           />
         ) : (
         <div style={{ maxWidth: 900, margin: '0 auto' }}>
-          <Typography.Title level={3}>{step.title}</Typography.Title>
 
           {/* Completed banner for lessons */}
           {step.type === 'lesson' && isCompleted && (
