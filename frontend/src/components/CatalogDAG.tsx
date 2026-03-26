@@ -48,8 +48,8 @@ interface CatalogDAGProps {
   edges: DependencyEdge[];
 }
 
-const NODE_WIDTH = 260;
-const NODE_HEIGHT = 120;
+const NODE_WIDTH = 300;
+const NODE_HEIGHT = 140;
 
 function getProgressStatus(path: CatalogPath): 'completed' | 'in_progress' | 'not_started' {
   if (!path.progress_total || path.progress_total === 0) return 'not_started';
@@ -69,27 +69,77 @@ const borderColors = {
   not_started: '#d9d9d9',
 };
 
-function getLayout(nodes: Node[], edges: Edge[]) {
-  const g = new dagre.graphlib.Graph();
-  g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: 'LR', nodesep: 60, ranksep: 120 });
-
-  nodes.forEach((node) => {
-    g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
-  });
+function getLayout(nodes: Node[], edges: Edge[]): { treeNodes: Node[]; isolatedNodes: Node[] } {
+  // Identify nodes that participate in edges vs isolated nodes
+  const connectedIds = new Set<string>();
   edges.forEach((edge) => {
-    g.setEdge(edge.source, edge.target);
+    connectedIds.add(edge.source);
+    connectedIds.add(edge.target);
   });
 
-  dagre.layout(g);
+  const connectedNodes = nodes.filter((n) => connectedIds.has(n.id));
+  const isolatedNodes = nodes.filter((n) => !connectedIds.has(n.id));
 
-  return nodes.map((node) => {
-    const pos = g.node(node.id);
-    return {
-      ...node,
-      position: { x: pos.x - NODE_WIDTH / 2, y: pos.y - NODE_HEIGHT / 2 },
-    };
-  });
+  // Sort connected nodes alphabetically for deterministic layout
+  const sortedConnected = [...connectedNodes].sort((a, b) =>
+    (a.data.path as CatalogPath).title.localeCompare((b.data.path as CatalogPath).title)
+  );
+
+  // Layout connected nodes with dagre (top-to-bottom)
+  let layoutConnected: Node[] = [];
+  let maxY = 0;
+  if (sortedConnected.length > 0) {
+    const g = new dagre.graphlib.Graph();
+    g.setDefaultEdgeLabel(() => ({}));
+    g.setGraph({ rankdir: 'TB', nodesep: 80, ranksep: 160 });
+
+    sortedConnected.forEach((node) => {
+      g.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
+    });
+    edges.forEach((edge) => {
+      g.setEdge(edge.source, edge.target);
+    });
+
+    dagre.layout(g);
+
+    layoutConnected = sortedConnected.map((node) => {
+      const pos = g.node(node.id);
+      const y = pos.y - NODE_HEIGHT / 2;
+      if (y + NODE_HEIGHT > maxY) maxY = y + NODE_HEIGHT;
+      return {
+        ...node,
+        position: { x: pos.x - NODE_WIDTH / 2, y },
+      };
+    });
+  }
+
+  // Place isolated nodes in a horizontal row below the tree
+  const ISOLATED_GAP = 40;
+  const ISOLATED_TOP_MARGIN = 80;
+  const sortedIsolated = [...isolatedNodes].sort((a, b) =>
+    (a.data.path as CatalogPath).title.localeCompare((b.data.path as CatalogPath).title)
+  );
+  const isolatedStartY = maxY + ISOLATED_TOP_MARGIN;
+  const totalIsolatedWidth = sortedIsolated.length * NODE_WIDTH + (sortedIsolated.length - 1) * ISOLATED_GAP;
+  // Center isolated row relative to tree width
+  const treeMinX = layoutConnected.length > 0
+    ? Math.min(...layoutConnected.map((n) => n.position.x))
+    : 0;
+  const treeMaxX = layoutConnected.length > 0
+    ? Math.max(...layoutConnected.map((n) => n.position.x + NODE_WIDTH))
+    : totalIsolatedWidth;
+  const treeCenterX = (treeMinX + treeMaxX) / 2;
+  const isolatedStartX = treeCenterX - totalIsolatedWidth / 2;
+
+  const layoutIsolated = sortedIsolated.map((node, i) => ({
+    ...node,
+    position: {
+      x: isolatedStartX + i * (NODE_WIDTH + ISOLATED_GAP),
+      y: isolatedStartY,
+    },
+  }));
+
+  return { treeNodes: layoutConnected, isolatedNodes: layoutIsolated };
 }
 
 // Custom node component
@@ -119,7 +169,7 @@ const PathNode: React.FC<{ data: { path: CatalogPath } }> = ({ data }) => {
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
           {path.icon && <span style={{ fontSize: 18 }}>{path.icon}</span>}
-          <Typography.Text strong ellipsis style={{ flex: 1, fontSize: 13 }}>
+          <Typography.Text strong ellipsis style={{ flex: 1, fontSize: 14 }}>
             {path.title}
           </Typography.Text>
           {status === 'completed' && <CheckCircleOutlined style={{ color: '#52c41a' }} />}
@@ -179,11 +229,11 @@ const PathNode: React.FC<{ data: { path: CatalogPath } }> = ({ data }) => {
 
   return (
     <>
-      <Handle type="target" position={Position.Left} style={{ background: isDark ? '#555' : '#d9d9d9' }} />
+      <Handle type="target" position={Position.Top} style={{ background: isDark ? '#555' : '#d9d9d9' }} />
       <Popover content={popoverContent} title={`${path.icon || ''} ${path.title}`} trigger="click" placement="right">
         {nodeContent}
       </Popover>
-      <Handle type="source" position={Position.Right} style={{ background: isDark ? '#555' : '#d9d9d9' }} />
+      <Handle type="source" position={Position.Bottom} style={{ background: isDark ? '#555' : '#d9d9d9' }} />
     </>
   );
 };
@@ -202,8 +252,8 @@ const CatalogDAG: React.FC<CatalogDAGProps> = ({ paths, edges: depEdges }) => {
       type: 'pathNode',
       data: { path: p },
       position: { x: 0, y: 0 },
-      sourcePosition: Position.Right,
-      targetPosition: Position.Left,
+      sourcePosition: Position.Bottom,
+      targetPosition: Position.Top,
     }));
 
     const rfEdges: Edge[] = depEdges
@@ -223,7 +273,32 @@ const CatalogDAG: React.FC<CatalogDAGProps> = ({ paths, edges: depEdges }) => {
         pathOptions: { borderRadius: 12 },
       }));
 
-    const layoutNodes = getLayout(rfNodes, rfEdges);
+    const { treeNodes, isolatedNodes } = getLayout(rfNodes, rfEdges);
+    const layoutNodes = [...treeNodes, ...isolatedNodes];
+
+    // Add a label node for isolated paths section if there are any
+    if (isolatedNodes.length > 0 && treeNodes.length > 0) {
+      const labelY = Math.min(...isolatedNodes.map((n) => n.position.y)) - 40;
+      const labelX = isolatedNodes.reduce((sum, n) => sum + n.position.x, 0) / isolatedNodes.length + NODE_WIDTH / 2 - 80;
+      layoutNodes.push({
+        id: '__isolated-label__',
+        type: 'default',
+        data: { label: '📚 Independent paths' },
+        position: { x: labelX, y: labelY },
+        selectable: false,
+        draggable: false,
+        style: {
+          background: 'transparent',
+          border: 'none',
+          fontSize: 13,
+          color: isDark ? '#8c8c8c' : '#595959',
+          fontStyle: 'italic',
+          width: 'auto',
+          padding: 0,
+        },
+      } as Node);
+    }
+
     return { initialNodes: layoutNodes, initialEdges: rfEdges };
   }, [paths, depEdges, pathIds, isDark]);
 
