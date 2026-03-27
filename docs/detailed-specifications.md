@@ -393,25 +393,7 @@ GET /api/assets/{hash}
 3. Filtering: by tag, by enrollment status (enrolled, not enrolled, completed), **by competency** (multi-select)
 4. Sorting: alphabetical, by progress, by most recently accessed, **by competency path** (topological order — **default**)
 5. Search: full-text search on title, description, tags
-6. **View mode toggle:** A `Segmented` control (Ant Design) lets the user switch between:
-   - **Grid view** (AppstoreOutlined icon) — the default card layout described below
-   - **DAG view** (ApartmentOutlined icon) — a directed acyclic graph visualization of learning paths and their dependencies
-   - The selected view mode is persisted in `localStorage` (`catalog-view` key)
-7. All filters (search, tags, competencies, status, sort) apply to both grid and DAG views
-
-**DAG view behavior:**
-- Uses `@xyflow/react` (React Flow) with `dagre` layout (horizontal left-to-right)
-- **Toggle** is a `Segmented` control placed next to the page title (not in the filter bar), with labels "Grid" and "Graph"
-- **Nodes** represent learning paths with: title, icon, progress border color (green = completed, orange = in_progress, gray = not_started), and tag badges
-- **Edges** use `smoothstep` type (orthogonal routing with rounded corners, `borderRadius: 12`). Three dependency types are combined:
-  - `auto`: computed from `path.prerequisites` matching other paths' `competencies_provided` — rendered in neutral gray (`#8c8c8c`)
-  - `manual`: administrator-created via the Admin UI (see §8.4) — rendered in purple (`#b37feb`), animated
-  - `yaml`: defined in `phoebus.yaml` via the `depends_on` field (list of path slugs) — rendered in purple (`#b37feb`), animated
-- Edge labels show the matching competency names (deduplicated)
-- **Dark mode**: all DAG elements (node backgrounds, edge labels, canvas, grid, MiniMap) adapt to the current theme via `useTheme()` context
-- **Popover on click**: clicking a node shows a popover with description, competencies provided, prerequisites, and a "View Path" button navigating to `/paths/:pathSlug`
-- **MiniMap**: color-coded by progress status (green/orange/gray)
-- **Controls**: zoom in/out and pan provided by React Flow's built-in Controls component
+6. **View mode:** The catalog displays learning paths as a grid of cards (no toggle — grid is the only view)
 
 **Competency path sorting (topological order):**
 Learning paths are ordered based on their competency dependencies:
@@ -1385,7 +1367,7 @@ All authenticated views share a common shell layout:
 
 **Required role:** `learner` (all authenticated users)
 
-**Layout:** Global shell. Segmented view toggle (Grid / DAG) above the filter bar. Grid of learning path cards (default) or DAG visualization, with filter/search controls.
+**Layout:** Global shell. Grid of learning path cards with filter/search controls.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -1441,12 +1423,9 @@ All authenticated views share a common shell layout:
 **API Calls:**
 - `GET /api/learning-paths` — returns all learning paths with metadata, `competencies_provided` (aggregated), and `prerequisites_met` (boolean)
 - `GET /api/competencies` — returns the list of all competencies across all modules (for the filter dropdown)
-- `GET /api/learning-paths/dependencies` — returns all dependency edges (auto + manual + yaml). Each edge: `{ source_path_id, target_path_id, dep_type }`. Used by the DAG view to render edges.
-
 **Navigation targets:**
 - Click a card → `/paths/:pathSlug`
 - "Browse Prerequisite Paths" (from popup) → `/catalog?competencies=...`
-- Click "View Path" in DAG popover → `/paths/:pathSlug`
 
 ### 10.6 Learning Path Overview (`/paths/:pathSlug`)
 
@@ -1454,7 +1433,7 @@ All authenticated views share a common shell layout:
 
 **Required role:** `learner` (all authenticated users)
 
-**Layout:** Global shell. Single-column content.
+**Layout:** Global shell. Two-column layout when dependent paths exist (main content left, "Unlocks" sidebar right). Falls back to single-column when there are no dependent paths.
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
@@ -1468,32 +1447,21 @@ All authenticated views share a common shell layout:
 │  Master the fundamentals of Kubernetes: from pods to deployments,    │
 │  services, and configuration management.                             │
 │                                                                      │
-│  Tags: #kubernetes #containers #orchestration                        │
-│  Duration: ~3 hours · 5 modules · 18 steps                          │
-│  Prerequisites: Docker Basics (✅ completed)                         │
-│                                                                      │
-│  Progress: ████████████░░░░ 72%               [Continue Learning]    │
-│                                                                      │
-│  ┌─ Modules ─────────────────────────────────────────────────────┐   │
-│  │                                                                │   │
-│  │  ✅ 1. Introduction to Kubernetes         4 steps   ✓ done    │   │
-│  │     ├── ✅ 📖 What is Kubernetes?                             │   │
-│  │     ├── ✅ 📖 Architecture Overview                           │   │
-│  │     ├── ✅ ❓ Key Concepts Quiz                               │   │
-│  │     └── ✅ 💻 Install minikube                                │   │
-│  │                                                                │   │
-│  │  🔵 2. Pods & Containers                  5 steps   3/5       │   │
-│  │     ├── ✅ 📖 Pod Basics                                      │   │
-│  │     ├── ✅ 💻 Create a Pod                                    │   │
-│  │     ├── ✅ ❓ Pod Lifecycle                                    │   │
-│  │     ├── ○  🔧 Fix Pod CrashLoop           ← current          │   │
-│  │     └── ○  📖 Multi-container Pods                            │   │
-│  │                                                                │   │
-│  │  ▸ 3. Services & Networking               4 steps   0/4       │   │
-│  │  ▸ 4. Configuration                       3 steps   0/3       │   │
-│  │  ▸ 5. Deployments & Rollouts              2 steps   0/2       │   │
-│  │                                                                │   │
-│  └────────────────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────┐ ┌────────────────────┐ │
+│  │ Progress: ████████████░░░░ 72%           │ │ 🔓 Unlocks         │ │
+│  │ 13/18 steps · 5 modules · ⏱ ~3h         │ │                    │ │
+│  │ Tags: #kubernetes #containers            │ │ Completing this    │ │
+│  │ Prerequisites: Docker Basics ✅          │ │ path unlocks:      │ │
+│  │                    [Continue Learning]    │ │                    │ │
+│  └──────────────────────────────────────────┘ │ 📘 Advanced K8s    │ │
+│                                               │ ████░░░ 3m · 12s   │ │
+│  ┌─ Modules ─────────────────────────────┐    │                    │ │
+│  │ ✅ 1. Introduction    4 steps  ✓ done │    │ 📘 K8s Security    │ │
+│  │ 🔵 2. Pods            5 steps  3/5    │    │ ░░░░░░ 2m · 8s    │ │
+│  │ ▸ 3. Services         4 steps  0/4    │    └────────────────────┘ │
+│  │ ▸ 4. Configuration    3 steps  0/3    │                           │
+│  │ ▸ 5. Deployments      2 steps  0/2    │                           │
+│  └────────────────────────────────────────┘                           │
 │                                                                      │
 └──────────────────────────────────────────────────────────────────────┘
 ```
@@ -1509,12 +1477,15 @@ All authenticated views share a common shell layout:
 | Continue Learning button | Navigates to the next incomplete step. Becomes "Start Learning" if not started. Hidden if completed. If prerequisites are unmet, shows the prerequisite enforcement popup first (§3.1.1) |
 | Module list | Expandable/collapsible (Ant Design Collapse). Shows step list with type icons and completion |
 | Current step indicator | "← current" on the last in-progress step |
+| **Unlocks sidebar** | Card shown on the right (Ant Design `Row`/`Col`, `lg={7}`) when the current path has dependent paths. Lists each dependent path with: icon, title, progress bar, module/step count. Click navigates to `/paths/:depSlug`. Only visible when `dependentPaths.length > 0`; otherwise the main content spans full width |
 
 **Step type icons:** 📖 Lesson · ❓ Quiz · 💻 Terminal Exercise · 🔧 Code Exercise
 
 **API Calls:**
 - `GET /api/learning-paths/:pathId` — returns path metadata, modules, steps (titles, types, order)
 - `GET /api/me/progress?path_id=:pathId` — returns learner's progress for all steps in this path
+- `GET /api/learning-paths` — returns all learning paths (used to resolve prerequisite providers and dependent paths)
+- `GET /api/learning-paths/dependencies` — returns all dependency edges (used to identify paths that depend on the current one for the "Unlocks" sidebar)
 
 **Navigation targets:**
 - Click any step → `/paths/:pathSlug/steps/:stepSlug`

@@ -65,7 +65,7 @@ Markdown rendering happens **client-side**: the backend sends raw Markdown to th
 | Terminal Simulator | React (custom component) | Terminal-like UI for command-selection exercises (prompt, output, command proposals) |
 | Code Viewer | Monaco Editor (read-only) | VS Code-like IDE layout: file tree, syntax highlighting, line selection, resizable panels |
 | Quiz UI | React + Ant Design | Multiple-choice and short-answer question rendering with feedback |
-| Catalog DAG | React + @xyflow/react + dagre | DAG visualization of learning path dependencies with custom nodes, smoothstep edges, dark mode support, progress coloring, MiniMap, and Controls |
+| Catalog DAG | React + @xyflow/react + dagre | DAG visualization of learning path dependencies (admin Dependencies page only). Custom nodes, smoothstep edges, dark mode support, progress coloring, MiniMap, and Controls |
 | Admin UI | React + Ant Design | Git repo management, user management, dependency management, analytics dashboards |
 | Markdown Renderer | React + remark/rehype | Render lesson content with syntax highlighting, Mermaid diagrams, embedded media |
 | Theme System | React Context + CSS Variables | Light/dark mode with system detection, user toggle, and localStorage persistence |
@@ -106,7 +106,7 @@ API endpoints that reference path or step IDs accept both UUIDs and slugs. When 
 | `POST /api/admin/repos/{id}/sync` | Manually trigger content sync for a repository |
 | `GET /api/admin/instructor-users` | List users with instructor/admin role (for owner selection) |
 | `POST /api/admin/users` | Create a local user (admin only, local auth must be enabled) |
-| `GET /api/learning-paths/dependencies` | Returns all dependency edges (auto + manual + yaml) between learning paths for DAG visualization |
+| `GET /api/learning-paths/dependencies` | Returns all dependency edges (auto + manual + yaml) between learning paths for admin DAG visualization and "Unlocks" sidebar on path overview |
 | `GET /api/admin/dependencies` | List manual/yaml dependencies with path titles (admin only) |
 | `POST /api/admin/dependencies` | Create a manual dependency between two learning paths (admin only) |
 | `DELETE /api/admin/dependencies/{depId}` | Delete a manual dependency (admin only) |

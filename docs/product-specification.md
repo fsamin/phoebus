@@ -87,7 +87,7 @@ A **Learning Path** is the top-level organizational unit. It represents a comple
 - A single Git repository can contain **one or many Learning Paths** (see [Repository Layouts](#41-repository-structure))
 - A Learning Path contains an ordered sequence of **Modules**
 - Learners enroll in Learning Paths and progress through them
-- Learning Paths can be visualized as a **DAG (Directed Acyclic Graph)** in the catalog, showing dependency relationships between paths based on prerequisites, competencies, and explicit `depends_on` declarations
+- Learning Path dependencies are managed via a **DAG visualization** in the admin Dependencies page, showing relationships based on prerequisites, competencies, and explicit `depends_on` declarations. On the learner-facing path overview page, an **"Unlocks" sidebar** shows which other paths depend on the current one
 
 ### 3.2 Module
 
