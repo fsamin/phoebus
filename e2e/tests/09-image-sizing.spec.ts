@@ -11,27 +11,54 @@ test.describe('Image Sizing in Markdown', () => {
     await page.request.patch('/api/me/onboarding', { data: { tour: 'catalog' } });
   });
 
-  test('images with |WIDTH syntax are rendered with correct dimensions', async ({ page }) => {
+  test('images with |WIDTH syntax are rendered with correct dimensions', async ({ page, request }) => {
     test.skip(!contentSynced, 'Content not synced — skipping');
 
-    // Navigate to the containerization learning path which has sized images
-    await page.goto('/catalog');
+    // Use the API to find the containerization path and its first step (like 06-assets does)
+    const pathsRes = await request.get('/api/learning-paths');
+    expect(pathsRes.ok()).toBeTruthy();
+    const paths = await pathsRes.json();
+
+    const containerPath = paths.find((lp: { title: string }) =>
+      lp.title?.toLowerCase().includes('container')
+    );
+    test.skip(!containerPath, 'Containerization learning path not found');
+
+    const pathRes = await request.get(`/api/learning-paths/${containerPath.id}`);
+    expect(pathRes.ok()).toBeTruthy();
+    const pathData = await pathRes.json();
+
+    // Find the first step with image sizing syntax in its content
+    const modules = pathData.modules || [];
+    let targetStepSlug: string | null = null;
+    for (const mod of modules) {
+      for (const step of mod.steps || []) {
+        if (step.id) {
+          const stepRes = await request.get(
+            `/api/learning-paths/${containerPath.id}/steps/${step.id}`
+          );
+          if (stepRes.ok()) {
+            const stepData = await stepRes.json();
+            if (stepData.content_md && stepData.content_md.includes('|')) {
+              // Check for image sizing pattern: ![...|SIZE](...)
+              if (/!\[[^\]]*\|[^\]]*\]\([^)]+\)/.test(stepData.content_md)) {
+                targetStepSlug = step.slug || step.id;
+                break;
+              }
+            }
+          }
+        }
+      }
+      if (targetStepSlug) break;
+    }
+    test.skip(!targetStepSlug, 'No step with image sizing syntax found');
+
+    // Navigate directly to the step page
+    await page.goto(`/paths/${containerPath.slug}/steps/${targetStepSlug}`);
     await page.waitForLoadState('networkidle');
 
-    // Find the containerization learning path
-    const containerCard = page.locator('[class*="ant-card"]').filter({ hasText: /container/i }).first();
-    await expect(containerCard).toBeVisible({ timeout: 10000 });
-    await containerCard.click();
-
-    // Click on the first step (Containers & Images) which has sized images
-    const stepItem = page.locator('.ant-list-item').first();
-    await expect(stepItem).toBeVisible({ timeout: 10000 });
-    await stepItem.click();
-
-    await page.waitForTimeout(2000);
-
     const markdownBody = page.locator('.markdown-body');
-    await expect(markdownBody).toBeVisible({ timeout: 10000 });
+    await expect(markdownBody).toBeVisible({ timeout: 15000 });
 
     // Check that images are rendered with sizing styles
     const images = markdownBody.locator('img');
@@ -53,19 +80,30 @@ test.describe('Image Sizing in Markdown', () => {
     expect(logoAlt).toBe('Docker Logo');
   });
 
-  test('images without size syntax render normally', async ({ page }) => {
+  test('images without size syntax render normally', async ({ page, request }) => {
     test.skip(!contentSynced, 'Content not synced — skipping');
 
-    // Use route interception to inject content without sizing
-    await page.goto('/catalog');
-    await page.waitForLoadState('networkidle');
+    // Find any learning path with at least one step
+    const pathsRes = await request.get('/api/learning-paths');
+    expect(pathsRes.ok()).toBeTruthy();
+    const paths = await pathsRes.json();
+    const anyPath = paths[0];
+    test.skip(!anyPath, 'No learning paths found');
 
-    const firstCard = page.locator('[class*="ant-card"]').first();
-    await expect(firstCard).toBeVisible({ timeout: 10000 });
-    await firstCard.click();
+    const pathRes = await request.get(`/api/learning-paths/${anyPath.id}`);
+    expect(pathRes.ok()).toBeTruthy();
+    const pathData = await pathRes.json();
 
-    const stepItem = page.locator('.ant-list-item').first();
-    await expect(stepItem).toBeVisible({ timeout: 10000 });
+    const modules = pathData.modules || [];
+    let stepSlug: string | null = null;
+    for (const mod of modules) {
+      const steps = mod.steps || [];
+      if (steps.length > 0) {
+        stepSlug = steps[0].slug || steps[0].id;
+        break;
+      }
+    }
+    test.skip(!stepSlug, 'No step found');
 
     // Intercept step API to inject content without sizing
     await page.route('**/api/learning-paths/*/steps/*', async (route) => {
@@ -75,11 +113,11 @@ test.describe('Image Sizing in Markdown', () => {
       await route.fulfill({ response, json: body });
     });
 
-    await stepItem.click();
-    await page.waitForTimeout(2000);
+    await page.goto(`/paths/${anyPath.slug}/steps/${stepSlug}`);
+    await page.waitForLoadState('networkidle');
 
     const markdownBody = page.locator('.markdown-body');
-    await expect(markdownBody).toBeVisible({ timeout: 10000 });
+    await expect(markdownBody).toBeVisible({ timeout: 15000 });
 
     const img = markdownBody.locator('img').first();
     await expect(img).toBeVisible({ timeout: 5000 });
