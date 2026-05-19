@@ -81,10 +81,9 @@ jobs:
 
       - name: Create MinIO test bucket
         run: |
-          curl -sS https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc
-          chmod +x /usr/local/bin/mc
-          mc alias set local http://localhost:9000 minioadmin minioadmin
-          mc mb local/phoebus-test-assets
+          docker run --rm --net=host \
+            --entrypoint sh minio/mc:latest -c \
+            "mc alias set local http://localhost:9000 minioadmin minioadmin && mc mb local/phoebus-test-assets"
 
       - name: Build
         run: go build ./...
