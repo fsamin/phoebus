@@ -701,6 +701,7 @@ Phœbus uses a full Markdown rendering engine. Here is what is supported in less
 | Inline code | `` `code` `` |
 | Link | `[text](https://url.com)` |
 | Image | `![alt](https://url.com/image.png)` |
+| Image (sized) | `![alt\|300x200](image.png)` or `![alt\|50%](image.png)` |
 | Unordered list | `- item` or `* item` |
 | Ordered list | `1. item` |
 | Blockquote | `> quote` |
@@ -897,6 +898,26 @@ Listen to the explanation:
 | **Other** | `.pdf`, etc. | Download link |
 
 > 💡 Videos and audio files referenced with `![alt](./assets/file.mp4)` syntax are automatically rendered as `<video>` or `<audio>` players in the lesson view.
+
+### Image Sizing
+
+You can control image dimensions by adding a size suffix to the alt text, separated by a pipe (`|`):
+
+```markdown
+![Diagram|600](./assets/architecture.png)          <!-- width 600px, auto height -->
+![Screenshot|800x400](./assets/screenshot.png)     <!-- width 800px, height 400px -->
+![Logo|50%](./assets/logo.png)                     <!-- width 50% of container -->
+![Banner|100%x200](./assets/banner.png)            <!-- width 100%, height 200px -->
+```
+
+| Syntax | Result |
+|--------|--------|
+| `![alt\|300](img.png)` | Width: 300px, Height: auto |
+| `![alt\|300x200](img.png)` | Width: 300px, Height: 200px |
+| `![alt\|50%](img.png)` | Width: 50%, Height: auto |
+| `![alt\|50%x300](img.png)` | Width: 50%, Height: 300px |
+
+> Without a size suffix, images are displayed at their natural size (max 100% of container width).
 
 ### How It Works
 

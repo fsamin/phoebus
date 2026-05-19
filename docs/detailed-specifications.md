@@ -309,6 +309,7 @@ No exercise data to extract. The Markdown body is stored in `content_md` as-is.
 
 **Rendering rules:**
 - Images with relative paths are automatically rewritten to `/api/assets/{hash}` during sync
+- Image sizing via alt text suffix: `![alt|WIDTHxHEIGHT](img.png)` or `![alt|WIDTH](img.png)`. Width/height values can be pixels (e.g. `300`) or percentages (e.g. `50%`). The pipe-separated suffix is stripped from the rendered alt attribute.
 - Video files (`.mp4`, `.webm`, `.ogg`, `.mov`) referenced with `![alt](./assets/file.mp4)` are rendered as `<video>` players
 - Audio files (`.mp3`, `.wav`, `.ogg`, `.flac`, `.aac`) referenced with `![alt](./assets/file.mp3)` are rendered as `<audio>` players
 - Code blocks with a language identifier receive syntax highlighting
