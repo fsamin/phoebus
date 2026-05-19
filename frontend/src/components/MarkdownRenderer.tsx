@@ -84,6 +84,25 @@ function getExtension(src: string): string {
 
 const admonitionNames = Object.keys(admonitionStyles);
 
+/**
+ * Parse image alt text to extract optional size suffix.
+ * Syntax: "alt text|WIDTHxHEIGHT" or "alt text|WIDTH"
+ * WIDTH/HEIGHT can be pixels (e.g. 300) or percentages (e.g. 50%)
+ */
+function parseImageAlt(alt: string): { cleanAlt: string; width?: string; height?: string } {
+  const pipeIndex = alt.lastIndexOf('|');
+  if (pipeIndex < 0) return { cleanAlt: alt };
+
+  const sizeStr = alt.substring(pipeIndex + 1).trim();
+  const match = sizeStr.match(/^(\d+%?)(?:x(\d+%?))?$/);
+  if (!match) return { cleanAlt: alt };
+
+  const cleanAlt = alt.substring(0, pipeIndex).trim();
+  const width = match[1].endsWith('%') ? match[1] : `${match[1]}px`;
+  const height = match[2] ? (match[2].endsWith('%') ? match[2] : `${match[2]}px`) : undefined;
+  return { cleanAlt, width, height };
+}
+
 const components: Components = {
   ...Object.fromEntries(
     admonitionNames.map((name) => [
@@ -94,14 +113,16 @@ const components: Components = {
     ])
   ),
   // Render video/audio files linked as images: ![alt](file.mp4)
+  // Support image sizing via alt text: ![alt|300x200](file.png) or ![alt|50%](file.png)
   img: ({ src, alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => {
-    if (!src) return <img src={src} alt={alt} {...props} />;
+    const { cleanAlt, width, height } = parseImageAlt(alt || '');
+    if (!src) return <img src={src} alt={cleanAlt} {...props} />;
     const ext = getExtension(src);
     if (videoExtensions.includes(ext)) {
       return (
-        <video controls style={{ maxWidth: '100%' }}>
+        <video controls style={{ maxWidth: '100%' }} width={width} height={height}>
           <source src={src} />
-          {alt}
+          {cleanAlt}
         </video>
       );
     }
@@ -109,11 +130,15 @@ const components: Components = {
       return (
         <audio controls>
           <source src={src} />
-          {alt}
+          {cleanAlt}
         </audio>
       );
     }
-    return <img src={src} alt={alt} {...props} />;
+    const sizeStyle: React.CSSProperties = {};
+    if (width) sizeStyle.width = width;
+    if (height) sizeStyle.height = height;
+    if (!width && !height) sizeStyle.maxWidth = '100%';
+    return <img src={src} alt={cleanAlt} style={sizeStyle} {...props} />;
   },
 };
 
