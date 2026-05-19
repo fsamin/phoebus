@@ -5,6 +5,12 @@ import path from 'path';
 test.describe('Image Sizing in Markdown', () => {
   const contentSynced = fs.existsSync(path.join(__dirname, '..', 'storage-state', 'content-synced'));
 
+  test.beforeEach(async ({ page }) => {
+    // Ensure onboarding tours don't block interactions
+    await page.request.patch('/api/me/onboarding', { data: { tour: 'dashboard' } });
+    await page.request.patch('/api/me/onboarding', { data: { tour: 'catalog' } });
+  });
+
   test('images with |WIDTH syntax are rendered with correct dimensions', async ({ page }) => {
     test.skip(!contentSynced, 'Content not synced — skipping');
 
