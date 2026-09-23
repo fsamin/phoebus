@@ -224,14 +224,7 @@ func (h *Handler) ResetExercise(w http.ResponseWriter, r *http.Request) {
 
 // Logout clears the session cookie.
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     "phoebus_session",
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   -1, // Delete cookie
-	})
+	clearSessionCookie(w, r)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "logged out"})
 }
 

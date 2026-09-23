@@ -30,7 +30,7 @@ func (h *Handler) ProxyAuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		// If there's already a valid JWT cookie, inject claims and continue
-		if cookie, err := r.Cookie("phoebus_session"); err == nil {
+		if cookie, err := r.Cookie(sessionCookieName); err == nil {
 			if claims, err := auth.ValidateToken(cookie.Value, h.cfg.JWT.Secret); err == nil {
 				ctx := context.WithValue(r.Context(), claimsKey, claims)
 				next.ServeHTTP(w, r.WithContext(ctx))
@@ -82,16 +82,9 @@ func (h *Handler) ProxyAuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		h.db.ExecContext(r.Context(), "UPDATE users SET last_login_at = now() WHERE id = $1", user.ID)
+		h.execBestEffort(r.Context(), "failed to update last login", "UPDATE users SET last_login_at = now() WHERE id = $1", user.ID)
 
-		http.SetCookie(w, &http.Cookie{
-			Name:     "phoebus_session",
-			Value:    token,
-			Path:     "/",
-			HttpOnly: true,
-			SameSite: http.SameSiteLaxMode,
-			MaxAge:   8 * 60 * 60,
-		})
+		setSessionCookie(w, r, token)
 
 		// Inject claims into context
 		claims := &auth.Claims{

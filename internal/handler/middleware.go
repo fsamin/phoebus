@@ -23,7 +23,7 @@ func (h *Handler) AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		cookie, err := r.Cookie("phoebus_session")
+		cookie, err := r.Cookie(sessionCookieName)
 		if err != nil {
 			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
 			return

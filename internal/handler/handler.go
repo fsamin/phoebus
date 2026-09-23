@@ -210,22 +210,15 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update last login
-	h.db.ExecContext(r.Context(), "UPDATE users SET last_login_at = now() WHERE id = $1", user.ID)
+	h.execBestEffort(r.Context(), "failed to update last login", "UPDATE users SET last_login_at = now() WHERE id = $1", user.ID)
 
 	// Enforce forced admin role on every login
 	if h.cfg.IsForcedAdmin(user.Username) && user.Role != model.RoleAdmin {
-		h.db.ExecContext(r.Context(), "UPDATE users SET role = 'admin', updated_at = now() WHERE id = $1", user.ID)
+		h.execBestEffort(r.Context(), "failed to enforce forced admin role", "UPDATE users SET role = 'admin', updated_at = now() WHERE id = $1", user.ID)
 		user.Role = model.RoleAdmin
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "phoebus_session",
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   8 * 60 * 60, // 8 hours
-	})
+	setSessionCookie(w, r, token)
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"user": map[string]any{
@@ -298,14 +291,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "phoebus_session",
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   8 * 60 * 60,
-	})
+	setSessionCookie(w, r, token)
 
 	h.auditLog(r.Context(), &auth.Claims{UserID: user.ID.String(), Username: user.Username, Role: user.Role}, "register", "user", user.ID.String(), map[string]any{"username": user.Username})
 

@@ -63,6 +63,7 @@ func (h *Handler) OIDCRedirect(w http.ResponseWriter, r *http.Request) {
 		Value:    state,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   isSecureRequest(r),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   300, // 5 minutes
 	})
@@ -89,6 +90,7 @@ func (h *Handler) OIDCCallback(w http.ResponseWriter, r *http.Request) {
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   isSecureRequest(r),
 		MaxAge:   -1,
 	})
 
@@ -163,16 +165,9 @@ func (h *Handler) OIDCCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.db.ExecContext(r.Context(), "UPDATE users SET last_login_at = now() WHERE id = $1", user.ID)
+	h.execBestEffort(r.Context(), "failed to update last login", "UPDATE users SET last_login_at = now() WHERE id = $1", user.ID)
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "phoebus_session",
-		Value:    sessionToken,
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   8 * 60 * 60,
-	})
+	setSessionCookie(w, r, sessionToken)
 
 	// Redirect to SPA
 	http.Redirect(w, r, "/", http.StatusFound)

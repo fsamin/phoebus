@@ -129,16 +129,9 @@ func (h *Handler) LDAPLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.db.ExecContext(r.Context(), "UPDATE users SET last_login_at = now() WHERE id = $1", user.ID)
+	h.execBestEffort(r.Context(), "failed to update last login", "UPDATE users SET last_login_at = now() WHERE id = $1", user.ID)
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "phoebus_session",
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   8 * 60 * 60,
-	})
+	setSessionCookie(w, r, token)
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"user": map[string]any{
