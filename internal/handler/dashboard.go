@@ -240,6 +240,13 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		instructorRepos = []instructorRepoOut{}
 	}
 
+	// Instance banner, nil unless an admin enabled one
+	banner, err := h.dashboardBanner(r.Context())
+	if err != nil {
+		writeDBError(w, r, "failed to load banner", err)
+		return
+	}
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"continue_learning": continueStep,
 		"enrolled_paths":    enrolledPaths,
@@ -247,6 +254,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		"stats":             stats,
 		"recent_activity":   recentActivity,
 		"instructor_repos":  instructorRepos,
+		"banner":            banner,
 	})
 }
 

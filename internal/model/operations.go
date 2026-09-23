@@ -48,6 +48,24 @@ type ExerciseAttempt struct {
 	CreatedAt time.Time       `json:"created_at" db:"created_at"`
 }
 
+// BannerLevel is the severity of the dashboard information banner. The
+// vocabulary matches the content admonitions (info/warning/danger) rather than
+// Ant Design's Alert types; the front end maps danger to Alert's "error".
+type BannerLevel string
+
+const (
+	BannerInfo    BannerLevel = "info"
+	BannerWarning BannerLevel = "warning"
+	BannerDanger  BannerLevel = "danger"
+)
+
+// Banner is the instance-wide information banner shown on the dashboard.
+type Banner struct {
+	Enabled   bool        `json:"enabled"`
+	Level     BannerLevel `json:"level"`
+	MessageMD string      `json:"message_md"`
+}
+
 type SyncJobStatus string
 
 const (

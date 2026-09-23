@@ -7,8 +7,10 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api/client';
+import type { BannerLevel } from '../api/client';
 import { usePageTitle } from '../hooks/usePageTitle';
 import OnboardingTour from '../components/OnboardingTour';
+import DashboardBanner from '../components/DashboardBanner';
 import { dashboardSteps } from '../tours/steps';
 
 interface DashboardData {
@@ -18,6 +20,7 @@ interface DashboardData {
   stats: { steps_completed: number; total_exercises: number; steps_in_progress: number };
   recent_activity: Array<{ step_title: string; path_title: string; path_id: string; path_slug: string; step_id: string; step_slug: string; event: string; timestamp: string }>;
   instructor_repos: Array<{ id: string; clone_url: string; branch: string; sync_status: string; sync_error?: string; last_synced_at?: string; path_titles: string[] }>;
+  banner: { level: BannerLevel; message_md: string } | null;
 }
 
 const Dashboard: React.FC = () => {
@@ -52,6 +55,8 @@ const Dashboard: React.FC = () => {
       <Typography.Title level={2} data-tour="dashboard-welcome">
         Welcome back, {user?.display_name || user?.username}!
       </Typography.Title>
+
+      {data.banner && <DashboardBanner {...data.banner} />}
 
       {/* Continue Learning */}
       {data.continue_learning && (
