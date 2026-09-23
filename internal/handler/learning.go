@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
 
 	"github.com/fsamin/phoebus/internal/model"
@@ -366,10 +365,10 @@ func (h *Handler) GetStep(w http.ResponseWriter, r *http.Request) {
 		"position":           step.Position,
 	}
 
-	// Parse exercise_data JSONB into a generic object for the response
+	// Parse exercise_data JSONB into a generic object for the response, with the
+	// answers stripped out — they are only ever used server-side.
 	if len(step.ExerciseData) > 0 && string(step.ExerciseData) != "null" {
-		var ed any
-		if err := json.Unmarshal(step.ExerciseData, &ed); err == nil {
+		if ed, ok := sanitizeExerciseData(step.Type, step.ExerciseData); ok {
 			response["exercise_data"] = ed
 		}
 	}

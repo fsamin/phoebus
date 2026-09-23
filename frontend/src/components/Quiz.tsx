@@ -7,7 +7,9 @@ interface QuizQuestion {
   text: string;
   type: 'multiple-choice' | 'short-answer';
   multi_select?: boolean;
-  choices?: { text: string; correct: boolean }[];
+  // correct/pattern/explanation are stripped server-side: the answers only ever
+  // come back in the attempt feedback.
+  choices?: { text: string; correct?: boolean }[];
   pattern?: string;
   explanation?: string;
 }
