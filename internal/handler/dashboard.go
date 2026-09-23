@@ -66,7 +66,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		Completed int    `json:"completed" db:"completed"`
 	}
 	var enrolledPaths []pathProgress
-	h.db.SelectContext(r.Context(), &enrolledPaths, `
+	if err := h.db.SelectContext(r.Context(), &enrolledPaths, `
 		SELECT lp.id AS path_id, lp.slug AS path_slug, lp.title AS path_title, COALESCE(lp.icon, '') AS path_icon,
 		       COUNT(DISTINCT s.id) AS total,
 		       COUNT(DISTINCT CASE WHEN p.status = 'completed' THEN s.id END) AS completed
@@ -76,7 +76,10 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL AND lp.enabled = true
 		WHERE p.user_id = $1 AND s.deleted_at IS NULL
 		GROUP BY lp.id, lp.title, lp.slug, lp.icon
-	`, claims.UserID)
+	`, claims.UserID); err != nil {
+		writeDBError(w, r, "failed to load enrolled paths", err)
+		return
+	}
 	if enrolledPaths == nil {
 		enrolledPaths = []pathProgress{}
 	}
@@ -89,7 +92,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	}
 	var competencies []competency
 	// Acquired: modules where all steps are completed
-	h.db.SelectContext(r.Context(), &competencies, `
+	if err := h.db.SelectContext(r.Context(), &competencies, `
 		SELECT UNNEST(m.competencies) AS name, true AS acquired, lp.title AS path_title
 		FROM modules m
 		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL AND lp.enabled = true
@@ -102,10 +105,13 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 			)
 		)
 		AND EXISTS (SELECT 1 FROM steps s WHERE s.module_id = m.id AND s.deleted_at IS NULL)
-	`, claims.UserID)
+	`, claims.UserID); err != nil {
+		writeDBError(w, r, "failed to load acquired competencies", err)
+		return
+	}
 	// Pending: modules where user has some progress but not all steps completed
 	var pendingCompetencies []competency
-	h.db.SelectContext(r.Context(), &pendingCompetencies, `
+	if err := h.db.SelectContext(r.Context(), &pendingCompetencies, `
 		SELECT UNNEST(m.competencies) AS name, false AS acquired, lp.title AS path_title
 		FROM modules m
 		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL AND lp.enabled = true
@@ -123,7 +129,10 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 			)
 		)
 		AND array_length(m.competencies, 1) > 0
-	`, claims.UserID)
+	`, claims.UserID); err != nil {
+		writeDBError(w, r, "failed to load pending competencies", err)
+		return
+	}
 	competencies = append(competencies, pendingCompetencies...)
 	if competencies == nil {
 		competencies = []competency{}
@@ -131,17 +140,20 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 
 	// Stats
 	var stats struct {
-		StepsCompleted int `json:"steps_completed" db:"steps_completed"`
-		TotalExercises int `json:"total_exercises" db:"total_exercises"`
+		StepsCompleted  int `json:"steps_completed" db:"steps_completed"`
+		TotalExercises  int `json:"total_exercises" db:"total_exercises"`
 		StepsInProgress int `json:"steps_in_progress" db:"steps_in_progress"`
 	}
-	h.db.GetContext(r.Context(), &stats, `
+	if err := h.db.GetContext(r.Context(), &stats, `
 		SELECT
 			COUNT(CASE WHEN p.status = 'completed' THEN 1 END) AS steps_completed,
 			COUNT(CASE WHEN p.status = 'in_progress' THEN 1 END) AS steps_in_progress,
 			(SELECT COUNT(*) FROM exercise_attempts WHERE user_id = $1) AS total_exercises
 		FROM progress p WHERE p.user_id = $1
-	`, claims.UserID)
+	`, claims.UserID); err != nil {
+		writeDBError(w, r, "failed to load dashboard stats", err)
+		return
+	}
 
 	// Recent activity
 	type activity struct {
@@ -155,7 +167,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		Timestamp string `json:"timestamp" db:"timestamp"`
 	}
 	var recentActivity []activity
-	h.db.SelectContext(r.Context(), &recentActivity, `
+	if err := h.db.SelectContext(r.Context(), &recentActivity, `
 		SELECT s.title AS step_title, lp.title AS path_title,
 		       lp.id AS path_id, lp.slug AS path_slug,
 		       s.id AS step_id, s.slug AS step_slug,
@@ -166,7 +178,10 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL AND lp.enabled = true
 		WHERE p.user_id = $1 AND s.deleted_at IS NULL
 		ORDER BY p.updated_at DESC LIMIT 10
-	`, claims.UserID)
+	`, claims.UserID); err != nil {
+		writeDBError(w, r, "failed to load recent activity", err)
+		return
+	}
 	if recentActivity == nil {
 		recentActivity = []activity{}
 	}
@@ -193,7 +208,7 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 	var instructorRepos []instructorRepoOut
 	if claims.Role == model.RoleInstructor || claims.Role == model.RoleAdmin {
 		var rows []instructorRepo
-		h.db.SelectContext(r.Context(), &rows, `
+		if err := h.db.SelectContext(r.Context(), &rows, `
 			SELECT gr.id::text AS id, gr.clone_url, gr.branch, gr.sync_status, gr.sync_error,
 			       to_char(gr.last_synced_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') AS last_synced_at,
 			       COALESCE(string_agg(lp.title, '||'), '') AS path_titles
@@ -203,7 +218,10 @@ func (h *Handler) Dashboard(w http.ResponseWriter, r *http.Request) {
 			WHERE ro.user_id = $1
 			GROUP BY gr.id
 			ORDER BY gr.created_at DESC
-		`, claims.UserID)
+		`, claims.UserID); err != nil {
+			writeDBError(w, r, "failed to load instructor repositories", err)
+			return
+		}
 		for _, row := range rows {
 			titles := []string{}
 			if row.PathTitles != "" {
@@ -246,10 +264,13 @@ func (h *Handler) AdminHealth(w http.ResponseWriter, r *http.Request) {
 		LastSynced *string `json:"last_synced_at,omitempty" db:"last_synced_at"`
 	}
 	var repos []repoStatus
-	h.db.SelectContext(r.Context(), &repos, `
+	if err := h.db.SelectContext(r.Context(), &repos, `
 		SELECT id, clone_url, sync_status, sync_error, last_synced_at::text AS last_synced_at
 		FROM git_repositories ORDER BY created_at
-	`)
+	`); err != nil {
+		writeDBError(w, r, "failed to load repository status", err)
+		return
+	}
 	if repos == nil {
 		repos = []repoStatus{}
 	}
@@ -261,15 +282,19 @@ func (h *Handler) AdminHealth(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Active users (24h)
-	var activeUsers24h int
-	h.db.GetContext(r.Context(), &activeUsers24h, `
-		SELECT COUNT(*) FROM users WHERE last_login_at > now() - interval '24 hours' AND active = true
-	`)
-
-	// Total users
-	var totalUsers int
-	h.db.GetContext(r.Context(), &totalUsers, `SELECT COUNT(*) FROM users WHERE active = true`)
+	// User counters
+	var userStats struct {
+		Active24h int `db:"active_24h"`
+		Total     int `db:"total"`
+	}
+	if err := h.db.GetContext(r.Context(), &userStats, `
+		SELECT COUNT(*) FILTER (WHERE last_login_at > now() - interval '24 hours') AS active_24h,
+		       COUNT(*) AS total
+		FROM users WHERE active = true
+	`); err != nil {
+		writeDBError(w, r, "failed to load user counters", err)
+		return
+	}
 
 	// Uptime
 	uptime := time.Since(serverStartTime).Round(time.Second).String()
@@ -278,11 +303,11 @@ func (h *Handler) AdminHealth(w http.ResponseWriter, r *http.Request) {
 	p50, p95, p99 := latencyTracker.Percentiles()
 
 	writeJSON(w, http.StatusOK, map[string]any{
-		"api":            map[string]any{"status": "ok", "uptime": uptime},
-		"database":       map[string]any{"connected": dbOK},
-		"repositories":   map[string]any{"total": len(repos), "synced": syncedCount, "details": repos},
-		"active_users_24h": activeUsers24h,
-		"total_users":    totalUsers,
+		"api":              map[string]any{"status": "ok", "uptime": uptime},
+		"database":         map[string]any{"connected": dbOK},
+		"repositories":     map[string]any{"total": len(repos), "synced": syncedCount, "details": repos},
+		"active_users_24h": userStats.Active24h,
+		"total_users":      userStats.Total,
 		"latency": map[string]any{
 			"p50_ms": p50,
 			"p95_ms": p95,

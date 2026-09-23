@@ -12,9 +12,9 @@ import (
 
 type learningPathResponse struct {
 	model.LearningPath
-	ModuleCount            int      `json:"module_count" db:"module_count"`
-	StepCount              int      `json:"step_count" db:"step_count"`
-	CompetenciesProvided   []string `json:"competencies_provided"`
+	ModuleCount          int      `json:"module_count" db:"module_count"`
+	StepCount            int      `json:"step_count" db:"step_count"`
+	CompetenciesProvided []string `json:"competencies_provided"`
 }
 
 func (h *Handler) ListCompetencies(w http.ResponseWriter, r *http.Request) {
@@ -92,12 +92,15 @@ func (h *Handler) ListLearningPaths(w http.ResponseWriter, r *http.Request) {
 		Competency     string `db:"competency"`
 	}
 	var compRows []compRow
-	h.db.SelectContext(r.Context(), &compRows, `
+	if err := h.db.SelectContext(r.Context(), &compRows, `
 		SELECT m.learning_path_id::text AS learning_path_id, unnest(m.competencies) AS competency
 		FROM modules m
 		JOIN learning_paths lp ON lp.id = m.learning_path_id AND lp.deleted_at IS NULL AND lp.enabled = true
 		WHERE m.deleted_at IS NULL AND array_length(m.competencies, 1) > 0
-	`)
+	`); err != nil {
+		writeDBError(w, r, "failed to load competencies", err)
+		return
+	}
 	compByPath := map[string][]string{}
 	for _, cr := range compRows {
 		// Deduplicate
@@ -129,7 +132,7 @@ func (h *Handler) ListLearningPaths(w http.ResponseWriter, r *http.Request) {
 	}
 	var userProgress []pathProg
 	if claims != nil {
-		h.db.SelectContext(r.Context(), &userProgress, `
+		if err := h.db.SelectContext(r.Context(), &userProgress, `
 			SELECT m.learning_path_id AS path_id,
 			       COUNT(DISTINCT s.id) AS total,
 			       COUNT(DISTINCT CASE WHEN p.status = 'completed' THEN s.id END) AS completed
@@ -142,7 +145,10 @@ func (h *Handler) ListLearningPaths(w http.ResponseWriter, r *http.Request) {
 				WHERE p2.user_id = $1 AND m2.learning_path_id = m.learning_path_id
 			)
 			GROUP BY m.learning_path_id
-		`, claims.UserID)
+		`, claims.UserID); err != nil {
+			writeDBError(w, r, "failed to load user progress", err)
+			return
+		}
 	}
 	progMap := map[string]pathProg{}
 	for _, pp := range userProgress {
@@ -168,14 +174,17 @@ func (h *Handler) ListLearningPaths(w http.ResponseWriter, r *http.Request) {
 		DisplayName string `db:"display_name"`
 	}
 	var ownerRows []ownerRow
-	h.db.SelectContext(r.Context(), &ownerRows, `
+	if err := h.db.SelectContext(r.Context(), &ownerRows, `
 		SELECT DISTINCT lp.repo_id::text AS repo_id, u.display_name
 		FROM learning_paths lp
 		JOIN repository_owners ro ON ro.repo_id = lp.repo_id
 		JOIN users u ON u.id = ro.user_id
 		WHERE lp.deleted_at IS NULL AND lp.enabled = true
 		ORDER BY u.display_name
-	`)
+	`); err != nil {
+		writeDBError(w, r, "failed to load path owners", err)
+		return
+	}
 	ownersByRepo := map[string][]string{}
 	for _, o := range ownerRows {
 		ownersByRepo[o.RepoID] = append(ownersByRepo[o.RepoID], o.DisplayName)
@@ -376,11 +385,14 @@ func (h *Handler) GetStep(w http.ResponseWriter, r *http.Request) {
 	// For code exercises, include codebase files
 	if step.Type == model.StepTypeCodeExercise {
 		var files []model.CodebaseFile
-		h.db.SelectContext(r.Context(), &files, `
+		if err := h.db.SelectContext(r.Context(), &files, `
 			SELECT id, step_id, file_path, content
 			FROM codebase_files WHERE step_id = $1
 			ORDER BY file_path
-		`, step.ID)
+		`, step.ID); err != nil {
+			writeDBError(w, r, "failed to load codebase files", err)
+			return
+		}
 		if files == nil {
 			files = []model.CodebaseFile{}
 		}

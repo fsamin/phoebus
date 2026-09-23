@@ -137,9 +137,11 @@ func (h *Handler) upsertProxyUser(r *http.Request, username, email, displayName 
 	`, username)
 	if err == nil {
 		// Update display name and email on every login, but preserve admin-assigned role
-		h.db.ExecContext(r.Context(), `
+		if _, err := h.db.ExecContext(r.Context(), `
 			UPDATE users SET display_name = $1, email = NULLIF($2, ''), updated_at = now() WHERE id = $3
-		`, displayName, email, user.ID)
+		`, displayName, email, user.ID); err != nil {
+			return nil, fmt.Errorf("sync proxy user attributes: %w", err)
+		}
 		user.DisplayName = displayName
 		if email != "" {
 			user.Email = &email
@@ -148,7 +150,9 @@ func (h *Handler) upsertProxyUser(r *http.Request, username, email, displayName 
 		}
 		// Override role only for forced admins
 		if h.cfg.IsForcedAdmin(username) {
-			h.db.ExecContext(r.Context(), `UPDATE users SET role = $1 WHERE id = $2`, model.RoleAdmin, user.ID)
+			if _, err := h.db.ExecContext(r.Context(), `UPDATE users SET role = $1 WHERE id = $2`, model.RoleAdmin, user.ID); err != nil {
+				return nil, fmt.Errorf("enforce forced admin role: %w", err)
+			}
 			user.Role = model.RoleAdmin
 		}
 		return &user, nil

@@ -66,7 +66,7 @@ func (h *Handler) LDAPLogin(w http.ResponseWriter, r *http.Request) {
 		cfg.BaseDN,
 		ldap.ScopeWholeSubtree,
 		ldap.NeverDerefAliases,
-		1, // size limit
+		1,  // size limit
 		10, // time limit
 		false,
 		filter,
@@ -197,9 +197,11 @@ func (h *Handler) upsertLDAPUser(r *http.Request, username, email, displayName, 
 	`, externalID)
 	if err == nil {
 		// Update on every login (sync attributes + role from groups)
-		h.db.ExecContext(r.Context(), `
+		if _, err := h.db.ExecContext(r.Context(), `
 			UPDATE users SET display_name = $1, email = $2, role = $3, updated_at = now() WHERE id = $4
-		`, displayName, email, role, user.ID)
+		`, displayName, email, role, user.ID); err != nil {
+			return nil, fmt.Errorf("sync LDAP user attributes: %w", err)
+		}
 		user.DisplayName = displayName
 		user.Email = &email
 		user.Role = role

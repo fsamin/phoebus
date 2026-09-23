@@ -65,7 +65,10 @@ func (h *Handler) InstructorListRepos(w http.ResponseWriter, r *http.Request) {
 		Title  string `db:"title"`
 	}
 	var pathTitles []result
-	h.db.SelectContext(r.Context(), &pathTitles, `SELECT repo_id, title FROM learning_paths`)
+	if err := h.db.SelectContext(r.Context(), &pathTitles, `SELECT repo_id, title FROM learning_paths`); err != nil {
+		writeDBError(w, r, "failed to load learning path titles", err)
+		return
+	}
 	titleMap := map[string][]string{}
 	for _, pt := range pathTitles {
 		titleMap[pt.RepoID] = append(titleMap[pt.RepoID], pt.Title)
