@@ -72,7 +72,7 @@ jobs:
             -p 9000:9000 \
             -e MINIO_ROOT_USER=minioadmin \
             -e MINIO_ROOT_PASSWORD=minioadmin \
-            minio/minio:latest server /data
+            quay.io/minio/minio:latest server /data
           for i in $(seq 1 30); do
             curl -sf http://localhost:9000/minio/health/live && break
             sleep 2
@@ -81,7 +81,7 @@ jobs:
       - name: Create MinIO test bucket
         run: |
           docker run --rm --net=host \
-            --entrypoint sh minio/mc:latest -c \
+            --entrypoint sh quay.io/minio/mc:latest -c \
             "mc alias set local http://localhost:9000 minioadmin minioadmin && mc mb local/phoebus-test-assets"
 
       - name: Check formatting
