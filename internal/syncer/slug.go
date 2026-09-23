@@ -11,8 +11,8 @@ import (
 )
 
 var (
-	nonAlphanumRe  = regexp.MustCompile(`[^a-z0-9]+`)
-	multiHyphenRe  = regexp.MustCompile(`-{2,}`)
+	nonAlphanumRe = regexp.MustCompile(`[^a-z0-9]+`)
+	multiHyphenRe = regexp.MustCompile(`-{2,}`)
 )
 
 // GenerateSlug creates a URL-friendly slug from a title.

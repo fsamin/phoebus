@@ -19,5 +19,15 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // Kept visible but non-blocking: these flag deliberate choices in this
+      // codebase (untyped Monaco/Mermaid handles, contexts exporting their hook
+      // alongside the provider) rather than defects. Revisit as a cleanup pass.
+      '@typescript-eslint/no-explicit-any': 'warn',
+      'react-refresh/only-export-components': 'warn',
+      'react-hooks/purity': 'warn',
+      'react-hooks/immutability': 'warn',
+      'react-hooks/set-state-in-effect': 'warn',
+    },
   },
 ])

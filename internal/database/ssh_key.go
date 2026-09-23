@@ -14,7 +14,7 @@ import (
 // SSHKeyPair holds the instance SSH keypair loaded at startup.
 type SSHKeyPair struct {
 	PrivateKeyPEM []byte
-	PublicKey      string
+	PublicKey     string
 }
 
 // EnsureSSHKey checks if an instance SSH keypair exists in the database.

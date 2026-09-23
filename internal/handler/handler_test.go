@@ -44,7 +44,7 @@ func TestMain(m *testing.M) {
 			"-e", "POSTGRES_PASSWORD=test",
 			"-e", "POSTGRES_DB=phoebus_test",
 			"-p", fmt.Sprintf("%d:5432", port),
-			"postgres:16-alpine",
+			"postgres:17-alpine",
 		)
 		out, cErr := cmd.CombinedOutput()
 		if cErr != nil {

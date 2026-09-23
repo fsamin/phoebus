@@ -100,7 +100,7 @@ function applyUnifiedDiff(diff: string, files: CodebaseFile[]): Map<string, { or
       const hunkMatch = lines[i].match(hunkRegex);
       if (!hunkMatch) continue;
 
-      let origLine = parseInt(hunkMatch[1], 10) - 1; // 0-based index in original
+      const origLine = parseInt(hunkMatch[1], 10) - 1; // 0-based index in original
       let pos = origLine + offset; // position in modifiedLines
       i++;
 
