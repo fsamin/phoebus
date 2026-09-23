@@ -5,8 +5,9 @@ import MarkdownRenderer from './MarkdownRenderer';
 
 interface Proposal {
   command: string;
-  correct: boolean;
-  explanation: string;
+  // Stripped server-side; the attempt feedback carries them instead.
+  correct?: boolean;
+  explanation?: string;
 }
 
 interface TerminalStep {

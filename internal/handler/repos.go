@@ -34,7 +34,10 @@ func (h *Handler) ListRepos(w http.ResponseWriter, r *http.Request) {
 		Title  string `db:"title"`
 	}
 	var pathTitles []result
-	h.db.SelectContext(r.Context(), &pathTitles, `SELECT repo_id, title FROM learning_paths`)
+	if err := h.db.SelectContext(r.Context(), &pathTitles, `SELECT repo_id, title FROM learning_paths`); err != nil {
+		writeDBError(w, r, "failed to load learning path titles", err)
+		return
+	}
 
 	titleMap := map[string][]string{}
 	for _, pt := range pathTitles {
@@ -49,12 +52,15 @@ func (h *Handler) ListRepos(w http.ResponseWriter, r *http.Request) {
 		DisplayName string `db:"display_name" json:"display_name"`
 	}
 	var ownerRows []ownerRow
-	h.db.SelectContext(r.Context(), &ownerRows, `
+	if err := h.db.SelectContext(r.Context(), &ownerRows, `
 		SELECT ro.repo_id::text AS repo_id, u.id::text AS id, u.username, u.display_name
 		FROM repository_owners ro
 		JOIN users u ON u.id = ro.user_id
 		ORDER BY u.display_name
-	`)
+	`); err != nil {
+		writeDBError(w, r, "failed to load repository owners", err)
+		return
+	}
 	ownerMap := map[string][]ownerRow{}
 	for _, o := range ownerRows {
 		ownerMap[o.RepoID] = append(ownerMap[o.RepoID], o)
@@ -98,13 +104,16 @@ func (h *Handler) GetRepo(w http.ResponseWriter, r *http.Request) {
 		DisplayName string `db:"display_name" json:"display_name"`
 	}
 	var owners []ownerInfo
-	h.db.SelectContext(r.Context(), &owners, `
+	if err := h.db.SelectContext(r.Context(), &owners, `
 		SELECT u.id::text AS id, u.username, u.display_name
 		FROM repository_owners ro
 		JOIN users u ON u.id = ro.user_id
 		WHERE ro.repo_id = $1
 		ORDER BY u.display_name
-	`, id)
+	`, id); err != nil {
+		writeDBError(w, r, "failed to load repository owners", err)
+		return
+	}
 	if owners == nil {
 		owners = []ownerInfo{}
 	}
@@ -173,7 +182,10 @@ func (h *Handler) CreateRepo(w http.ResponseWriter, r *http.Request) {
 	h.enqueueSync(r.Context(), repo.ID)
 
 	// Save owners
-	h.setRepoOwners(r.Context(), repo.ID.String(), req.OwnerIDs)
+	if err := h.setRepoOwners(r.Context(), repo.ID.String(), req.OwnerIDs); err != nil {
+		writeDBError(w, r, "failed to set repository owners", err)
+		return
+	}
 
 	h.auditLog(r.Context(), ClaimsFromContext(r.Context()), "create", "git_repository", repo.ID.String(), map[string]any{"clone_url": req.CloneURL})
 
@@ -219,7 +231,10 @@ func (h *Handler) UpdateRepo(w http.ResponseWriter, r *http.Request) {
 	h.auditLog(r.Context(), ClaimsFromContext(r.Context()), "update", "git_repository", id, nil)
 
 	// Update owners
-	h.setRepoOwners(r.Context(), id, req.OwnerIDs)
+	if err := h.setRepoOwners(r.Context(), id, req.OwnerIDs); err != nil {
+		writeDBError(w, r, "failed to set repository owners", err)
+		return
+	}
 
 	writeJSON(w, http.StatusOK, repo)
 }
@@ -330,12 +345,24 @@ func (h *Handler) SyncJobLogs(w http.ResponseWriter, r *http.Request) {
 	w.Write(*logsJSON)
 }
 
-// setRepoOwners replaces all owners for a given repo.
-func (h *Handler) setRepoOwners(ctx context.Context, repoID string, ownerIDs []string) {
-	h.db.ExecContext(ctx, "DELETE FROM repository_owners WHERE repo_id = $1", repoID)
-	for _, uid := range ownerIDs {
-		h.db.ExecContext(ctx, "INSERT INTO repository_owners (repo_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", repoID, uid)
+// setRepoOwners replaces all owners for a given repo. The delete and the inserts
+// run in one transaction so a failure cannot leave the repo without owners.
+func (h *Handler) setRepoOwners(ctx context.Context, repoID string, ownerIDs []string) error {
+	tx, err := h.db.BeginTxx(ctx, nil)
+	if err != nil {
+		return err
 	}
+	defer tx.Rollback()
+
+	if _, err := tx.ExecContext(ctx, "DELETE FROM repository_owners WHERE repo_id = $1", repoID); err != nil {
+		return err
+	}
+	for _, uid := range ownerIDs {
+		if _, err := tx.ExecContext(ctx, "INSERT INTO repository_owners (repo_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", repoID, uid); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // ListInstructorUsers returns users with instructor or admin role (for owner selector).

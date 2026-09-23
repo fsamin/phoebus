@@ -41,6 +41,32 @@ test.describe('Exercises & Progress', () => {
     await expect(options.first()).toBeVisible({ timeout: 10000 });
   });
 
+  // The spec requires the step endpoint to serve sanitized exercise_data: a
+  // learner must not be able to read the answers out of the network tab.
+  test('step endpoint does not serve exercise answers', async ({ request }) => {
+    test.skip(!contentSynced, 'Content not synced — skipping');
+
+    const pathsRes = await request.get('/api/learning-paths');
+    const paths = await pathsRes.json();
+    let checked = 0;
+
+    for (const p of paths) {
+      const pathRes = await request.get(`/api/learning-paths/${p.id}`);
+      const pathData = await pathRes.json();
+      for (const mod of pathData.modules || []) {
+        for (const step of mod.steps || []) {
+          if (step.type === 'lesson') continue;
+          const stepRes = await request.get(`/api/learning-paths/${p.slug}/steps/${step.slug}`);
+          const body = await stepRes.text();
+          expect(body, `${step.type} step ${step.slug} leaks its answers`).not.toContain('"correct"');
+          checked++;
+        }
+      }
+    }
+
+    test.skip(checked === 0, 'No exercise step found in synced content');
+  });
+
   test('progress updates after completing a step', async ({ page, request }) => {
     test.skip(!contentSynced, 'Content not synced — skipping');
 

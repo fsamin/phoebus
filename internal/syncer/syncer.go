@@ -122,12 +122,20 @@ func (s *Syncer) pickAndProcess(ctx context.Context) bool {
 	}
 
 	// Mark as processing
-	tx.ExecContext(ctx, `
+	if _, err := tx.ExecContext(ctx, `
 		UPDATE sync_jobs SET status = 'processing', attempts = attempts + 1, started_at = now(), updated_at = now() WHERE id = $1
-	`, job.ID)
-	tx.ExecContext(ctx, `
+	`, job.ID); err != nil {
+		tx.Rollback()
+		slog.Error("failed to mark job as processing", "error", err.Error())
+		return false
+	}
+	if _, err := tx.ExecContext(ctx, `
 		UPDATE git_repositories SET sync_status = 'syncing', updated_at = now() WHERE id = $1
-	`, job.RepoID)
+	`, job.RepoID); err != nil {
+		tx.Rollback()
+		slog.Error("failed to mark repository as syncing", "error", err.Error())
+		return false
+	}
 	if err := tx.Commit(); err != nil {
 		slog.Error("failed to commit job pickup", "error", err.Error())
 		return false
@@ -221,12 +229,16 @@ func (s *Syncer) processJob(ctx context.Context, jobID, repoID uuid.UUID) {
 	logsJSON, _ := collector.Entries()
 
 	// Mark success
-	s.db.ExecContext(ctx, `
+	if _, err := s.db.ExecContext(ctx, `
 		UPDATE git_repositories SET sync_status = 'synced', sync_error = NULL, last_synced_at = now(), updated_at = now() WHERE id = $1
-	`, repoID)
-	s.db.ExecContext(ctx, `
+	`, repoID); err != nil {
+		logger.Error("failed to mark repository as synced", "error", err.Error())
+	}
+	if _, err := s.db.ExecContext(ctx, `
 		UPDATE sync_jobs SET status = 'done', completed_at = now(), logs = $2, updated_at = now() WHERE id = $1
-	`, jobID, logsJSON)
+	`, jobID, logsJSON); err != nil {
+		logger.Error("failed to mark sync job as done", "error", err.Error())
+	}
 
 	syncJobsTotal.WithLabelValues("done").Inc()
 	syncDuration.Observe(time.Since(syncStart).Seconds())
@@ -237,12 +249,16 @@ func (s *Syncer) failJob(ctx context.Context, collector *logging.SyncCollector, 
 	syncJobsTotal.WithLabelValues("failed").Inc()
 	errMsg := syncErr.Error()
 	logsJSON, _ := collector.Entries()
-	s.db.ExecContext(ctx, `
+	if _, err := s.db.ExecContext(ctx, `
 		UPDATE git_repositories SET sync_status = 'error', sync_error = $1, updated_at = now() WHERE id = $2
-	`, errMsg, repoID)
-	s.db.ExecContext(ctx, `
+	`, errMsg, repoID); err != nil {
+		slog.Error("failed to mark repository as errored", "repo_id", repoID, "error", err.Error())
+	}
+	if _, err := s.db.ExecContext(ctx, `
 		UPDATE sync_jobs SET status = 'failed', error = $1, completed_at = now(), logs = $3, updated_at = now() WHERE id = $2
-	`, errMsg, jobID, logsJSON)
+	`, errMsg, jobID, logsJSON); err != nil {
+		slog.Error("failed to mark sync job as failed", "job_id", jobID, "error", err.Error())
+	}
 }
 
 func gitClone(cloneURL, branch, destDir, authType string, credentials []byte) error {
@@ -352,16 +368,20 @@ func (s *Syncer) syncContent(ctx context.Context, repoID uuid.UUID, repoDir stri
 	}
 
 	// Soft-delete learning paths that no longer exist in this repo
-	tx.ExecContext(ctx, `
+	if _, err := tx.ExecContext(ctx, `
 		UPDATE learning_paths SET deleted_at = now(), updated_at = now()
 		WHERE repo_id = $1 AND file_path != ALL($2) AND deleted_at IS NULL
-	`, repoID, pq.Array(keys(existingPathKeys)))
+	`, repoID, pq.Array(keys(existingPathKeys))); err != nil {
+		return fmt.Errorf("soft-delete removed learning paths: %w", err)
+	}
 
 	// Restore learning paths that reappeared
-	tx.ExecContext(ctx, `
+	if _, err := tx.ExecContext(ctx, `
 		UPDATE learning_paths SET deleted_at = NULL, updated_at = now()
 		WHERE repo_id = $1 AND file_path = ANY($2) AND deleted_at IS NOT NULL
-	`, repoID, pq.Array(keys(existingPathKeys)))
+	`, repoID, pq.Array(keys(existingPathKeys))); err != nil {
+		return fmt.Errorf("restore learning paths: %w", err)
+	}
 
 	return tx.Commit()
 }
@@ -461,7 +481,9 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 	var moduleHashes []string
 
 	// Reset positions to avoid unique constraint violations when modules are reordered
-	tx.ExecContext(ctx, `UPDATE modules SET position = -1 - position WHERE learning_path_id = $1 AND deleted_at IS NULL`, lpID)
+	if _, err := tx.ExecContext(ctx, `UPDATE modules SET position = -1 - position WHERE learning_path_id = $1 AND deleted_at IS NULL`, lpID); err != nil {
+		return fmt.Errorf("reset module positions: %w", err)
+	}
 
 	existingModulePaths := map[string]bool{}
 
@@ -572,7 +594,9 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 			if err == nil && existingStepHash == sd.hash {
 				logger.Debug("step unchanged, skipping", "module", modulePath, "step", sd.filePath)
 				// Still need to ensure position and slug are correct
-				tx.ExecContext(ctx, `UPDATE steps SET position = $1, slug = $4, updated_at = now() WHERE module_id = $2 AND file_path = $3 AND deleted_at IS NULL`, stepPos, moduleID, sd.filePath, stepSlug)
+				if _, err := tx.ExecContext(ctx, `UPDATE steps SET position = $1, slug = $4, updated_at = now() WHERE module_id = $2 AND file_path = $3 AND deleted_at IS NULL`, stepPos, moduleID, sd.filePath, stepSlug); err != nil {
+					return fmt.Errorf("update step position %s/%s: %w", modulePath, sd.filePath, err)
+				}
 				continue
 			}
 
@@ -627,7 +651,9 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 			}
 			if len(rewrites) > 0 {
 				rewritten := rewriteAssetURLs(sd.contentMD, rewrites)
-				tx.ExecContext(ctx, `UPDATE steps SET content_md = $1 WHERE id = $2`, rewritten, stepID)
+				if _, err := tx.ExecContext(ctx, `UPDATE steps SET content_md = $1 WHERE id = $2`, rewritten, stepID); err != nil {
+					return fmt.Errorf("rewrite asset URLs %s/%s: %w", modulePath, sd.filePath, err)
+				}
 			}
 
 			if sd.meta.Type == "code-exercise" {
@@ -639,23 +665,29 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 		}
 
 		// Soft-delete steps that no longer exist in this module
-		tx.ExecContext(ctx, `
+		if _, err := tx.ExecContext(ctx, `
 			UPDATE steps SET deleted_at = now(), updated_at = now()
 			WHERE module_id = $1 AND file_path != ALL($2) AND deleted_at IS NULL
-		`, moduleID, pq.Array(keys(existingStepPaths)))
+		`, moduleID, pq.Array(keys(existingStepPaths))); err != nil {
+			return fmt.Errorf("soft-delete removed steps in %s: %w", modulePath, err)
+		}
 
 		_ = existingModuleHash
 	}
 
 	// Soft-delete modules that no longer exist
-	tx.ExecContext(ctx, `
+	if _, err := tx.ExecContext(ctx, `
 		UPDATE modules SET deleted_at = now(), updated_at = now()
 		WHERE learning_path_id = $1 AND file_path != ALL($2) AND deleted_at IS NULL
-	`, lpID, pq.Array(keys(existingModulePaths)))
+	`, lpID, pq.Array(keys(existingModulePaths))); err != nil {
+		return fmt.Errorf("soft-delete removed modules: %w", err)
+	}
 
 	// Update path-level hash
 	pathHash := computeHash(append(pathHashParts, moduleHashes...)...)
-	tx.ExecContext(ctx, `UPDATE learning_paths SET content_hash = $1, updated_at = now() WHERE id = $2`, pathHash, lpID)
+	if _, err := tx.ExecContext(ctx, `UPDATE learning_paths SET content_hash = $1, updated_at = now() WHERE id = $2`, pathHash, lpID); err != nil {
+		return fmt.Errorf("update path content hash: %w", err)
+	}
 
 	// Sync YAML-defined dependencies (depends_on field)
 	if len(lpMeta.DependsOn) > 0 {
@@ -688,21 +720,29 @@ func (s *Syncer) syncOnePath(ctx context.Context, tx *sqlx.Tx, repoID uuid.UUID,
 			}
 		}
 		if len(validSourceIDs) > 0 {
-			tx.ExecContext(ctx, `
+			if _, err := tx.ExecContext(ctx, `
 				DELETE FROM path_dependencies
 				WHERE target_path_id = $1 AND dep_type = 'yaml' AND source_path_id != ALL($2)
-			`, lpID, pq.Array(validSourceIDs))
-		} else {
-			tx.ExecContext(ctx, `
-				DELETE FROM path_dependencies WHERE target_path_id = $1 AND dep_type = 'yaml'
-			`, lpID)
+			`, lpID, pq.Array(validSourceIDs)); err != nil {
+				return fmt.Errorf("clean up stale yaml dependencies: %w", err)
+			}
+		} else if err := deleteYAMLDependencies(ctx, tx, lpID); err != nil {
+			return err
 		}
-	} else {
-		tx.ExecContext(ctx, `
-			DELETE FROM path_dependencies WHERE target_path_id = $1 AND dep_type = 'yaml'
-		`, lpID)
+	} else if err := deleteYAMLDependencies(ctx, tx, lpID); err != nil {
+		return err
 	}
 
+	return nil
+}
+
+// deleteYAMLDependencies removes every yaml-declared dependency pointing at a path.
+func deleteYAMLDependencies(ctx context.Context, tx *sqlx.Tx, lpID uuid.UUID) error {
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM path_dependencies WHERE target_path_id = $1 AND dep_type = 'yaml'
+	`, lpID); err != nil {
+		return fmt.Errorf("clean up yaml dependencies: %w", err)
+	}
 	return nil
 }
 
@@ -718,7 +758,9 @@ func computeHash(parts ...string) string {
 
 func (s *Syncer) syncCodebaseFiles(ctx context.Context, tx *sqlx.Tx, stepID uuid.UUID, codebaseDir string) error {
 	// Delete existing files
-	tx.ExecContext(ctx, "DELETE FROM codebase_files WHERE step_id = $1", stepID)
+	if _, err := tx.ExecContext(ctx, "DELETE FROM codebase_files WHERE step_id = $1", stepID); err != nil {
+		return fmt.Errorf("delete codebase files: %w", err)
+	}
 
 	if _, err := os.Stat(codebaseDir); os.IsNotExist(err) {
 		return nil
@@ -897,7 +939,9 @@ func (s *Syncer) syncStepAssets(ctx context.Context, tx *sqlx.Tx, stepID uuid.UU
 	}
 
 	// Clean existing step_assets for this step (we'll re-link)
-	tx.ExecContext(ctx, `DELETE FROM step_assets WHERE step_id = $1`, stepID)
+	if _, err := tx.ExecContext(ctx, `DELETE FROM step_assets WHERE step_id = $1`, stepID); err != nil {
+		return nil, fmt.Errorf("delete step assets: %w", err)
+	}
 
 	rewrites := map[string]string{}
 
@@ -952,10 +996,12 @@ func (s *Syncer) syncStepAssets(ctx context.Context, tx *sqlx.Tx, stepID uuid.UU
 		}
 
 		// Link step → asset
-		tx.ExecContext(ctx, `
+		if _, err := tx.ExecContext(ctx, `
 			INSERT INTO step_assets (step_id, asset_id, original_path) VALUES ($1, $2, $3)
 			ON CONFLICT DO NOTHING
-		`, stepID, assetID, relPath)
+		`, stepID, assetID, relPath); err != nil {
+			return fmt.Errorf("link step asset %s: %w", relPath, err)
+		}
 
 		// Build rewrite map: ./assets/img.png → /api/assets/{hash}
 		rewrites["./"+relPath] = "/api/assets/" + hash

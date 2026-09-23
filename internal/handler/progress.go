@@ -224,14 +224,7 @@ func (h *Handler) ResetExercise(w http.ResponseWriter, r *http.Request) {
 
 // Logout clears the session cookie.
 func (h *Handler) Logout(w http.ResponseWriter, r *http.Request) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     "phoebus_session",
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   -1, // Delete cookie
-	})
+	clearSessionCookie(w, r)
 	writeJSON(w, http.StatusOK, map[string]string{"status": "logged out"})
 }
 
@@ -274,13 +267,16 @@ func (h *Handler) SubmitAttempt(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Ensure progress is at least in_progress
-	h.db.ExecContext(r.Context(), `
+	if _, err := h.db.ExecContext(r.Context(), `
 		INSERT INTO progress (user_id, step_id, status)
 		VALUES ($1, $2, 'in_progress')
 		ON CONFLICT (user_id, step_id)
 		DO UPDATE SET updated_at = now()
 		WHERE progress.status = 'not_started'
-	`, claims.UserID, stepID)
+	`, claims.UserID, stepID); err != nil {
+		writeDBError(w, r, "failed to record progress", err)
+		return
+	}
 
 	// Validate based on exercise type
 	var result attemptResult
@@ -318,12 +314,15 @@ func (h *Handler) SubmitAttempt(w http.ResponseWriter, r *http.Request) {
 	// If correct and this completes the exercise, check completion
 	if result.shouldComplete {
 		now := time.Now()
-		h.db.ExecContext(r.Context(), `
+		if _, err := h.db.ExecContext(r.Context(), `
 			INSERT INTO progress (user_id, step_id, status, completed_at)
 			VALUES ($1, $2, 'completed', $3)
 			ON CONFLICT (user_id, step_id)
 			DO UPDATE SET status = 'completed', completed_at = $3, updated_at = now()
-		`, claims.UserID, step.ID, now)
+		`, claims.UserID, step.ID, now); err != nil {
+			writeDBError(w, r, "failed to complete step", err)
+			return
+		}
 		stepsCompletedTotal.Inc()
 	}
 
@@ -344,7 +343,7 @@ func validateQuizAttempt(body json.RawMessage, exerciseData json.RawMessage) (at
 		QuestionIndex int      `json:"question_index"`
 		Type          string   `json:"type"`
 		Selected      []string `json:"selected"` // for multiple-choice
-		Answer        string   `json:"answer"`    // for short-answer
+		Answer        string   `json:"answer"`   // for short-answer
 	}
 	if err := json.Unmarshal(body, &req); err != nil {
 		return attemptResult{}, err

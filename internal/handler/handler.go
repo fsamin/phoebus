@@ -11,6 +11,7 @@ import (
 	"github.com/fsamin/phoebus/internal/assets"
 	"github.com/fsamin/phoebus/internal/auth"
 	"github.com/fsamin/phoebus/internal/config"
+	"github.com/fsamin/phoebus/internal/logging"
 	"github.com/fsamin/phoebus/internal/model"
 	"github.com/fsamin/phoebus/internal/syncer"
 	"github.com/go-chi/chi/v5"
@@ -209,22 +210,15 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Update last login
-	h.db.ExecContext(r.Context(), "UPDATE users SET last_login_at = now() WHERE id = $1", user.ID)
+	h.execBestEffort(r.Context(), "failed to update last login", "UPDATE users SET last_login_at = now() WHERE id = $1", user.ID)
 
 	// Enforce forced admin role on every login
 	if h.cfg.IsForcedAdmin(user.Username) && user.Role != model.RoleAdmin {
-		h.db.ExecContext(r.Context(), "UPDATE users SET role = 'admin', updated_at = now() WHERE id = $1", user.ID)
+		h.execBestEffort(r.Context(), "failed to enforce forced admin role", "UPDATE users SET role = 'admin', updated_at = now() WHERE id = $1", user.ID)
 		user.Role = model.RoleAdmin
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "phoebus_session",
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   8 * 60 * 60, // 8 hours
-	})
+	setSessionCookie(w, r, token)
 
 	writeJSON(w, http.StatusOK, map[string]any{
 		"user": map[string]any{
@@ -297,14 +291,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "phoebus_session",
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   8 * 60 * 60,
-	})
+	setSessionCookie(w, r, token)
 
 	h.auditLog(r.Context(), &auth.Claims{UserID: user.ID.String(), Username: user.Username, Role: user.Role}, "register", "user", user.ID.String(), map[string]any{"username": user.Username})
 
@@ -354,7 +341,10 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	offset := (page - 1) * perPage
 
 	var total int
-	h.db.GetContext(r.Context(), &total, "SELECT COUNT(*) FROM users")
+	if err := h.db.GetContext(r.Context(), &total, "SELECT COUNT(*) FROM users"); err != nil {
+		writeDBError(w, r, "failed to count users", err)
+		return
+	}
 
 	var users []model.User
 	err := h.db.SelectContext(r.Context(), &users, `
@@ -376,7 +366,7 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		CompletedPaths int    `db:"completed_paths"`
 	}
 	var counts []pathCount
-	h.db.SelectContext(r.Context(), &counts, `
+	if err := h.db.SelectContext(r.Context(), &counts, `
 		SELECT user_id, COUNT(*) AS completed_paths
 		FROM (
 			SELECT p.user_id, lp.id AS path_id
@@ -389,7 +379,10 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 			HAVING COUNT(DISTINCT s.id) = COUNT(DISTINCT p.step_id) AND p.user_id IS NOT NULL
 		) completed
 		GROUP BY user_id
-	`)
+	`); err != nil {
+		writeDBError(w, r, "failed to count completed paths", err)
+		return
+	}
 	countMap := map[string]int{}
 	for _, c := range counts {
 		countMap[c.UserID] = c.CompletedPaths
@@ -415,6 +408,21 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		"page":     page,
 		"per_page": perPage,
 	})
+}
+
+// execBestEffort runs a non-critical write: a failure is logged but does not
+// fail the request (e.g. refreshing last_login_at after a successful login).
+func (h *Handler) execBestEffort(ctx context.Context, what, query string, args ...any) {
+	if _, err := h.db.ExecContext(ctx, query, args...); err != nil {
+		logging.FromContext(ctx).Warn(what, "error", err.Error())
+	}
+}
+
+// writeDBError logs a failed query and reports it to the client as a 500.
+// Callers must return immediately after calling it.
+func writeDBError(w http.ResponseWriter, r *http.Request, what string, err error) {
+	logging.FromContext(r.Context()).Error(what, "error", err.Error())
+	writeJSON(w, http.StatusInternalServerError, map[string]string{"error": what})
 }
 
 func writeJSON(w http.ResponseWriter, status int, data any) {

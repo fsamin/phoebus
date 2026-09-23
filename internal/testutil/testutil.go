@@ -35,7 +35,7 @@ func SetupTestDB(t *testing.T) *sqlx.DB {
 		"-e", "POSTGRES_PASSWORD=test",
 		"-e", "POSTGRES_DB=phoebus_test",
 		"-p", fmt.Sprintf("%d:5432", port),
-		"postgres:16-alpine",
+		"postgres:17-alpine",
 	)
 	out, err := cmd.CombinedOutput()
 	if err != nil {

@@ -8,15 +8,18 @@ import type { CodebaseFile } from '../api/client';
 
 interface Patch {
   label: string;
-  correct: boolean;
-  explanation: string;
+  // correct/explanation are stripped server-side and only come back in the
+  // attempt feedback, once the learner has answered.
+  correct?: boolean;
+  explanation?: string;
   diff: string;
 }
 
 interface CodeExerciseProps {
   mode: string;
   description: string;
-  target?: { file: string; lines: number[] };
+  // target.lines is withheld in identify-and-fix mode: finding them is the exercise.
+  target?: { file: string; lines?: number[] };
   patches: Patch[];
   codebaseFiles: CodebaseFile[];
   onSubmit: (body: Record<string, unknown>) => Promise<Record<string, unknown>>;
@@ -97,7 +100,7 @@ function applyUnifiedDiff(diff: string, files: CodebaseFile[]): Map<string, { or
       const hunkMatch = lines[i].match(hunkRegex);
       if (!hunkMatch) continue;
 
-      let origLine = parseInt(hunkMatch[1], 10) - 1; // 0-based index in original
+      const origLine = parseInt(hunkMatch[1], 10) - 1; // 0-based index in original
       let pos = origLine + offset; // position in modifiedLines
       i++;
 
@@ -186,7 +189,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
     const editor = editorRef.current;
     const monaco = monacoRef.current;
     if (!editor || !monaco) return;
-    const newDecorations: any[] = selectedLines.map((lineNum) => ({
+    const newDecorations: any[] = (phase === 'identify' ? selectedLines : []).map((lineNum) => ({
       range: new monaco.Range(lineNum, 1, lineNum, 1),
       options: {
         isWholeLine: true,
@@ -195,7 +198,9 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
       },
     }));
     if (phase === 'fix' && target?.file === selectedFile) {
-      target.lines.forEach((lineNum: number) => {
+      // In identify-and-fix mode the lines are not sent by the server; by the time
+      // we reach the fix phase the learner's own selection is the validated answer.
+      (target.lines ?? selectedLines).forEach((lineNum: number) => {
         newDecorations.push({
           range: new monaco.Range(lineNum, 1, lineNum, 1),
           options: {

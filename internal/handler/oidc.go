@@ -63,6 +63,7 @@ func (h *Handler) OIDCRedirect(w http.ResponseWriter, r *http.Request) {
 		Value:    state,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   isSecureRequest(r),
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   300, // 5 minutes
 	})
@@ -89,6 +90,7 @@ func (h *Handler) OIDCCallback(w http.ResponseWriter, r *http.Request) {
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   isSecureRequest(r),
 		MaxAge:   -1,
 	})
 
@@ -163,16 +165,9 @@ func (h *Handler) OIDCCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.db.ExecContext(r.Context(), "UPDATE users SET last_login_at = now() WHERE id = $1", user.ID)
+	h.execBestEffort(r.Context(), "failed to update last login", "UPDATE users SET last_login_at = now() WHERE id = $1", user.ID)
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     "phoebus_session",
-		Value:    sessionToken,
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   8 * 60 * 60,
-	})
+	setSessionCookie(w, r, sessionToken)
 
 	// Redirect to SPA
 	http.Redirect(w, r, "/", http.StatusFound)
@@ -188,14 +183,18 @@ func (h *Handler) upsertOIDCUser(ctx context.Context, externalID, email, display
 	`, externalID)
 	if err == nil {
 		// Update display name and email
-		h.db.ExecContext(ctx, `
+		if _, err := h.db.ExecContext(ctx, `
 			UPDATE users SET display_name = $1, email = $2, updated_at = now() WHERE id = $3
-		`, displayName, email, user.ID)
+		`, displayName, email, user.ID); err != nil {
+			return nil, fmt.Errorf("sync OIDC user attributes: %w", err)
+		}
 		user.DisplayName = displayName
 		user.Email = &email
 		// Override role for forced admins on every login
 		if h.cfg.IsForcedAdmin(user.Username) && user.Role != model.RoleAdmin {
-			h.db.ExecContext(ctx, `UPDATE users SET role = 'admin', updated_at = now() WHERE id = $1`, user.ID)
+			if _, err := h.db.ExecContext(ctx, `UPDATE users SET role = 'admin', updated_at = now() WHERE id = $1`, user.ID); err != nil {
+				return nil, fmt.Errorf("enforce forced admin role: %w", err)
+			}
 			user.Role = model.RoleAdmin
 		}
 		return &user, nil
@@ -208,9 +207,11 @@ func (h *Handler) upsertOIDCUser(ctx context.Context, externalID, email, display
 			FROM users WHERE email = $1 AND auth_provider = 'oidc'
 		`, email)
 		if err == nil {
-			h.db.ExecContext(ctx, `
+			if _, err := h.db.ExecContext(ctx, `
 				UPDATE users SET external_id = $1, display_name = $2, updated_at = now() WHERE id = $3
-			`, externalID, displayName, user.ID)
+			`, externalID, displayName, user.ID); err != nil {
+				return nil, fmt.Errorf("link OIDC account: %w", err)
+			}
 			return &user, nil
 		}
 	}

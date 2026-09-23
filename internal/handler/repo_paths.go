@@ -17,13 +17,13 @@ func (h *Handler) ListRepoPaths(w http.ResponseWriter, r *http.Request) {
 	}
 
 	type repoPath struct {
-		ID                string `json:"id" db:"id"`
-		Slug              string `json:"slug" db:"slug"`
-		Title             string `json:"title" db:"title"`
-		Description       string `json:"description" db:"description"`
-		Enabled           bool   `json:"enabled" db:"enabled"`
-		ModuleCount       int    `json:"module_count" db:"module_count"`
-		StepCount         int    `json:"step_count" db:"step_count"`
+		ID          string `json:"id" db:"id"`
+		Slug        string `json:"slug" db:"slug"`
+		Title       string `json:"title" db:"title"`
+		Description string `json:"description" db:"description"`
+		Enabled     bool   `json:"enabled" db:"enabled"`
+		ModuleCount int    `json:"module_count" db:"module_count"`
+		StepCount   int    `json:"step_count" db:"step_count"`
 	}
 
 	var paths []repoPath

@@ -129,14 +129,14 @@ type LDAPAttrMapping struct {
 // AdvancedDatabaseConfig represents an alternative database configuration format
 // commonly used in advanced environments.
 type AdvancedDatabaseConfig struct {
-	User      string                 `json:"user"`
-	Password  string                 `json:"password"`
-	Database  string                 `json:"database"`
+	User      string                     `json:"user"`
+	Password  string                     `json:"password"`
+	Database  string                     `json:"database"`
 	Writers   []AdvancedDatabaseEndpoint `json:"writers"`
 	Readers   []AdvancedDatabaseEndpoint `json:"readers"`
 	Analytics []AdvancedDatabaseEndpoint `json:"analytics"`
-	Type      string                 `json:"type"`
-	SSL       string                 `json:"ssl"`
+	Type      string                     `json:"type"`
+	SSL       string                     `json:"ssl"`
 }
 
 // AdvancedDatabaseEndpoint represents a host:port pair in advanced database config.
