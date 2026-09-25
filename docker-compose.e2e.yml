@@ -12,11 +12,10 @@ services:
       retries: 10
 
   minio-e2e:
-    image: quay.io/minio/minio:latest
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
-    command: server /data
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
       interval: 5s
@@ -24,15 +23,17 @@ services:
       retries: 5
 
   minio-init:
-    image: quay.io/minio/mc:latest
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
     profiles: ["init"]
     depends_on:
       minio-e2e:
         condition: service_healthy
+    # The image first runs a temporary server for its own setup, which already
+    # passes the health check: retry until the final server accepts clients.
     entrypoint: >
       /bin/sh -c "
-      mc alias set local http://minio-e2e:9000 minioadmin minioadmin &&
-      mc mb --ignore-existing local/phoebus-assets &&
+      for i in $$(seq 1 30); do mc --config-dir /tmp/.mc alias set local http://minio-e2e:9000 minioadmin minioadmin && break; sleep 2; done &&
+      mc --config-dir /tmp/.mc mb --ignore-existing local/phoebus-assets &&
       exit 0
       "
 
