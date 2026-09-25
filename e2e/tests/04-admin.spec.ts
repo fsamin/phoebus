@@ -40,6 +40,33 @@ test.describe('Admin', () => {
     await expect(page.getByText('admin').first()).toBeVisible({ timeout: 10000 });
   });
 
+  // Search runs server-side: a user created before 25 others sits beyond the
+  // first page, and must still be found, with a total describing the matches.
+  test('users search finds users beyond the current page', async ({ page, request }) => {
+    const tag = Date.now().toString(36);
+    const create = (username: string) =>
+      request.post('/api/admin/users', {
+        data: { username, display_name: `Display ${username}`, role: 'learner', password: 'Test1234!' },
+      });
+    expect((await create(`needle-${tag}`)).status()).toBe(201);
+    for (let i = 0; i < 25; i++) {
+      expect((await create(`filler-${tag}-${i}`)).status()).toBe(201);
+    }
+
+    await page.goto('/admin/users');
+    await expect(page.locator('.ant-table-row').first()).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('cell', { name: `needle-${tag}`, exact: true })).toHaveCount(0);
+    // Searching from page 2 must bring the results back to page 1.
+    await page.locator('.ant-pagination-item-2').click();
+    await expect(page.locator('.ant-pagination-item-active')).toHaveText('2');
+
+    await page.getByPlaceholder('Search users...').fill(`needle-${tag}`);
+    await expect(page.getByRole('cell', { name: `needle-${tag}`, exact: true })).toBeVisible({ timeout: 10000 });
+    await expect(page.locator('.ant-table-row')).toHaveCount(1);
+    await expect(page.getByText('1 users')).toBeVisible();
+    await expect(page.locator('.ant-pagination-item-active')).toHaveText('1');
+  });
+
   test('health page shows application status', async ({ page }) => {
     await page.goto('/admin/health');
     await expect(page.getByText(/health|status|ok/i).first()).toBeVisible({ timeout: 10000 });
