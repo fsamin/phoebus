@@ -1215,6 +1215,7 @@ All authenticated views share a common shell layout:
 | `/paths/:pathSlug/steps/:stepSlug` | Step View | `learner` | Learning layout | 10.7 |
 | `/analytics` | Analytics Dashboard | `instructor` | Global shell | 10.8 |
 | `/analytics/paths/:pathSlug` | Learning Path Analytics | `instructor` | Global shell | 10.9 |
+| `/analytics/learners` | Learners | `instructor` | Global shell | 10.10 |
 | `/analytics/learners/:learnerId` | Learner Detail | `instructor` | Global shell | 10.10 |
 | `/admin/repositories` | Repository Management | `admin` | Global shell | 10.11 |
 | `/admin/repositories/new` | Add Repository | `admin` | Global shell | 10.12 |
@@ -1812,17 +1813,34 @@ Renders a VS Code-like IDE layout with full-bleed display (no padding, no max-wi
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
+**Learners list (`/analytics/learners`):** paginated table of the active learners, plus any active user with progress on a path. Columns: learner, paths completed / enrolled, progress, first-try success, last activity, status. Server-side search (username, display name, email), sort and status filter (`not_started`, `inactive`, `stuck`). List state is kept in the URL. Click row → `/analytics/learners/:learnerId`.
+
+**KPI definitions** (computed over enabled, non-deleted paths):
+
+| KPI | Definition |
+|---|---|
+| Paths completed / enrolled | Enrolled = at least one progress row in the path; completed = every step completed |
+| Progress | Completed steps / total steps of the enrolled paths |
+| First-try success | Share of attempted exercises whose first attempt was correct |
+| Avg attempts / exercise | Attempts / attempted exercises |
+| Active days (30d) | Distinct UTC days with a progress or attempt event, today included |
+| Current streak | Consecutive active days ending today or yesterday |
+| Inactive | No activity for more than 30 days |
+| Stuck | At least one step `in_progress` started more than 14 days ago |
+
 **Sections:**
 
 | Section | Data |
 |---|---|
+| KPIs (Ant Design Statistic) | Paths completed, progress, first-try success, avg attempts, active days (30d), current streak; inactive / stuck tags next to the name |
 | Profile | Name, role, last login, join date |
 | Enrolled paths | Learning paths with progress bars |
 | Activity timeline (Ant Design Timeline) | Chronological list of all progress and attempt events. Grouped by day |
 | Exercise performance (Ant Design Table) | Per-exercise: name, number of attempts, result, estimated time spent. Sortable |
 
 **API Calls:**
-- `GET /api/analytics/learners/:learnerId` — returns profile, enrolled paths with progress, activity timeline, exercise performance
+- `GET /api/analytics/learners?q=&status=&sort=&order=&page=&per_page=` — learners list with KPIs
+- `GET /api/analytics/learners/:learnerId` — returns profile, KPIs, enrolled paths with progress, activity timeline, exercise performance
 
 **Navigation:**
 - ← Analytics breadcrumb → `/analytics`

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Typography, Card, Table, Spin, Tag, Breadcrumb, Row, Col, Progress as AntProgress, Timeline } from 'antd';
+import { Typography, Card, Table, Spin, Tag, Breadcrumb, Row, Col, Progress as AntProgress, Timeline, Statistic, Tooltip } from 'antd';
 import { CheckCircleOutlined, ClockCircleOutlined } from '@ant-design/icons';
 import { useParams, Link } from 'react-router-dom';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -33,6 +33,21 @@ interface LearnerData {
     attempts: number;
     correct: number;
   }>;
+  kpis: {
+    enrolled_paths: number;
+    completed_paths: number;
+    completed_steps: number;
+    enrolled_steps: number;
+    stuck_steps: number;
+    progress_rate: number | null;
+    first_try_rate: number | null;
+    avg_attempts: number | null;
+    inactive: boolean;
+    active_days_30d: number;
+    current_streak: number;
+    inactive_days: number;
+    stuck_days: number;
+  };
 }
 
 const LearnerDetail: React.FC = () => {
@@ -60,6 +75,8 @@ const LearnerDetail: React.FC = () => {
     return d.toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' });
   };
 
+  const kpis = data.kpis;
+
   // Group activity by day
   const groupedActivity: Record<string, typeof data.activity> = {};
   for (const a of data.activity) {
@@ -71,10 +88,50 @@ const LearnerDetail: React.FC = () => {
     <div>
       <Breadcrumb items={[
         { title: <Link to="/analytics">Analytics</Link> },
+        { title: <Link to="/analytics/learners">Learners</Link> },
         { title: data.display_name || data.username },
       ]} style={{ marginBottom: 16 }} />
 
-      <Typography.Title level={2}>{data.display_name || data.username}</Typography.Title>
+      <Typography.Title level={2}>
+        {data.display_name || data.username}
+        {kpis.inactive && (
+          <Tooltip title={`No activity for more than ${kpis.inactive_days} days`}>
+            <Tag color="orange" style={{ marginLeft: 12, verticalAlign: 'middle' }}>Inactive</Tag>
+          </Tooltip>
+        )}
+        {kpis.stuck_steps > 0 && (
+          <Tooltip title={`${kpis.stuck_steps} step(s) started more than ${kpis.stuck_days} days ago and not completed`}>
+            <Tag color="red" style={{ marginLeft: 12, verticalAlign: 'middle' }}>Stuck</Tag>
+          </Tooltip>
+        )}
+      </Typography.Title>
+
+      <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
+        <Col xs={12} md={8} xl={4}>
+          <Card><Statistic title="Paths completed" value={kpis.completed_paths} suffix={`/ ${kpis.enrolled_paths}`} /></Card>
+        </Col>
+        <Col xs={12} md={8} xl={4}>
+          <Tooltip title={`${kpis.completed_steps} of ${kpis.enrolled_steps} steps in enrolled paths`}>
+            <Card><Statistic title="Progress" value={kpis.progress_rate === null ? '—' : Math.round(kpis.progress_rate)} suffix={kpis.progress_rate === null ? undefined : '%'} /></Card>
+          </Tooltip>
+        </Col>
+        <Col xs={12} md={8} xl={4}>
+          <Tooltip title="Share of exercises passed at the first attempt">
+            <Card><Statistic title="First-try success" value={kpis.first_try_rate === null ? '—' : Math.round(kpis.first_try_rate)} suffix={kpis.first_try_rate === null ? undefined : '%'} /></Card>
+          </Tooltip>
+        </Col>
+        <Col xs={12} md={8} xl={4}>
+          <Card><Statistic title="Avg attempts / exercise" value={kpis.avg_attempts === null ? '—' : kpis.avg_attempts.toFixed(1)} /></Card>
+        </Col>
+        <Col xs={12} md={8} xl={4}>
+          <Card><Statistic title="Active days (30d)" value={kpis.active_days_30d} /></Card>
+        </Col>
+        <Col xs={12} md={8} xl={4}>
+          <Tooltip title="Consecutive days with activity, up to today or yesterday">
+            <Card><Statistic title="Current streak" value={kpis.current_streak} suffix={kpis.current_streak === 1 ? 'day' : 'days'} /></Card>
+          </Tooltip>
+        </Col>
+      </Row>
 
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={8}>

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Typography, Card, Row, Col, Table, Spin, Statistic } from 'antd';
+import { Typography, Card, Row, Col, Table, Spin, Statistic, Button } from 'antd';
 import { TeamOutlined, BookOutlined, TrophyOutlined, ExperimentOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { usePageTitle } from '../../hooks/usePageTitle';
@@ -60,14 +60,19 @@ const Analytics: React.FC = () => {
 
   return (
     <div>
-      <Typography.Title level={2}>Analytics</Typography.Title>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <Typography.Title level={2} style={{ margin: 0 }}>Analytics</Typography.Title>
+        <Button icon={<TeamOutlined />} onClick={() => navigate('/analytics/learners')}>Learners</Button>
+      </div>
 
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={24} sm={6}>
           <Card><Statistic title="Learning Paths" value={overview.total_paths} prefix={<BookOutlined />} /></Card>
         </Col>
         <Col xs={24} sm={6}>
-          <Card><Statistic title="Enrolled Learners" value={overview.total_learners} prefix={<TeamOutlined />} /></Card>
+          <Card hoverable onClick={() => navigate('/analytics/learners')}>
+            <Statistic title="Enrolled Learners" value={overview.total_learners} prefix={<TeamOutlined />} />
+          </Card>
         </Col>
         <Col xs={24} sm={6}>
           <Card><Statistic title="Completion Rate" value={overview.completion_rate.toFixed(1)} suffix="%" prefix={<TrophyOutlined />} /></Card>
