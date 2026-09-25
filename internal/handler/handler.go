@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/fsamin/phoebus/internal/assets"
@@ -342,18 +343,31 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	}
 	offset := (page - 1) * perPage
 
+	// Search is done server-side so it covers every user, not only the current
+	// page, and so that total matches the filtered set. LIKE wildcards typed by
+	// the admin are matched literally.
+	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	pattern := ""
+	if q != "" {
+		pattern = "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(q) + "%"
+	}
+	const searchFilter = `$1 = '' OR username ILIKE $1 OR display_name ILIKE $1 OR COALESCE(email, '') ILIKE $1`
+
 	var total int
-	if err := h.db.GetContext(r.Context(), &total, "SELECT COUNT(*) FROM users"); err != nil {
+	if err := h.db.GetContext(r.Context(), &total, "SELECT COUNT(*) FROM users WHERE "+searchFilter, pattern); err != nil {
 		writeDBError(w, r, "failed to count users", err)
 		return
 	}
 
+	// id breaks ties between users created at the same instant, otherwise rows
+	// can be repeated or skipped across pages.
 	var users []model.User
 	err := h.db.SelectContext(r.Context(), &users, `
 		SELECT id, username, email, display_name, role, auth_provider, active, last_login_at, created_at, updated_at
-		FROM users ORDER BY created_at DESC
-		LIMIT $1 OFFSET $2
-	`, perPage, offset)
+		FROM users WHERE `+searchFilter+`
+		ORDER BY created_at DESC, id
+		LIMIT $2 OFFSET $3
+	`, pattern, perPage, offset)
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list users"})
 		return

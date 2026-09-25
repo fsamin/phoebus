@@ -19,21 +19,28 @@ const Users: React.FC = () => {
   const [createLoading, setCreateLoading] = useState(false);
   const [createForm] = Form.useForm();
 
-  // Debounce search 300ms
+  // Debounce search 300ms; a new search starts back on the first page.
+  // Both updates are batched into a single render, hence a single fetch.
+  // An unchanged search must not reset the page (e.g. right after mount).
   useEffect(() => {
-    const t = setTimeout(() => setSearch(searchInput), 300);
+    const t = setTimeout(() => {
+      const next = searchInput.trim();
+      if (next === search) return;
+      setSearch(next);
+      setPage(1);
+    }, 300);
     return () => clearTimeout(t);
-  }, [searchInput]);
+  }, [searchInput, search]);
 
-  const loadUsers = (p = page) => {
+  const loadUsers = () => {
     setLoading(true);
-    api.listUsers(p).then((data) => {
+    api.listUsers(page, 20, search).then((data) => {
       setUsers(data.users);
       setTotal(data.total);
     }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { loadUsers(); }, [page]);
+  useEffect(() => { loadUsers(); }, [page, search]);
 
   const updateUser = async (userId: string, patch: { role?: string; active?: boolean }) => {
     const resp = await fetch(`/api/admin/users/${userId}`, {
@@ -50,13 +57,6 @@ const Users: React.FC = () => {
     message.success('User updated');
     loadUsers();
   };
-
-  const filteredUsers = search
-    ? users.filter((u) =>
-        u.username.toLowerCase().includes(search.toLowerCase()) ||
-        (u.display_name || '').toLowerCase().includes(search.toLowerCase()) ||
-        (u.email || '').toLowerCase().includes(search.toLowerCase()))
-    : users;
 
   const handleCreateUser = async (values: { username: string; display_name: string; email?: string; role: string; password: string }) => {
     setCreateLoading(true);
@@ -92,7 +92,7 @@ const Users: React.FC = () => {
         </div>
       </div>
       <Table
-        dataSource={filteredUsers}
+        dataSource={users}
         rowKey="id"
         loading={loading}
         rowClassName={(record: User) => record.active ? '' : 'deactivated-row'}
