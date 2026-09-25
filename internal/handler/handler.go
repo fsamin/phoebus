@@ -119,6 +119,7 @@ func (h *Handler) RegisterRoutes(ctx context.Context, r chi.Router) {
 			r.Get("/api/analytics/activity", h.AnalyticsActivity)
 			r.Get("/api/analytics/paths/{pathId}", h.AnalyticsPath)
 			r.Get("/api/analytics/paths/{pathId}/steps/{stepId}", h.AnalyticsStep)
+			r.Get("/api/analytics/learners", h.AnalyticsLearners)
 			r.Get("/api/analytics/learners/{learnerId}", h.AnalyticsLearner)
 
 			// Instructor repos (ownership-verified)
@@ -346,11 +347,7 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 	// Search is done server-side so it covers every user, not only the current
 	// page, and so that total matches the filtered set. LIKE wildcards typed by
 	// the admin are matched literally.
-	q := strings.TrimSpace(r.URL.Query().Get("q"))
-	pattern := ""
-	if q != "" {
-		pattern = "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(q) + "%"
-	}
+	pattern := likePattern(r.URL.Query().Get("q"))
 	const searchFilter = `$1 = '' OR username ILIKE $1 OR display_name ILIKE $1 OR COALESCE(email, '') ILIKE $1`
 
 	var total int
@@ -424,6 +421,16 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		"page":     page,
 		"per_page": perPage,
 	})
+}
+
+// likePattern turns a user-typed search into an ILIKE "contains" pattern where
+// LIKE wildcards are literal. An empty search yields an empty pattern.
+func likePattern(q string) string {
+	q = strings.TrimSpace(q)
+	if q == "" {
+		return ""
+	}
+	return "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(q) + "%"
 }
 
 // execBestEffort runs a non-critical write: a failure is logged but does not

@@ -357,6 +357,7 @@ type learnerDetail struct {
 	EnrolledPaths []enrolledPath    `json:"enrolled_paths"`
 	Activity      []activityItem    `json:"activity"`
 	Performance   []performanceItem `json:"performance"`
+	KPIs          *learnerKPIs      `json:"kpis" db:"-"`
 }
 
 type enrolledPath struct {
@@ -463,6 +464,11 @@ func (h *Handler) AnalyticsLearner(w http.ResponseWriter, r *http.Request) {
 	}
 	if detail.Performance == nil {
 		detail.Performance = []performanceItem{}
+	}
+
+	if detail.KPIs, err = h.loadLearnerKPIs(r, detail.UserID); err != nil {
+		writeDBError(w, r, "failed to load learner KPIs", err)
+		return
 	}
 
 	writeJSON(w, http.StatusOK, detail)

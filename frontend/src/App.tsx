@@ -20,6 +20,7 @@ import InstructorSyncLogs from './pages/instructor/InstructorSyncLogs';
 import Analytics from './pages/analytics/Analytics';
 import PathAnalyticsView from './pages/analytics/PathAnalytics';
 import LearnerDetail from './pages/analytics/LearnerDetail';
+import LearnersAnalytics from './pages/analytics/LearnersAnalytics';
 
 function RequireRole({ role, children }: { role: string; children: React.ReactNode }) {
   const { user } = useAuth();
@@ -50,6 +51,7 @@ function ThemedApp() {
               <Route path="/paths/:pathId/steps/:stepId" element={<StepView />} />
               <Route path="/analytics" element={<RequireRole role="instructor"><Analytics /></RequireRole>} />
               <Route path="/analytics/paths/:pathId" element={<RequireRole role="instructor"><PathAnalyticsView /></RequireRole>} />
+              <Route path="/analytics/learners" element={<RequireRole role="instructor"><LearnersAnalytics /></RequireRole>} />
               <Route path="/analytics/learners/:learnerId" element={<RequireRole role="instructor"><LearnerDetail /></RequireRole>} />
               <Route path="/instructor/repositories/:repoId/sync-logs" element={<RequireRole role="instructor"><InstructorSyncLogs /></RequireRole>} />
               <Route path="/admin/repositories" element={<RequireRole role="admin"><Repositories /></RequireRole>} />

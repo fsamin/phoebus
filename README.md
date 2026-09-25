@@ -318,6 +318,7 @@ go build -o phoebus ./cmd/phoebus
 | `GET` | `/api/analytics/activity` | 👨‍🏫 | Activity timeline |
 | `GET` | `/api/analytics/paths/{pathId}` | 👨‍🏫 | Path analytics |
 | `GET` | `/api/analytics/paths/{pathId}/steps/{stepId}` | 👨‍🏫 | Step-level analytics |
+| `GET` | `/api/analytics/learners` | 👨‍🏫 | Learners with KPIs (search, status filter, sort) |
 | `GET` | `/api/analytics/learners/{learnerId}` | 👨‍🏫 | Learner analytics |
 | `GET` | `/api/instructor/repos` | 👨‍🏫 | List owned repositories |
 | `GET` | `/api/instructor/repos/{repoId}` | 👨‍🏫 | Owned repo details (ownership verified) |
