@@ -15,6 +15,8 @@ const Users: React.FC = () => {
   const [page, setPage] = useState(1);
   const [searchInput, setSearchInput] = useState('');
   const [search, setSearch] = useState('');
+  // Sorting is server-side so that it spans every page, not only the current one.
+  const [completedPathsOrder, setCompletedPathsOrder] = useState<'asc' | 'desc' | undefined>();
   const [createModalOpen, setCreateModalOpen] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [createForm] = Form.useForm();
@@ -34,13 +36,13 @@ const Users: React.FC = () => {
 
   const loadUsers = () => {
     setLoading(true);
-    api.listUsers(page, 20, search).then((data) => {
+    api.listUsers(page, 20, search, completedPathsOrder).then((data) => {
       setUsers(data.users);
       setTotal(data.total);
     }).finally(() => setLoading(false));
   };
 
-  useEffect(() => { loadUsers(); }, [page, search]);
+  useEffect(() => { loadUsers(); }, [page, search, completedPathsOrder]);
 
   const updateUser = async (userId: string, patch: { role?: string; active?: boolean }) => {
     const resp = await fetch(`/api/admin/users/${userId}`, {
@@ -96,6 +98,12 @@ const Users: React.FC = () => {
         rowKey="id"
         loading={loading}
         rowClassName={(record: User) => record.active ? '' : 'deactivated-row'}
+        onChange={(_pagination, _filters, sorter, { action }) => {
+          if (action !== 'sort') return;
+          const order = Array.isArray(sorter) ? sorter[0]?.order : sorter.order;
+          setCompletedPathsOrder(order === 'ascend' ? 'asc' : order === 'descend' ? 'desc' : undefined);
+          setPage(1);
+        }}
         pagination={{
           current: page,
           pageSize: 20,
@@ -148,8 +156,8 @@ const Users: React.FC = () => {
             title: 'Completed Paths',
             dataIndex: 'completed_paths',
             width: 130,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            sorter: (a: any, b: any) => (a.completed_paths ?? 0) - (b.completed_paths ?? 0),
+            sorter: true,
+            sortOrder: completedPathsOrder === 'asc' ? 'ascend' : completedPathsOrder === 'desc' ? 'descend' : null,
           },
           {
             title: 'Last Login',

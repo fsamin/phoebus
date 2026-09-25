@@ -356,63 +356,43 @@ func (h *Handler) ListUsers(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// id breaks ties between users created at the same instant, otherwise rows
-	// can be repeated or skipped across pages.
-	var users []model.User
-	err := h.db.SelectContext(r.Context(), &users, `
-		SELECT id, username, email, display_name, role, auth_provider, active, last_login_at, created_at, updated_at
-		FROM users WHERE `+searchFilter+`
-		ORDER BY created_at DESC, id
-		LIMIT $2 OFFSET $3
-	`, pattern, perPage, offset)
-	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list users"})
-		return
-	}
-	if users == nil {
-		users = []model.User{}
-	}
-
-	// Enrich with completed paths count per user
-	type pathCount struct {
-		UserID         string `db:"user_id"`
-		CompletedPaths int    `db:"completed_paths"`
-	}
-	var counts []pathCount
-	if err := h.db.SelectContext(r.Context(), &counts, `
-		SELECT user_id, COUNT(*) AS completed_paths
-		FROM (
-			SELECT p.user_id, lp.id AS path_id
-			FROM learning_paths lp
-			JOIN modules m ON m.learning_path_id = lp.id AND m.deleted_at IS NULL
-			JOIN steps s ON s.module_id = m.id AND s.deleted_at IS NULL
-			LEFT JOIN progress p ON p.step_id = s.id AND p.status = 'completed'
-			WHERE lp.deleted_at IS NULL AND lp.enabled = true
-			GROUP BY p.user_id, lp.id
-			HAVING COUNT(DISTINCT s.id) = COUNT(DISTINCT p.step_id) AND p.user_id IS NOT NULL
-		) completed
-		GROUP BY user_id
-	`); err != nil {
-		writeDBError(w, r, "failed to count completed paths", err)
-		return
-	}
-	countMap := map[string]int{}
-	for _, c := range counts {
-		countMap[c.UserID] = c.CompletedPaths
+	// Completed paths come from the learner KPIs so that both pages agree, and
+	// sorting on them is done in SQL to span every page, not only the current one.
+	orderBy := "u.created_at DESC"
+	if r.URL.Query().Get("sort") == "completed_paths" {
+		orderBy = "ls.completed_paths DESC"
+		if r.URL.Query().Get("order") == "asc" {
+			orderBy = "ls.completed_paths ASC"
+		}
+		orderBy += ", u.created_at DESC"
 	}
 
 	type userResponse struct {
 		model.User
-		CompletedPaths int  `json:"completed_paths"`
-		RoleLocked     bool `json:"role_locked"`
+		CompletedPaths int  `json:"completed_paths" db:"completed_paths"`
+		RoleLocked     bool `json:"role_locked" db:"-"`
 	}
-	out := make([]userResponse, len(users))
-	for i, u := range users {
-		out[i] = userResponse{
-			User:           u,
-			CompletedPaths: countMap[u.ID.String()],
-			RoleLocked:     h.cfg.IsForcedAdmin(u.Username),
-		}
+	// id breaks ties between users created at the same instant, otherwise rows
+	// can be repeated or skipped across pages.
+	var out []userResponse
+	err := h.db.SelectContext(r.Context(), &out, learnerStatsCTE+`
+		SELECT u.id, u.username, u.email, u.display_name, u.role, u.auth_provider, u.active,
+		       u.last_login_at, u.created_at, u.updated_at, ls.completed_paths
+		FROM users u
+		JOIN learner_stats ls ON ls.id = u.id
+		WHERE $2 = '' OR u.username ILIKE $2 OR u.display_name ILIKE $2 OR COALESCE(u.email, '') ILIKE $2
+		ORDER BY `+orderBy+`, u.id
+		LIMIT $3 OFFSET $4
+	`, learnerStuckDays, pattern, perPage, offset)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": "failed to list users"})
+		return
+	}
+	if out == nil {
+		out = []userResponse{}
+	}
+	for i := range out {
+		out[i].RoleLocked = h.cfg.IsForcedAdmin(out[i].Username)
 	}
 
 	writeJSON(w, http.StatusOK, map[string]any{

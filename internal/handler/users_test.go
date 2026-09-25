@@ -153,3 +153,86 @@ func TestListUsersPaginationIsStable(t *testing.T) {
 		}
 	}
 }
+
+// A path counts as completed only when every one of its steps is: finishing
+// one step out of two must not show up as a completed path.
+func TestListUsersCompletedPaths(t *testing.T) {
+	srv, cleanup := setupTest(t)
+	defer cleanup()
+	admin := loginAs(t, model.RoleAdmin)
+	tag := uuid.New().String()[:8]
+	now := time.Now()
+	steps := createKPIPath(t, true, "lesson", "lesson")
+	disabled := createKPIPath(t, false, "lesson")
+
+	partial := insertUser(t, "cp-"+tag+"-partial", "x", "", now)
+	addProgress(t, partial, steps[0], "completed", now)
+	full := insertUser(t, "cp-"+tag+"-full", "x", "", now)
+	addProgress(t, full, steps[0], "completed", now)
+	addProgress(t, full, steps[1], "completed", now)
+	// A disabled path is not offered to learners and must not count.
+	addProgress(t, full, disabled[0], "completed", now)
+
+	resp := doRequest(t, srv, "GET", "/api/admin/users?q=cp-"+tag, nil, admin)
+	var body struct {
+		Users []struct {
+			ID             string `json:"id"`
+			CompletedPaths int    `json:"completed_paths"`
+		} `json:"users"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	resp.Body.Close()
+	want := map[string]int{partial: 0, full: 1}
+	if len(body.Users) != 2 {
+		t.Fatalf("users = %+v, want 2", body.Users)
+	}
+	for _, u := range body.Users {
+		if u.CompletedPaths != want[u.ID] {
+			t.Errorf("user %s: completed_paths = %d, want %d", u.ID, u.CompletedPaths, want[u.ID])
+		}
+	}
+}
+
+// Sorting by completed paths must rank across every page: the user with the
+// most completed paths comes first even when created long before the others.
+func TestListUsersSortByCompletedPaths(t *testing.T) {
+	srv, cleanup := setupTest(t)
+	defer cleanup()
+	admin := loginAs(t, model.RoleAdmin)
+	tag := uuid.New().String()[:8]
+	now := time.Now()
+	pathA := createKPIPath(t, true, "lesson")
+	pathB := createKPIPath(t, true, "lesson")
+
+	two := insertUser(t, "sortcp-"+tag+"-two", "x", "", now.AddDate(-1, 0, 0))
+	addProgress(t, two, pathA[0], "completed", now)
+	addProgress(t, two, pathB[0], "completed", now)
+	one := insertUser(t, "sortcp-"+tag+"-one", "x", "", now.AddDate(0, -1, 0))
+	addProgress(t, one, pathA[0], "completed", now)
+	for i := range 3 {
+		insertUser(t, "sortcp-"+tag+"-zero-"+strconv.Itoa(i), "x", "", now)
+	}
+
+	sorted := func(order string, page int) listUsersResponse {
+		t.Helper()
+		resp := doRequest(t, srv, "GET", "/api/admin/users?q=sortcp-"+tag+"&sort=completed_paths&order="+order+
+			"&per_page=2&page="+strconv.Itoa(page), nil, admin)
+		defer resp.Body.Close()
+		var out listUsersResponse
+		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		return out
+	}
+
+	desc := sorted("desc", 1)
+	if desc.Total != 5 || len(desc.Users) != 2 || desc.Users[0].ID != two || desc.Users[1].ID != one {
+		t.Errorf("desc, first page of 2: total=%d users=%+v, want [two one]", desc.Total, desc.Users)
+	}
+	asc := sorted("asc", 3)
+	if len(asc.Users) != 1 || asc.Users[0].ID != two {
+		t.Errorf("asc, last page: users=%+v, want [two]", asc.Users)
+	}
+}
