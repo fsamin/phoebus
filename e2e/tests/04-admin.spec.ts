@@ -67,6 +67,24 @@ test.describe('Admin', () => {
     await expect(page.locator('.ant-pagination-item-active')).toHaveText('1');
   });
 
+  // Sorting by completed paths must be asked to the server, so that it ranks
+  // every user rather than the 20 displayed, and restart from the first page.
+  test('users sort by completed paths is server-side', async ({ page }) => {
+    await page.goto('/admin/users');
+    await expect(page.locator('.ant-table-row').first()).toBeVisible({ timeout: 10000 });
+    await page.locator('.ant-pagination-item-2').click();
+    await expect(page.locator('.ant-pagination-item-active')).toHaveText('2');
+
+    const sorted = page.waitForRequest((r) => /\/api\/admin\/users\?.*sort=completed_paths&order=asc/.test(r.url()));
+    await page.getByRole('columnheader', { name: /completed paths/i }).click();
+    expect(new URL((await sorted).url()).searchParams.get('page')).toBe('1');
+    await expect(page.locator('.ant-pagination-item-active')).toHaveText('1');
+
+    const desc = page.waitForRequest((r) => r.url().includes('sort=completed_paths&order=desc'));
+    await page.getByRole('columnheader', { name: /completed paths/i }).click();
+    await desc;
+  });
+
   test('health page shows application status', async ({ page }) => {
     await page.goto('/admin/health');
     await expect(page.getByText(/health|status|ok/i).first()).toBeVisible({ timeout: 10000 });

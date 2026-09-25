@@ -87,8 +87,8 @@ export const api = {
     request<SyncLog[]>(`/admin/repos/${id}/sync-logs`),
   syncJobLogs: (repoId: string, jobId: string) =>
     request<SyncJobLogEntry[]>(`/admin/repos/${repoId}/sync-logs/${jobId}`),
-  listUsers: (page = 1, perPage = 20, q = '') =>
-    request<{ users: Array<User & { completed_paths: number }>; total: number; page: number; per_page: number }>(`/admin/users?page=${page}&per_page=${perPage}${q ? `&q=${encodeURIComponent(q)}` : ''}`),
+  listUsers: (page = 1, perPage = 20, q = '', completedPathsOrder?: 'asc' | 'desc') =>
+    request<{ users: Array<User & { completed_paths: number }>; total: number; page: number; per_page: number }>(`/admin/users?page=${page}&per_page=${perPage}${q ? `&q=${encodeURIComponent(q)}` : ''}${completedPathsOrder ? `&sort=completed_paths&order=${completedPathsOrder}` : ''}`),
   createUser: (data: { username: string; display_name: string; email?: string; role: string; password: string }) =>
     request<User>('/admin/users', {
       method: 'POST',
