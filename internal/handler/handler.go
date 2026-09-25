@@ -150,6 +150,8 @@ func (h *Handler) RegisterRoutes(ctx context.Context, r chi.Router) {
 			r.Patch("/api/admin/repos/{repoId}/paths/{pathId}", h.ToggleRepoPath)
 			r.Get("/api/admin/health", h.AdminHealth)
 			r.Get("/api/admin/ssh-public-key", h.SSHPublicKey)
+			r.Get("/api/admin/banner", h.GetBanner)
+			r.Put("/api/admin/banner", h.UpdateBanner)
 			r.Get("/api/admin/dependencies", h.ListManualDependencies)
 			r.Post("/api/admin/dependencies", h.CreatePathDependency)
 			r.Delete("/api/admin/dependencies/{depId}", h.DeletePathDependency)

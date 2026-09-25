@@ -24,6 +24,7 @@ Phœbus follows a **content-as-code** philosophy: learning paths are authored in
 - 🖼️ **Asset Management** — Attach images, videos, and files to lessons with pluggable storage (local filesystem or S3/MinIO)
 - 📊 **Progress Tracking** — Per-step completion, exercise attempts with server-side validation
 - 📈 **Analytics** — Enrollment, completion rates, failure points, learner activity
+- 📢 **Dashboard Banner** — Admin-configurable announcement (info / warning / danger) in Markdown, shown to every user on the dashboard
 - 🔐 **Authentication** — Local accounts, OIDC, LDAP, proxy auth with role-based access (learner / instructor / admin)
 - 🎨 **Modern UI** — React 19 + Ant Design SPA with dark/light mode, syntax highlighting, Mermaid diagrams, and admonitions
 - 📦 **Single Binary** — Frontend embedded via `go:embed`, deploy with Docker Compose
@@ -335,6 +336,7 @@ go build -o phoebus ./cmd/phoebus
 | `PATCH` | `/api/admin/repos/{repoId}/paths/{pathId}` | 🔑 | Enable/disable a learning path |
 | `GET` | `/api/admin/health` | 🔑 | Detailed health check |
 | `GET` | `/api/admin/ssh-public-key` | 🔑 | Instance SSH public key |
+| `GET/PUT` | `/api/admin/banner` | 🔑 | Read / set the dashboard banner |
 | `GET` | `/metrics` | — | Prometheus metrics |
 
 Roles: ✅ = any authenticated user, 👨‍🏫 = instructor+ (ownership verified for repos), 🔑 = admin only

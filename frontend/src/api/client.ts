@@ -95,6 +95,12 @@ export const api = {
       body: JSON.stringify(data),
     }),
   sshPublicKey: () => request<{ public_key: string }>('/admin/ssh-public-key'),
+  getBanner: () => request<Banner>('/admin/banner'),
+  updateBanner: (data: Banner) =>
+    request<Banner>('/admin/banner', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
   listManualDependencies: () => request<ManualDependency[]>('/admin/dependencies'),
   createDependency: (sourcePathId: string, targetPathId: string) =>
     request<PathDependencyRecord>('/admin/dependencies', {
@@ -130,6 +136,15 @@ export const api = {
 };
 
 // --- Types ---
+
+export type BannerLevel = 'info' | 'warning' | 'danger';
+
+/** Instance-wide banner shown on the dashboard, configured by an admin. */
+export interface Banner {
+  enabled: boolean;
+  level: BannerLevel;
+  message_md: string;
+}
 
 export interface User {
   id: string;

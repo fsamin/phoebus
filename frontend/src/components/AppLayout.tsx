@@ -14,6 +14,7 @@ import {
   SunOutlined,
   QuestionCircleOutlined,
   ApartmentOutlined,
+  NotificationOutlined,
 } from '@ant-design/icons';
 import { Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -66,12 +67,13 @@ const AppLayout: React.FC = () => {
         { key: '/admin/repositories', icon: <SettingOutlined />, label: 'Repositories' },
         { key: '/admin/users', icon: <TeamOutlined />, label: 'Users' },
         { key: '/admin/dependencies', icon: <ApartmentOutlined />, label: 'Dependencies' },
+        { key: '/admin/banner', icon: <NotificationOutlined />, label: 'Banner' },
         { key: '/admin/health', icon: <HeartOutlined />, label: 'Health' },
       ],
     });
   }
 
-  const currentKey = ['/admin/repositories', '/admin/users', '/admin/dependencies', '/admin/health', '/analytics', '/catalog', '/']
+  const currentKey = ['/admin/repositories', '/admin/users', '/admin/dependencies', '/admin/banner', '/admin/health', '/analytics', '/catalog', '/']
     .filter((k) => location.pathname.startsWith(k))
     .sort((a, b) => b.length - a.length)[0] || '/';
 
