@@ -72,17 +72,19 @@ jobs:
             -p 9000:9000 \
             -e MINIO_ROOT_USER=minioadmin \
             -e MINIO_ROOT_PASSWORD=minioadmin \
-            quay.io/minio/minio:latest server /data
+            bitnamilegacy/minio:2025.7.23-debian-12-r5
           for i in $(seq 1 30); do
             curl -sf http://localhost:9000/minio/health/live && break
             sleep 2
           done
 
+      # The image first runs a temporary server for its own setup, which already
+      # answers the health check: retry until the final server accepts clients.
       - name: Create MinIO test bucket
         run: |
           docker run --rm --net=host \
-            --entrypoint sh quay.io/minio/mc:latest -c \
-            "mc alias set local http://localhost:9000 minioadmin minioadmin && mc mb local/phoebus-test-assets"
+            --entrypoint sh bitnamilegacy/minio:2025.7.23-debian-12-r5 -c \
+            "for i in \$(seq 1 30); do mc --config-dir /tmp/.mc alias set local http://localhost:9000 minioadmin minioadmin && break; sleep 2; done && mc --config-dir /tmp/.mc mb local/phoebus-test-assets"
 
       - name: Check formatting
         run: |
