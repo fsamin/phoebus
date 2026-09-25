@@ -1,4 +1,6 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, request as apiRequest } from '@playwright/test';
+import fs from 'fs';
+import path from 'path';
 
 // KPI values are covered by the Go tests; these tests cover the front-end
 // wiring: route and entry point, server-side search / filter / sort driven by
@@ -53,6 +55,41 @@ test.describe('Learners analytics', () => {
     await expect(page).toHaveURL(new RegExp(`q=${tag}`));
     await expect(page.getByPlaceholder('Search learners...')).toHaveValue(tag);
     await expect(page.locator('.ant-table-row')).toHaveCount(2);
+  });
+
+  // "x/y steps" must count against the whole path, like the progress bar next
+  // to it: a learner who finished one step out of five is not at 1/1.
+  test('enrolled path shows completed steps out of the whole path', async ({ page, request, baseURL }) => {
+    const contentSynced = fs.existsSync(path.join(__dirname, '..', 'storage-state', 'content-synced'));
+    test.skip(!contentSynced, 'Content not synced — skipping');
+
+    let target: { id: string; title: string; steps: number; lessonId: string } | null = null;
+    for (const p of await (await request.get('/api/learning-paths')).json()) {
+      const detail = await (await request.get(`/api/learning-paths/${p.id}`)).json();
+      const steps = (detail.modules || []).flatMap((m: { steps?: Array<{ id: string; type: string }> }) => m.steps || []);
+      const lesson = steps.find((st: { type: string }) => st.type === 'lesson');
+      if (steps.length >= 2 && lesson) {
+        target = { id: p.id, title: p.title, steps: steps.length, lessonId: lesson.id };
+        break;
+      }
+    }
+    test.skip(!target, 'No path with a lesson and at least 2 steps in synced content');
+
+    const username = `kpi-${tag}-steps`;
+    const created = await request.post('/api/admin/users', {
+      data: { username, display_name: username, role: 'learner', password: 'Test1234!' },
+    });
+    expect(created.status()).toBe(201);
+    const learnerId = (await created.json()).id;
+
+    const learner = await apiRequest.newContext({ baseURL });
+    expect((await learner.post('/api/auth/login', { data: { username, password: 'Test1234!' } })).ok()).toBeTruthy();
+    expect((await learner.post('/api/progress', { data: { step_id: target!.lessonId, status: 'completed' } })).ok()).toBeTruthy();
+    await learner.dispose();
+
+    await page.goto(`/analytics/learners/${learnerId}`);
+    const row = page.locator('div', { has: page.getByRole('link', { name: target!.title }) }).last();
+    await expect(row).toContainText(`1/${target!.steps} steps`, { timeout: 10000 });
   });
 
   test('learner detail links back to the learners list', async ({ page }) => {
