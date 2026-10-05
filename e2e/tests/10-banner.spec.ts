@@ -64,7 +64,7 @@ test.describe('Dashboard banner', () => {
     await disableBanner(request);
 
     await page.goto('/');
-    await expect(page.locator('h2')).toBeVisible({ timeout: 10000 });
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 10000 });
     await expect(page.getByText('Temporary notice')).toHaveCount(0);
   });
 });
