@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Typography, Tag } from 'antd';
+import { Typography, Tag, Button } from 'antd';
 import { CheckCircleFilled, CloseCircleFilled, LoadingOutlined } from '@ant-design/icons';
 import MarkdownRenderer from './MarkdownRenderer';
 
@@ -36,14 +36,16 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ title, introduction
   const terminalEndRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
 
-  // Auto-focus terminal on mount so keyboard works immediately
+  // Auto-focus terminal on mount so keyboard works immediately, without
+  // scrolling the step heading out of view
   useEffect(() => {
-    terminalRef.current?.focus();
+    terminalRef.current?.focus({ preventScroll: true });
   }, []);
 
   useEffect(() => {
+    if (history.length === 0 && !feedback) return;
     terminalEndRef.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
-  }, [history, feedback, currentStep, selected]);
+  }, [history, feedback]);
 
   const step = completed ? null : steps[currentStep];
 
@@ -52,19 +54,20 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ title, introduction
     .map((p, i) => ({ ...p, origIndex: i }))
     .filter((p) => !disabledCommands.has(p.command)) ?? [];
 
-  // Auto-select first available command when step changes or after wrong answer
+  // Auto-select first available command when the step changes. Not after a
+  // wrong answer: the prompt would then show a command next to an error it did not cause.
   useEffect(() => {
     if (availableProposals.length > 0 && !selected) {
       setSelected(availableProposals[0].command);
     }
-  }, [currentStep, disabledCommands.size]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentStep]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = async () => {
     if (!selected || submitting) return;
     setSubmitting(true);
     try {
       const result = await onSubmit({ step_number: currentStep + 1, selected_command: selected });
-      setFeedback(result);
+      setFeedback({ ...result, command: selected });
       if (result.is_correct) {
         setTimeout(() => {
           setHistory((prev) => [...prev, { command: selected, output: (result.output as string) || '' }]);
@@ -173,10 +176,10 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ title, introduction
             ? 'Executing.'
             : feedback?.is_correct
             ? 'Correct.'
+            : feedback && !selected
+            ? `Incorrect: ${feedback.command as string}. ${feedback.explanation as string}`
             : selected
             ? `Selected command: ${selected}`
-            : feedback
-            ? `Incorrect. ${feedback.explanation as string}`
             : ''}
         </div>
 
@@ -223,7 +226,7 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ title, introduction
               {feedback && !feedback.is_correct && (
                 <div style={{ color: '#ff6b6b', padding: '6px 0 2px 4px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                   <CloseCircleFilled style={{ marginTop: 3 }} />
-                  <span>{feedback.explanation as string}</span>
+                  <span><s>{feedback.command as string}</s>: {feedback.explanation as string}</span>
                 </div>
               )}
               {feedback?.is_correct && (
@@ -245,7 +248,7 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ title, introduction
               {!feedback?.is_correct && !submitting && (
                 <div style={{ marginTop: 10, borderTop: '1px solid var(--color-terminal-separator)', paddingTop: 10 }}>
                   <div style={{ color: 'var(--color-terminal-muted)', fontSize: 12, marginBottom: 6 }}>
-                    Select a command (↑↓ to navigate, Enter ⏎ to validate):
+                    Pick a command, then Run it (or ↑↓ and Enter ⏎):
                   </div>
                   {step.proposals.map((p, idx) => {
                     const isDisabled = disabledCommands.has(p.command);
@@ -301,6 +304,18 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ title, introduction
                       </div>
                     );
                   })}
+                  <Button
+                    type="primary"
+                    size="small"
+                    className="terminal-run"
+                    disabled={!selected}
+                    onClick={handleSubmit}
+                    // Enter on the button already clicks it; keep the terminal handler from submitting twice
+                    onKeyDown={(e) => e.stopPropagation()}
+                    style={{ marginTop: 8 }}
+                  >
+                    Run
+                  </Button>
                 </div>
               )}
             </>

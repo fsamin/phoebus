@@ -262,6 +262,13 @@ body {
   border-color: var(--color-ide-disabled-border) !important;
 }
 
+/* Ant's disabled button colours vanish on the dark terminal background */
+.terminal-run.ant-btn:disabled {
+  background: transparent !important;
+  color: var(--color-terminal-muted) !important;
+  border-color: var(--color-terminal-muted) !important;
+}
+
 /* ── Markdown images ── */
 .markdown-body img {
   max-width: 100%;

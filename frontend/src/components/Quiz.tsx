@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useId, useState } from 'react';
 import { Card, Radio, Checkbox, Input, Button, Alert, Typography, Tag, Space, Divider } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -39,6 +39,7 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit, onComplete }) => {
   const [submitting, setSubmitting] = useState(false);
   const [results, setResults] = useState<Array<{ idx: number; correct: boolean; explanation?: string }>>([]);
   const [showSummary, setShowSummary] = useState(false);
+  const questionId = useId();
 
   if (showSummary) {
     const correct = results.filter((r) => r.correct).length;
@@ -105,7 +106,7 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit, onComplete }) => {
     <Card
       title={<Tag>Question {currentIdx + 1}/{questions.length}</Tag>}
     >
-      <div style={{ marginBottom: 16 }}>
+      <div id={questionId} style={{ marginBottom: 16 }}>
         <MarkdownRenderer content={q.text} />
       </div>
       {q.type === 'multiple-choice' ? (
@@ -113,6 +114,8 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit, onComplete }) => {
           <Space direction="vertical" style={{ width: '100%' }}>
             <Typography.Text type="secondary">Select all that apply</Typography.Text>
             <Checkbox.Group
+              role="group"
+              aria-labelledby={questionId}
               onChange={(values) => setSelected(values as string[])}
               value={selected}
               disabled={!!feedback}
@@ -155,6 +158,7 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit, onComplete }) => {
           </Space>
         ) : (
           <Radio.Group
+            aria-labelledby={questionId}
             onChange={(e) => setSelected([e.target.value])}
             value={selected[0]}
             disabled={!!feedback}
@@ -189,6 +193,7 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit, onComplete }) => {
         )
       ) : (
         <Input
+          aria-labelledby={questionId}
           placeholder="Type your answer..."
           value={answer}
           onChange={(e) => setAnswer(e.target.value)}
