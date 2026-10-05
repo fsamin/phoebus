@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Layout, Menu, Spin, Button, Typography, Popconfirm, message, Modal } from 'antd';
+import { Layout, Menu, Spin, Button, Typography, Popconfirm, message, Modal, Result } from 'antd';
 import {
   ArrowLeftOutlined, ArrowRightOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
   FileTextOutlined, QuestionCircleOutlined, DesktopOutlined, CodeOutlined,
@@ -33,6 +33,8 @@ const StepView: React.FC = () => {
   const [step, setStep] = useState<StepDetail | null>(null);
   const [progress, setProgress] = useState<Progress[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [exerciseCompleted, setExerciseCompleted] = useState(false);
@@ -45,6 +47,7 @@ const StepView: React.FC = () => {
   useEffect(() => {
     if (!pathId || !stepId) return;
     setLoading(true);
+    setLoadError(false);
     setExerciseCompleted(false);
     scrollTrackedRef.current = false;
     Promise.all([
@@ -61,8 +64,9 @@ const StepView: React.FC = () => {
           api.updateProgress(s.id, 'in_progress').catch(() => {});
         }
       })
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
-  }, [pathId, stepId]);
+  }, [pathId, stepId, reloadKey]);
 
   // Scroll tracking for lessons: mark in_progress at 75% scroll
   useEffect(() => {
@@ -171,6 +175,20 @@ const StepView: React.FC = () => {
     // Force reload the step
     window.location.reload();
   };
+
+  if (loadError) {
+    return (
+      <Result
+        status="error"
+        title="We couldn't load this step."
+        subTitle="Check your connection and try again."
+        extra={[
+          <Button key="retry" type="primary" onClick={() => setReloadKey((k) => k + 1)}>Retry</Button>,
+          <Button key="back" onClick={() => navigate(`/paths/${pathId}`)}>Back to the path</Button>,
+        ]}
+      />
+    );
+  }
 
   if (loading || !path || !step) return <Spin size="large" style={{ display: 'block', marginTop: 100 }} />;
 
@@ -324,7 +342,7 @@ const StepView: React.FC = () => {
           {/* Reset button for exercises */}
           {step.type !== 'lesson' && (
             <div style={{ marginTop: 24, textAlign: 'center' }}>
-              <Popconfirm title="Reset this exercise? Your previous attempts will be preserved." onConfirm={handleReset}>
+              <Popconfirm title="Reset this exercise? Your previous attempts will be preserved." okText="Reset" cancelText="Keep my progress" onConfirm={handleReset}>
                 <Button danger>Reset Exercise</Button>
               </Popconfirm>
             </div>
@@ -357,23 +375,19 @@ const StepView: React.FC = () => {
                 </Button>
               )
             ) : (
-              nextStep ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {!isCompleted && !exerciseCompleted && (
+                  <Typography.Text type="secondary" id="next-step-hint">Finish the exercise to continue</Typography.Text>
+                )}
                 <Button
                   type="primary"
                   disabled={!isCompleted && !exerciseCompleted}
-                  onClick={() => navigate(`/paths/${path.slug}/steps/${nextStep.slug}`)}
+                  aria-describedby={!isCompleted && !exerciseCompleted ? 'next-step-hint' : undefined}
+                  onClick={() => navigate(nextStep ? `/paths/${path.slug}/steps/${nextStep.slug}` : `/paths/${path.slug}`)}
                 >
-                  {nextStep.title} <ArrowRightOutlined />
+                  {nextStep ? <>{nextStep.title} <ArrowRightOutlined /></> : 'Back to Overview'}
                 </Button>
-              ) : (
-                <Button
-                  type="primary"
-                  disabled={!isCompleted && !exerciseCompleted}
-                  onClick={() => navigate(`/paths/${path.slug}`)}
-                >
-                  Back to Overview
-                </Button>
-              )
+              </div>
             )}
           </div>
         </div>

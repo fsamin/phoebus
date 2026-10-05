@@ -216,7 +216,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
 
   // Read by the editor listeners, which are registered once at mount
   const canSelectLinesRef = useRef(false);
-  canSelectLinesRef.current = phase === 'identify' && !feedback;
+  canSelectLinesRef.current = phase === 'identify' && !feedback?.is_correct;
 
   const handleEditorMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
@@ -273,11 +273,9 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
         // Keep selectedPatch so DiffEditor stays visible with the correct fix
         setTimeout(() => setCompleted(true), 1200);
       } else {
+        // Keep the explanation on screen until the learner picks another fix
         setDisabledPatches((prev) => new Set([...prev, selectedPatch]));
-        setTimeout(() => {
-          setSelectedPatch('');
-          setFeedback(null);
-        }, 2000);
+        setSelectedPatch('');
       }
     } finally { setSubmitting(false); }
   };
@@ -452,17 +450,18 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
           </div>
         ) : phase === 'identify' ? (
           <div>
-            {/* Show feedback OR description, not both */}
-            {feedback && !feedback.is_correct ? (
+            {/* The hint is shown next to the task, so the learner can retry without losing it */}
+            {feedback && !feedback.is_correct && (
               <Alert
-                message={`${feedback.matched}/${feedback.total} lines found`}
+                message={`${feedback.matched} of ${feedback.total} lines found. Change your selection and check again.`}
                 description={feedback.hint as string}
                 type="warning"
                 showIcon
                 style={{ marginBottom: 8 }}
               />
-            ) : feedback?.is_correct ? (
-              <Alert message="Correct! Moving to fix phase..." type="success" showIcon style={{ marginBottom: 8 }} />
+            )}
+            {feedback?.is_correct ? (
+              <Alert message="Correct. Next, choose the fix." type="success" showIcon style={{ marginBottom: 8 }} />
             ) : (
               <div style={{ marginBottom: 8 }}>
                 <MarkdownRenderer content={description} />
@@ -474,29 +473,30 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
                 Selected: <strong aria-live="polite">{selectedLines.length > 0 ? [...selectedLines].sort((a, b) => a - b).join(', ') : 'none'}</strong>
               </Typography.Text>
               <Button type="primary" size="small" onClick={handleSubmitIdentify} loading={submitting} disabled={selectedLines.length === 0}>
-                Validate
+                Check lines
               </Button>
             </div>
           </div>
         ) : (
           <div>
-            {/* Show feedback OR patch selection */}
-            {feedback ? (
+            {/* A wrong fix keeps its explanation above the remaining choices */}
+            {feedback && (
               <Alert
-                message={feedback.is_correct ? 'Correct!' : 'Incorrect'}
+                message={feedback.is_correct ? 'Correct fix.' : 'This fix does not solve the problem. Choose another one.'}
                 description={feedback.explanation as string}
                 type={feedback.is_correct ? 'success' : 'error'}
                 showIcon
                 style={{ marginBottom: 8 }}
               />
-            ) : (
+            )}
+            {!feedback?.is_correct && (
               <>
                 <div style={{ marginBottom: 8 }}>
                   <Typography.Text strong style={{ color: 'var(--color-text-ide)', fontSize: 13 }}>
                     Select the correct fix:
                   </Typography.Text>
                 </div>
-                <Radio.Group onChange={(e) => setSelectedPatch(e.target.value)} value={selectedPatch} style={{ width: '100%' }}>
+                <Radio.Group onChange={(e) => { setSelectedPatch(e.target.value); setFeedback(null); }} value={selectedPatch} style={{ width: '100%' }}>
                   <Space direction="vertical">
                     {patches.map((p) => {
                       const isDisabled = disabledPatches.has(p.label);
@@ -512,7 +512,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
                 </Radio.Group>
                 <div style={{ marginTop: 10 }}>
                   <Button type="primary" size="small" onClick={handleSubmitFix} loading={submitting} disabled={!selectedPatch}>
-                    Submit Fix
+                    Check fix
                   </Button>
                 </div>
               </>

@@ -37,26 +37,32 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit, onComplete }) => {
   const [answer, setAnswer] = useState('');
   const [feedback, setFeedback] = useState<Record<string, unknown> | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [results, setResults] = useState<Array<{ idx: number; correct: boolean }>>([]);
+  const [results, setResults] = useState<Array<{ idx: number; correct: boolean; explanation?: string }>>([]);
   const [showSummary, setShowSummary] = useState(false);
 
   if (showSummary) {
     const correct = results.filter((r) => r.correct).length;
     return (
-      <Card title="Quiz Complete">
+      <Card title="Quiz results">
         <Typography.Title level={4}>
-          {correct}/{questions.length} correct
+          {correct} of {questions.length} correct
         </Typography.Title>
         {results.map((r) => (
-          <div key={r.idx} style={{ marginBottom: 8 }}>
+          <div key={r.idx} style={{ marginBottom: 12 }}>
             {r.correct ? (
-              <Tag icon={<CheckCircleOutlined />} color="success">Q{r.idx + 1}: Correct</Tag>
+              <Tag icon={<CheckCircleOutlined />} color="success">Question {r.idx + 1}: correct</Tag>
             ) : (
-              <Tag icon={<CloseCircleOutlined />} color="error">Q{r.idx + 1}: Incorrect</Tag>
+              <Tag icon={<CloseCircleOutlined />} color="error">Question {r.idx + 1}: incorrect</Tag>
             )}
             <Typography.Text style={{ marginLeft: 8, whiteSpace: 'normal' }}>{questions[r.idx].text}</Typography.Text>
+            {r.explanation && (
+              <div style={{ marginTop: 4 }}>
+                <MarkdownRenderer content={r.explanation} />
+              </div>
+            )}
           </div>
         ))}
+        <Typography.Text type="secondary">To take the quiz again, use Reset Exercise below.</Typography.Text>
       </Card>
     );
   }
@@ -77,7 +83,7 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit, onComplete }) => {
       }
       const result = await onSubmit(body);
       setFeedback(result);
-      setResults((prev) => [...prev, { idx: currentIdx, correct: result.is_correct as boolean }]);
+      setResults((prev) => [...prev, { idx: currentIdx, correct: result.is_correct as boolean, explanation: result.explanation as string | undefined }]);
     } finally {
       setSubmitting(false);
     }
@@ -194,7 +200,7 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit, onComplete }) => {
       {feedback && (
         <div style={{ marginTop: 16 }}>
           <Alert
-            message={feedback.is_correct ? 'Correct!' : 'Incorrect'}
+            message={feedback.is_correct ? 'Correct.' : q.type === 'multiple-choice' ? 'Incorrect. The correct answer is marked above.' : 'Incorrect.'}
             type={feedback.is_correct ? 'success' : 'error'}
             showIcon
           />
@@ -214,11 +220,11 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit, onComplete }) => {
           loading={submitting}
           disabled={q.type === 'multiple-choice' ? selected.length === 0 : !answer}
         >
-          Submit
+          Check answer
         </Button>
       ) : (
         <Button type="primary" onClick={handleNext}>
-          {currentIdx + 1 >= questions.length ? 'See Results' : 'Next Question'}
+          {currentIdx + 1 >= questions.length ? 'See results' : 'Next question'}
         </Button>
       )}
     </Card>

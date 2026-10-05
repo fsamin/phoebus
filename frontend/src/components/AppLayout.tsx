@@ -90,9 +90,10 @@ const AppLayout: React.FC = () => {
           style={{ display: 'flex', alignItems: 'center', marginRight: 32 }}
         >
           <FireOutlined style={{ fontSize: 24, color: '#ff7a45', marginRight: 8 }} />
-          <Typography.Title level={4} style={{ margin: 0, color: '#fff' }}>
-            Phoebus
-          </Typography.Title>
+          {/* Not a heading: each page owns its h1 */}
+          <span style={{ fontSize: 20, fontWeight: 600, lineHeight: 1.4, color: '#fff' }}>
+            Phœbus
+          </span>
         </Link>
         <Menu
           theme="dark"

@@ -22,6 +22,13 @@ const stepIcon = (type: string) => {
   }
 };
 
+const stepTypeLabel: Record<string, string> = {
+  lesson: 'Lesson',
+  quiz: 'Quiz',
+  'terminal-exercise': 'Terminal exercise',
+  'code-exercise': 'Code exercise',
+};
+
 const stepStatus = (stepId: string, progress: Progress[]) => {
   const p = progress.find((pr) => pr.step_id === stepId);
   if (!p) return 'not_started';
@@ -196,7 +203,7 @@ const PathOverview: React.FC = () => {
                           title={step.title}
                           description={
                             <span>
-                              <Tag>{step.type}</Tag>
+                              <Tag>{stepTypeLabel[step.type] ?? step.type}</Tag>
                               {step.estimated_duration && (
                                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                                   ⏱ {step.estimated_duration}
@@ -208,7 +215,7 @@ const PathOverview: React.FC = () => {
                         {status === 'completed' ? (
                           <CheckCircleOutlined style={{ color: 'var(--color-success)' }} />
                         ) : status === 'in_progress' ? (
-                          <span><ClockCircleOutlined style={{ color: 'var(--color-warning)' }} /> <Typography.Text type="secondary" style={{ fontSize: 12 }}>← in progress</Typography.Text></span>
+                          <span><ClockCircleOutlined style={{ color: 'var(--color-warning)' }} /> <Typography.Text type="secondary" style={{ fontSize: 12 }}>In progress</Typography.Text></span>
                         ) : null}
                       </Link>
                     </List.Item>

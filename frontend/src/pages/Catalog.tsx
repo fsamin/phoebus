@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Card, Row, Col, Typography, Tag, Input, Empty, Spin, Select, Progress as AntProgress } from 'antd';
+import { Button, Card, Row, Col, Typography, Tag, Input, Empty, Spin, Select, Progress as AntProgress } from 'antd';
 import { SearchOutlined, CheckCircleOutlined, WarningOutlined } from '@ant-design/icons';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
@@ -208,7 +208,17 @@ const Catalog: React.FC = () => {
       </Row>
 
       {filtered.length === 0 ? (
-        <Empty description="No learning paths match your search" />
+        paths.length === 0 ? (
+          <Empty description="No learning paths are available yet." />
+        ) : (
+          <Empty description="No learning paths match these filters">
+            <Button
+              onClick={() => { setSearchInput(''); setTagFilter([]); setCompetencyFilter([]); setStatusFilter('all'); }}
+            >
+              Clear filters
+            </Button>
+          </Empty>
+        )
       ) : (
         <Row gutter={[16, 16]}>
           {filtered.map((path, index) => {

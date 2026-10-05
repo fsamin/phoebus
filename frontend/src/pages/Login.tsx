@@ -170,7 +170,7 @@ const Login: React.FC = () => {
       <Card style={{ width: 420 }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <FireOutlined style={{ fontSize: 48, color: 'var(--color-primary)' }} />
-          <Typography.Title level={2} style={{ marginTop: 8 }}>Phoebus</Typography.Title>
+          <Typography.Title level={1} style={{ marginTop: 8, fontSize: 30 }}>Phœbus</Typography.Title>
         </div>
         {error && <Alert message={error} type="error" showIcon style={{ marginBottom: 16 }} />}
 
