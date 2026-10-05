@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Button, Alert, Typography, Tag, Tree, Radio, Space } from 'antd';
+import { Button, Alert, Typography, Tag, Tree, Radio, Space, Grid } from 'antd';
 import { FileOutlined, FolderOutlined, CheckCircleFilled, BugFilled, DiffOutlined, ArrowLeftOutlined, ArrowRightOutlined, ReloadOutlined } from '@ant-design/icons';
 import Editor, { DiffEditor } from '@monaco-editor/react';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -148,6 +148,8 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
   const [submitting, setSubmitting] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [bottomPanelHeight, setBottomPanelHeight] = useState(200);
+  const isMobile = !Grid.useBreakpoint().md;
+  const clampHeight = (h: number) => Math.max(100, Math.min(500, h));
   const [disabledPatches, setDisabledPatches] = useState<Set<string>>(new Set());
   const editorRef = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
@@ -214,19 +216,33 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
     decorationsRef.current = editor.deltaDecorations(decorationsRef.current, newDecorations);
   }, [selectedLines, phase, target, selectedFile]);
 
+  // Read by the editor listeners, which are registered once at mount
+  const canSelectLinesRef = useRef(false);
+  canSelectLinesRef.current = phase === 'identify' && !feedback?.is_correct;
+
   const handleEditorMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
     editor.updateOptions({ readOnly: true, glyphMargin: phase === 'identify' });
+    const toggleLine = (lineNum: number) =>
+      setSelectedLines((prev) =>
+        prev.includes(lineNum) ? prev.filter((l) => l !== lineNum) : [...prev, lineNum]
+      );
     editor.onMouseDown((e: any) => {
-      if (phase !== 'identify' || feedback) return;
+      if (!canSelectLinesRef.current) return;
       const lineNum = e.target?.position?.lineNumber;
       if (!lineNum) return;
       if (e.target.type === 2 || e.target.type === 3 || e.target.type === 4) {
-        setSelectedLines((prev) =>
-          prev.includes(lineNum) ? prev.filter((l) => l !== lineNum) : [...prev, lineNum]
-        );
+        toggleLine(lineNum);
       }
+    });
+    editor.onKeyDown((e: any) => {
+      if (!canSelectLinesRef.current) return;
+      if (e.keyCode !== monaco.KeyCode.Space && e.keyCode !== monaco.KeyCode.Enter) return;
+      const lineNum = editor.getPosition()?.lineNumber;
+      if (!lineNum) return;
+      e.preventDefault();
+      toggleLine(lineNum);
     });
   };
 
@@ -259,31 +275,29 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
         // Keep selectedPatch so DiffEditor stays visible with the correct fix
         setTimeout(() => setCompleted(true), 1200);
       } else {
+        // Keep the explanation on screen until the learner picks another fix
         setDisabledPatches((prev) => new Set([...prev, selectedPatch]));
-        setTimeout(() => {
-          setSelectedPatch('');
-          setFeedback(null);
-        }, 2000);
+        setSelectedPatch('');
       }
     } finally { setSubmitting(false); }
   };
 
-  const handleResizeStart = (e: React.MouseEvent) => {
+  const handleResizeStart = (e: React.PointerEvent) => {
     e.preventDefault();
     resizingRef.current = true;
     const startY = e.clientY;
     const startHeight = bottomPanelHeight;
-    const onMove = (ev: MouseEvent) => {
+    const onMove = (ev: PointerEvent) => {
       if (!resizingRef.current) return;
-      setBottomPanelHeight(Math.max(100, Math.min(500, startHeight + (startY - ev.clientY))));
+      setBottomPanelHeight(clampHeight(startHeight + (startY - ev.clientY)));
     };
     const onUp = () => {
       resizingRef.current = false;
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
     };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
   };
 
   return (
@@ -298,7 +312,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {showDiffEditor ? <DiffOutlined style={{ color: 'var(--color-primary)', fontSize: 13 }} /> : <FileOutlined style={{ color: 'var(--color-text-ide)', fontSize: 13 }} />}
           <Typography.Text style={{ color: 'var(--color-text-ide)', fontSize: 13 }}>{selectedFile}</Typography.Text>
-          {showDiffEditor && <Tag color="var(--color-primary)" style={{ fontSize: 11, lineHeight: '18px', padding: '0 6px' }}>DIFF</Tag>}
+          {showDiffEditor && <Tag style={{ background: 'var(--color-primary-fill)', color: 'var(--color-on-primary)', borderColor: 'transparent', fontSize: 11, lineHeight: '18px', padding: '0 6px' }}>DIFF</Tag>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {completed && <Tag color="success" icon={<CheckCircleFilled />}>Completed</Tag>}
@@ -315,7 +329,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         {/* File explorer */}
         <div style={{
-          width: 200, background: 'var(--color-bg-ide-secondary)', borderRight: '1px solid var(--color-border-ide)',
+          width: isMobile ? 120 : 200, background: 'var(--color-bg-ide-secondary)', borderRight: '1px solid var(--color-border-ide)',
           overflow: 'auto', flexShrink: 0, padding: '8px 0',
         }}>
           <div style={{ padding: '4px 12px 8px', color: 'var(--color-text-ide-secondary)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>
@@ -372,7 +386,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
               onMount={handleEditorMount}
               options={{
                 readOnly: true,
-                minimap: { enabled: true, scale: 2, size: 'proportional' },
+                minimap: { enabled: !isMobile, scale: 2, size: 'proportional' },
                 fontSize: 14,
                 lineNumbers: 'on',
                 scrollBeyondLastLine: false,
@@ -389,11 +403,23 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
         </div>
       </div>
 
-      {/* Resize handle */}
+      {/* Resize handle: pointer (mouse, touch, pen) and arrow keys */}
       <div
-        onMouseDown={handleResizeStart}
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize the bottom panel"
+        aria-valuenow={bottomPanelHeight}
+        aria-valuemin={100}
+        aria-valuemax={500}
+        tabIndex={0}
+        onPointerDown={handleResizeStart}
+        onKeyDown={(e) => {
+          if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+          e.preventDefault();
+          setBottomPanelHeight((h) => clampHeight(h + (e.key === 'ArrowUp' ? 16 : -16)));
+        }}
         style={{
-          height: 4, background: 'var(--color-border-resize)', cursor: 'ns-resize', flexShrink: 0,
+          height: 8, background: 'var(--color-border-resize)', cursor: 'ns-resize', flexShrink: 0, touchAction: 'none',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
@@ -404,7 +430,6 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
       <div className="ide-bottom-panel" style={{
         height: bottomPanelHeight, background: 'var(--color-bg-ide-panel)', borderTop: '1px solid var(--color-border-ide)',
         overflow: 'auto', flexShrink: 0, padding: '12px 16px', color: 'var(--color-text-ide)',
-        transition: 'height 0.2s ease',
       }}>
         {completed ? (
           <div>
@@ -438,17 +463,18 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
           </div>
         ) : phase === 'identify' ? (
           <div>
-            {/* Show feedback OR description, not both */}
-            {feedback && !feedback.is_correct ? (
+            {/* The hint is shown next to the task, so the learner can retry without losing it */}
+            {feedback && !feedback.is_correct && (
               <Alert
-                message={`${feedback.matched}/${feedback.total} lines found`}
+                message={`${feedback.matched} of ${feedback.total} lines found. Change your selection and check again.`}
                 description={feedback.hint as string}
                 type="warning"
                 showIcon
                 style={{ marginBottom: 8 }}
               />
-            ) : feedback?.is_correct ? (
-              <Alert message="Correct! Moving to fix phase..." type="success" showIcon style={{ marginBottom: 8 }} />
+            )}
+            {feedback?.is_correct ? (
+              <Alert message="Correct. Next, choose the fix." type="success" showIcon style={{ marginBottom: 8 }} />
             ) : (
               <div style={{ marginBottom: 8 }}>
                 <MarkdownRenderer content={description} />
@@ -456,33 +482,34 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <Typography.Text style={{ color: 'var(--color-text-ide)' }}>
-                Click line numbers to select problematic lines.
-                Selected: <strong>{selectedLines.length > 0 ? selectedLines.sort((a, b) => a - b).join(', ') : 'none'}</strong>
+                Click line numbers, or move to a line and press Space, to select problematic lines.
+                Selected: <strong aria-live="polite">{selectedLines.length > 0 ? [...selectedLines].sort((a, b) => a - b).join(', ') : 'none'}</strong>
               </Typography.Text>
               <Button type="primary" size="small" onClick={handleSubmitIdentify} loading={submitting} disabled={selectedLines.length === 0}>
-                Validate
+                Check lines
               </Button>
             </div>
           </div>
         ) : (
           <div>
-            {/* Show feedback OR patch selection */}
-            {feedback ? (
+            {/* A wrong fix keeps its explanation above the remaining choices */}
+            {feedback && (
               <Alert
-                message={feedback.is_correct ? 'Correct!' : 'Incorrect'}
+                message={feedback.is_correct ? 'Correct fix.' : 'This fix does not solve the problem. Choose another one.'}
                 description={feedback.explanation as string}
                 type={feedback.is_correct ? 'success' : 'error'}
                 showIcon
                 style={{ marginBottom: 8 }}
               />
-            ) : (
+            )}
+            {!feedback?.is_correct && (
               <>
                 <div style={{ marginBottom: 8 }}>
                   <Typography.Text strong style={{ color: 'var(--color-text-ide)', fontSize: 13 }}>
                     Select the correct fix:
                   </Typography.Text>
                 </div>
-                <Radio.Group onChange={(e) => setSelectedPatch(e.target.value)} value={selectedPatch} style={{ width: '100%' }}>
+                <Radio.Group onChange={(e) => { setSelectedPatch(e.target.value); setFeedback(null); }} value={selectedPatch} style={{ width: '100%' }}>
                   <Space direction="vertical">
                     {patches.map((p) => {
                       const isDisabled = disabledPatches.has(p.label);
@@ -498,7 +525,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
                 </Radio.Group>
                 <div style={{ marginTop: 10 }}>
                   <Button type="primary" size="small" onClick={handleSubmitFix} loading={submitting} disabled={!selectedPatch}>
-                    Submit Fix
+                    Check fix
                   </Button>
                 </div>
               </>

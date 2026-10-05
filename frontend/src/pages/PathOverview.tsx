@@ -5,7 +5,7 @@ import {
 import {
   CheckCircleOutlined, ClockCircleOutlined,
   FileTextOutlined, QuestionCircleOutlined, CodeOutlined, DesktopOutlined,
-  WarningOutlined, ExclamationCircleOutlined, ArrowRightOutlined,
+  WarningOutlined, ExclamationCircleOutlined, ArrowRightOutlined, FieldTimeOutlined,
 } from '@ant-design/icons';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api/client';
@@ -20,6 +20,13 @@ const stepIcon = (type: string) => {
     case 'code-exercise': return <CodeOutlined />;
     default: return <FileTextOutlined />;
   }
+};
+
+const stepTypeLabel: Record<string, string> = {
+  lesson: 'Lesson',
+  quiz: 'Quiz',
+  'terminal-exercise': 'Terminal exercise',
+  'code-exercise': 'Code exercise',
 };
 
 const stepStatus = (stepId: string, progress: Progress[]) => {
@@ -110,7 +117,7 @@ const PathOverview: React.FC = () => {
         { title: <Link to="/catalog">Catalog</Link> },
         { title: path.title },
       ]} style={{ marginBottom: 16 }} />
-      <Typography.Title level={2}>
+      <Typography.Title level={1} style={{ fontSize: 30 }}>
         {path.icon && <span style={{ marginRight: 8 }}>{path.icon}</span>}
         {path.title}
       </Typography.Title>
@@ -125,7 +132,7 @@ const PathOverview: React.FC = () => {
                 <Typography.Text type="secondary">
                   {completedSteps}/{allSteps.length} steps completed
                   {' · '}{path.modules.length} modules
-                  {path.estimated_duration ? ` · ⏱ ${path.estimated_duration}` : ''}
+                  {path.estimated_duration && <> · <FieldTimeOutlined aria-label="Estimated duration" /> {path.estimated_duration}</>}
                 </Typography.Text>
               </div>
               {!isPathCompleted && nextStep && (
@@ -133,7 +140,7 @@ const PathOverview: React.FC = () => {
                   {completedSteps > 0 ? 'Continue Learning' : 'Start Learning'}
                 </Button>
               )}
-              {isPathCompleted && <Tag color="green" icon={<CheckCircleOutlined />}>Path Completed</Tag>}
+              {isPathCompleted && <Tag color="success" icon={<CheckCircleOutlined />}>Path Completed</Tag>}
             </div>
             <div style={{ marginTop: 12 }}>
               {path.tags?.map((tag) => <Tag key={tag}>{tag}</Tag>)}
@@ -184,33 +191,32 @@ const PathOverview: React.FC = () => {
                 renderItem={(step: StepSummary) => {
                   const status = stepStatus(step.id, progress);
                   return (
-                    <List.Item
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => handleStartLearning(step.slug)}
-                      extra={
-                        <>
-                          {status === 'completed' ? (
-                            <CheckCircleOutlined style={{ color: 'var(--color-success)' }} />
-                          ) : status === 'in_progress' ? (
-                            <span><ClockCircleOutlined style={{ color: 'var(--color-warning)' }} /> <Typography.Text type="secondary" style={{ fontSize: 12 }}>← in progress</Typography.Text></span>
-                          ) : null}
-                        </>
-                      }
-                    >
-                      <List.Item.Meta
-                        avatar={stepIcon(step.type)}
-                        title={step.title}
-                        description={
+                    <List.Item>
+                      <Link
+                        to={`/paths/${path.slug}/steps/${step.slug}`}
+                        className="row-link"
+                        style={{ display: 'flex', alignItems: 'center' }}
+                        onClick={(e) => { e.preventDefault(); handleStartLearning(step.slug); }}
+                      >
+                        {/* Not List.Item.Meta: its h4 title would skip heading levels */}
+                        <span style={{ display: 'flex', alignItems: 'flex-start', gap: 16, flex: 1 }}>
+                          {stepIcon(step.type)}
                           <span>
-                            <Tag>{step.type}</Tag>
+                            <Typography.Text style={{ display: 'block', marginBottom: 4 }}>{step.title}</Typography.Text>
+                            <Tag>{stepTypeLabel[step.type] ?? step.type}</Tag>
                             {step.estimated_duration && (
                               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                                ⏱ {step.estimated_duration}
+                                <FieldTimeOutlined aria-label="Estimated duration" /> {step.estimated_duration}
                               </Typography.Text>
                             )}
                           </span>
-                        }
-                      />
+                        </span>
+                        {status === 'completed' ? (
+                          <CheckCircleOutlined style={{ color: 'var(--color-success)' }} />
+                        ) : status === 'in_progress' ? (
+                          <span><ClockCircleOutlined style={{ color: 'var(--color-warning)' }} /> <Typography.Text type="secondary" style={{ fontSize: 12 }}>In progress</Typography.Text></span>
+                        ) : null}
+                      </Link>
                     </List.Item>
                   );
                 }}
@@ -241,27 +247,27 @@ const PathOverview: React.FC = () => {
                   const depStatus = !dep.progress_total ? 'not_started'
                     : dep.progress_completed === dep.progress_total ? 'completed' : 'in_progress';
                   return (
-                    <List.Item style={{ padding: '8px 0', cursor: 'pointer' }} onClick={() => navigate(`/paths/${dep.slug}`)}>
-                      <div style={{ width: '100%' }}>
+                    <List.Item style={{ padding: '8px 0' }}>
+                      <Link to={`/paths/${dep.slug}`} className="row-link">
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           {dep.icon && <span>{dep.icon}</span>}
                           <Typography.Text strong style={{ fontSize: 13 }}>
                             {dep.title}
                           </Typography.Text>
-                          <ArrowRightOutlined style={{ fontSize: 10, color: '#8c8c8c', marginLeft: 'auto' }} />
+                          <ArrowRightOutlined style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginLeft: 'auto' }} />
                         </div>
                         <div style={{ marginTop: 4 }}>
                           <AntProgress
                             percent={depProgress}
                             size="small"
                             showInfo={false}
-                            strokeColor={depStatus === 'completed' ? '#52c41a' : depStatus === 'in_progress' ? '#fa8c16' : '#d9d9d9'}
+                            strokeColor={depStatus === 'completed' ? 'var(--color-success)' : depStatus === 'in_progress' ? 'var(--color-warning)' : 'var(--color-border-input)'}
                           />
                           <Typography.Text type="secondary" style={{ fontSize: 11 }}>
                             {dep.module_count} modules · {dep.step_count} steps
                           </Typography.Text>
                         </div>
-                      </div>
+                      </Link>
                     </List.Item>
                   );
                 }}
@@ -274,7 +280,7 @@ const PathOverview: React.FC = () => {
       <Modal
         title={
           <span>
-            <ExclamationCircleOutlined style={{ color: '#faad14', marginRight: 8 }} />
+            <ExclamationCircleOutlined style={{ color: 'var(--color-warning)', marginRight: 8 }} />
             Prerequisites Not Met
           </span>
         }
@@ -301,7 +307,7 @@ const PathOverview: React.FC = () => {
                 {item.met ? (
                   <CheckCircleOutlined style={{ color: 'var(--color-success)', marginRight: 8 }} />
                 ) : (
-                  <WarningOutlined style={{ color: '#faad14', marginRight: 8 }} />
+                  <WarningOutlined style={{ color: 'var(--color-warning)', marginRight: 8 }} />
                 )}
                 <strong>{item.competency}</strong>
                 {item.provider && (

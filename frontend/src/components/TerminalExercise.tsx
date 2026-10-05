@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Typography, Tag } from 'antd';
+import { Typography, Tag, Button } from 'antd';
 import { CheckCircleFilled, CloseCircleFilled, LoadingOutlined } from '@ant-design/icons';
 import MarkdownRenderer from './MarkdownRenderer';
 
@@ -18,13 +18,14 @@ interface TerminalStep {
 }
 
 interface TerminalExerciseProps {
+  title?: string;
   introduction: string;
   steps: TerminalStep[];
   onSubmit: (body: Record<string, unknown>) => Promise<Record<string, unknown>>;
   onComplete?: () => void;
 }
 
-const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps, onSubmit, onComplete }) => {
+const TerminalExercise: React.FC<TerminalExerciseProps> = ({ title, introduction, steps, onSubmit, onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [selected, setSelected] = useState('');
   const [feedback, setFeedback] = useState<Record<string, unknown> | null>(null);
@@ -35,14 +36,16 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
   const terminalEndRef = useRef<HTMLDivElement>(null);
   const terminalRef = useRef<HTMLDivElement>(null);
 
-  // Auto-focus terminal on mount so keyboard works immediately
+  // Auto-focus terminal on mount so keyboard works immediately, without
+  // scrolling the step heading out of view
   useEffect(() => {
-    terminalRef.current?.focus();
+    terminalRef.current?.focus({ preventScroll: true });
   }, []);
 
   useEffect(() => {
-    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [history, feedback, currentStep, selected]);
+    if (history.length === 0 && !feedback) return;
+    terminalEndRef.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  }, [history, feedback]);
 
   const step = completed ? null : steps[currentStep];
 
@@ -51,19 +54,20 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
     .map((p, i) => ({ ...p, origIndex: i }))
     .filter((p) => !disabledCommands.has(p.command)) ?? [];
 
-  // Auto-select first available command when step changes or after wrong answer
+  // Auto-select first available command when the step changes. Not after a
+  // wrong answer: the prompt would then show a command next to an error it did not cause.
   useEffect(() => {
     if (availableProposals.length > 0 && !selected) {
       setSelected(availableProposals[0].command);
     }
-  }, [currentStep, disabledCommands.size]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentStep]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = async () => {
     if (!selected || submitting) return;
     setSubmitting(true);
     try {
       const result = await onSubmit({ step_number: currentStep + 1, selected_command: selected });
-      setFeedback(result);
+      setFeedback({ ...result, command: selected });
       if (result.is_correct) {
         setTimeout(() => {
           setHistory((prev) => [...prev, { command: selected, output: (result.output as string) || '' }]);
@@ -107,6 +111,10 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
 
   return (
     <div style={{ maxWidth: 900 }}>
+      {/* The introduction carries the page heading; once it is gone, keep one */}
+      {title && !(introduction && currentStep === 0 && !completed) && (
+        <Typography.Title level={1} style={{ fontSize: 30, marginTop: 0 }}>{title}</Typography.Title>
+      )}
       {/* Context above terminal */}
       {introduction && currentStep === 0 && !completed && (
         <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>
@@ -122,7 +130,7 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
       {/* Step counter */}
       {!completed && (
         <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Tag color="var(--color-primary)">Step {currentStep + 1}/{steps.length}</Tag>
+          <Tag style={{ background: 'var(--color-primary-fill)', color: 'var(--color-on-primary)', borderColor: 'transparent' }}>Step {currentStep + 1}/{steps.length}</Tag>
         </div>
       )}
 
@@ -131,6 +139,8 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
         ref={terminalRef}
         onKeyDown={handleKeyDown}
         tabIndex={0}
+        role="group"
+        aria-label="Terminal exercise. Use the up and down arrow keys to choose a command, then Enter to run it."
         style={{
           background: 'var(--color-bg-terminal)',
           borderRadius: 10,
@@ -140,7 +150,6 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
           overflow: 'hidden',
           border: '1px solid var(--color-terminal-border)',
           boxShadow: 'var(--terminal-shadow)',
-          outline: 'none',
         }}
       >
         {/* Title bar */}
@@ -158,6 +167,20 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
           <span style={{ marginLeft: 'auto', color: 'var(--color-terminal-muted)', fontSize: 12 }}>
             {completed ? 'Exercise Complete' : 'Terminal Exercise'}
           </span>
+        </div>
+
+        <div className="sr-only" aria-live="polite">
+          {completed
+            ? 'All steps completed successfully.'
+            : submitting
+            ? 'Executing.'
+            : feedback?.is_correct
+            ? 'Correct.'
+            : feedback && !selected
+            ? `Incorrect: ${feedback.command as string}. ${feedback.explanation as string}`
+            : selected
+            ? `Selected command: ${selected}`
+            : ''}
         </div>
 
         {/* Terminal body */}
@@ -203,7 +226,7 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
               {feedback && !feedback.is_correct && (
                 <div style={{ color: '#ff6b6b', padding: '6px 0 2px 4px', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                   <CloseCircleFilled style={{ marginTop: 3 }} />
-                  <span>{feedback.explanation as string}</span>
+                  <span><s>{feedback.command as string}</s>: {feedback.explanation as string}</span>
                 </div>
               )}
               {feedback?.is_correct && (
@@ -225,7 +248,7 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
               {!feedback?.is_correct && !submitting && (
                 <div style={{ marginTop: 10, borderTop: '1px solid var(--color-terminal-separator)', paddingTop: 10 }}>
                   <div style={{ color: 'var(--color-terminal-muted)', fontSize: 12, marginBottom: 6 }}>
-                    Select a command (↑↓ to navigate, Enter ⏎ to validate):
+                    Pick a command, then Run it (or ↑↓ and Enter ⏎):
                   </div>
                   {step.proposals.map((p, idx) => {
                     const isDisabled = disabledCommands.has(p.command);
@@ -281,6 +304,18 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
                       </div>
                     );
                   })}
+                  <Button
+                    type="primary"
+                    size="small"
+                    className="terminal-run"
+                    disabled={!selected}
+                    onClick={handleSubmit}
+                    // Enter on the button already clicks it; keep the terminal handler from submitting twice
+                    onKeyDown={(e) => e.stopPropagation()}
+                    style={{ marginTop: 8 }}
+                  >
+                    Run
+                  </Button>
                 </div>
               )}
             </>

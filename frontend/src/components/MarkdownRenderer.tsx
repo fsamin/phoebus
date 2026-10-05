@@ -9,6 +9,7 @@ import rehypeRaw from 'rehype-raw';
 import rehypeSanitize, { defaultSchema } from 'rehype-sanitize';
 import DOMPurify from 'dompurify';
 import mermaid from 'mermaid';
+import { BulbOutlined, WarningOutlined, StopOutlined, InfoCircleOutlined, EditOutlined } from '@ant-design/icons';
 import 'highlight.js/styles/github.css';
 
 mermaid.initialize({ startOnLoad: false, theme: 'default', securityLevel: 'strict' });
@@ -44,26 +45,27 @@ interface MarkdownRendererProps {
   content: string;
 }
 
-const admonitionStyles: Record<string, { color: string; icon: string }> = {
-  tip:     { color: 'var(--color-success)', icon: '💡' },
-  warning: { color: 'var(--color-warning)', icon: '⚠️' },
-  danger:  { color: 'var(--color-danger)', icon: '🚨' },
-  info:    { color: 'var(--color-info)', icon: 'ℹ️' },
-  note:    { color: 'var(--color-note)', icon: '📝' },
-  caution: { color: 'var(--color-warning)', icon: '⚠️' },
+const admonitionStyles: Record<string, { color: string; icon: React.ReactNode }> = {
+  tip:     { color: 'var(--color-success)', icon: <BulbOutlined /> },
+  warning: { color: 'var(--color-warning)', icon: <WarningOutlined /> },
+  danger:  { color: 'var(--color-danger)', icon: <StopOutlined /> },
+  info:    { color: 'var(--color-info)', icon: <InfoCircleOutlined /> },
+  note:    { color: 'var(--color-note)', icon: <EditOutlined /> },
+  caution: { color: 'var(--color-warning)', icon: <WarningOutlined /> },
 };
 
 function Admonition({ type, children }: { type: string; children?: React.ReactNode }) {
   const style = admonitionStyles[type] || admonitionStyles.info;
   return (
     <div style={{
-      borderLeft: `4px solid ${style.color}`,
+      border: `1px solid ${style.color}`,
       padding: '12px 16px',
       margin: '16px 0',
       background: 'var(--color-bg-elevated)',
       borderRadius: 4,
     }}>
-      <strong>{style.icon} {type.charAt(0).toUpperCase() + type.slice(1)}</strong>
+      {/* The label carries the meaning; the icon is decorative */}
+      <strong><span aria-hidden="true" style={{ color: style.color, marginRight: 8 }}>{style.icon}</span>{type.charAt(0).toUpperCase() + type.slice(1)}</strong>
       <div style={{ marginTop: 8 }}>{children}</div>
     </div>
   );
@@ -111,6 +113,12 @@ const components: Components = {
         <Admonition type={name} {...props}>{children}</Admonition>
       ),
     ])
+  ),
+  // Wide tables scroll inside their own box instead of being clipped on small screens
+  table: ({ children }) => (
+    <div className="table-scroll" tabIndex={0}>
+      <table>{children}</table>
+    </div>
   ),
   // Render video/audio files linked as images: ![alt](file.mp4)
   // Support image sizing via alt text: ![alt|300x200](file.png) or ![alt|50%](file.png)
