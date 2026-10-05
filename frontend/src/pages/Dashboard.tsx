@@ -52,7 +52,7 @@ const Dashboard: React.FC = () => {
   return (
     <div>
       <OnboardingTour tour="dashboard" steps={dashboardSteps} />
-      <Typography.Title level={2} data-tour="dashboard-welcome">
+      <Typography.Title level={1} style={{ fontSize: 30 }} data-tour="dashboard-welcome">
         Welcome back, {user?.display_name || user?.username}!
       </Typography.Title>
 
@@ -60,7 +60,7 @@ const Dashboard: React.FC = () => {
 
       {/* Continue Learning */}
       {data.continue_learning && (
-        <Card style={{ marginBottom: 24, borderLeft: '4px solid var(--color-primary)' }} data-tour="dashboard-continue">
+        <Card style={{ marginBottom: 24 }} data-tour="dashboard-continue">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <Typography.Text type="secondary">Continue Learning</Typography.Text>

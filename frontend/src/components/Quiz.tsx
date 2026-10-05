@@ -44,7 +44,7 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit, onComplete }) => {
     const correct = results.filter((r) => r.correct).length;
     return (
       <Card title="Quiz results">
-        <Typography.Title level={4}>
+        <Typography.Title level={2} style={{ fontSize: 20 }}>
           {correct} of {questions.length} correct
         </Typography.Title>
         {results.map((r) => (

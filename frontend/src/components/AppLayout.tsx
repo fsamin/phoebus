@@ -73,8 +73,10 @@ const AppLayout: React.FC = () => {
     });
   }
 
+  // Path and step pages are reached from the catalog
+  const navPath = location.pathname.startsWith('/paths/') ? '/catalog' : location.pathname;
   const currentKey = ['/admin/repositories', '/admin/users', '/admin/dependencies', '/admin/banner', '/admin/health', '/analytics', '/catalog', '/']
-    .filter((k) => location.pathname.startsWith(k))
+    .filter((k) => navPath.startsWith(k))
     .sort((a, b) => b.length - a.length)[0] || '/';
 
   return (

@@ -301,7 +301,16 @@ const StepView: React.FC = () => {
             onReset={handleReset}
           />
         ) : (
-        <div style={{ maxWidth: 900, margin: '0 auto' }}>
+        <div style={step.type === 'lesson' ? { maxWidth: '65ch', margin: '0 auto', fontSize: 16 } : { maxWidth: 900, margin: '0 auto' }}>
+          {currentIdx >= 0 && (
+            <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
+              {allSteps[currentIdx].moduleTitle} · Step {currentIdx + 1} of {allSteps.length}
+            </Typography.Text>
+          )}
+          {/* Lessons and terminal introductions carry their own h1 in the Markdown */}
+          {step.type === 'quiz' && (
+            <Typography.Title level={1} style={{ fontSize: 30, marginTop: 0 }}>{step.title}</Typography.Title>
+          )}
 
           {/* Completed banner for lessons */}
           {step.type === 'lesson' && isCompleted && (

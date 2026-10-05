@@ -144,7 +144,7 @@ const Catalog: React.FC = () => {
     <div>
       <OnboardingTour tour="catalog" steps={catalogSteps} />
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <Typography.Title level={2} style={{ margin: 0 }} data-tour="catalog-title">Catalog</Typography.Title>
+        <Typography.Title level={1} style={{ margin: 0, fontSize: 30 }} data-tour="catalog-title">Catalog</Typography.Title>
       </div>
       <Row gutter={16} style={{ marginBottom: 24 }} data-tour="catalog-filters">
         <Col xs={24} sm={6}>

@@ -117,7 +117,7 @@ const PathOverview: React.FC = () => {
         { title: <Link to="/catalog">Catalog</Link> },
         { title: path.title },
       ]} style={{ marginBottom: 16 }} />
-      <Typography.Title level={2}>
+      <Typography.Title level={1} style={{ fontSize: 30 }}>
         {path.icon && <span style={{ marginRight: 8 }}>{path.icon}</span>}
         {path.title}
       </Typography.Title>
@@ -198,20 +198,19 @@ const PathOverview: React.FC = () => {
                         style={{ display: 'flex', alignItems: 'center' }}
                         onClick={(e) => { e.preventDefault(); handleStartLearning(step.slug); }}
                       >
-                        <List.Item.Meta
-                          avatar={stepIcon(step.type)}
-                          title={step.title}
-                          description={
-                            <span>
-                              <Tag>{stepTypeLabel[step.type] ?? step.type}</Tag>
-                              {step.estimated_duration && (
-                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                                  ⏱ {step.estimated_duration}
-                                </Typography.Text>
-                              )}
-                            </span>
-                          }
-                        />
+                        {/* Not List.Item.Meta: its h4 title would skip heading levels */}
+                        <span style={{ display: 'flex', alignItems: 'flex-start', gap: 16, flex: 1 }}>
+                          {stepIcon(step.type)}
+                          <span>
+                            <Typography.Text style={{ display: 'block', marginBottom: 4 }}>{step.title}</Typography.Text>
+                            <Tag>{stepTypeLabel[step.type] ?? step.type}</Tag>
+                            {step.estimated_duration && (
+                              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                ⏱ {step.estimated_duration}
+                              </Typography.Text>
+                            )}
+                          </span>
+                        </span>
                         {status === 'completed' ? (
                           <CheckCircleOutlined style={{ color: 'var(--color-success)' }} />
                         ) : status === 'in_progress' ? (
