@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Typography, List, Tag, Spin, Empty, Progress as AntProgress, Timeline, Statistic, Button, message, Space, Tooltip } from 'antd';
+import { Card, Row, Col, Typography, List, Tag, Spin, Empty, Progress as AntProgress, Timeline, Button, message, Space, Tooltip } from 'antd';
 import {
-  CheckCircleOutlined, ClockCircleOutlined, TrophyOutlined,
-  ExperimentOutlined, ArrowRightOutlined, SyncOutlined, UnorderedListOutlined,
+  CheckCircleOutlined, ClockCircleOutlined,
+  ArrowRightOutlined, SyncOutlined, UnorderedListOutlined,
 } from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -55,6 +55,11 @@ const Dashboard: React.FC = () => {
       <Typography.Title level={1} style={{ fontSize: 30 }} data-tour="dashboard-welcome">
         Welcome back, {user?.display_name || user?.username}!
       </Typography.Title>
+      {/* One summary line: paths and competencies below already carry the detail */}
+      <Typography.Paragraph type="secondary" data-tour="dashboard-stats">
+        {data.stats.steps_completed} steps completed · {data.stats.total_exercises} exercises attempted
+        {data.competencies.length > 0 && ` · ${data.competencies.filter((c) => c.acquired).length} of ${data.competencies.length} competencies`}
+      </Typography.Paragraph>
 
       {data.banner && <DashboardBanner {...data.banner} />}
 
@@ -146,19 +151,6 @@ const Dashboard: React.FC = () => {
         </Card>
       )}
 
-      {/* Stats */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }} data-tour="dashboard-stats">
-        <Col xs={24} sm={8}>
-          <Card><Statistic title="Steps Completed" value={data.stats.steps_completed} prefix={<CheckCircleOutlined />} /></Card>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Card><Statistic title="Exercises Attempted" value={data.stats.total_exercises} prefix={<ExperimentOutlined />} /></Card>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Card><Statistic title="Competencies" value={`${data.competencies.filter(c => c.acquired).length}/${data.competencies.length}`} prefix={<TrophyOutlined />} /></Card>
-        </Col>
-      </Row>
-
       <Row gutter={[16, 16]}>
         {/* Enrolled Paths */}
         <Col xs={24} lg={12}>
@@ -192,8 +184,8 @@ const Dashboard: React.FC = () => {
           {data.competencies.length > 0 && (
             <Card title="Competencies" style={{ marginBottom: 24 }} data-tour="dashboard-competencies">
               {data.competencies.map((c, i) => (
-                <Tag key={i} color={c.acquired ? 'success' : 'default'} style={{ marginBottom: 4 }}>
-                  {c.acquired ? '✅' : '⬜'} {c.name}
+                <Tag key={i} color={c.acquired ? 'success' : 'default'} icon={c.acquired ? <CheckCircleOutlined aria-label="Acquired" /> : undefined} style={{ marginBottom: 4 }}>
+                  {c.name}
                 </Tag>
               ))}
             </Card>

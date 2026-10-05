@@ -4,7 +4,7 @@ import { Layout, Menu, Spin, Button, Typography, Popconfirm, message, Modal, Res
 import {
   ArrowLeftOutlined, ArrowRightOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
   FileTextOutlined, QuestionCircleOutlined, DesktopOutlined, CodeOutlined,
-  CheckCircleOutlined, ClockCircleOutlined, CloseOutlined,
+  CheckCircleOutlined, ClockCircleOutlined,
 } from '@ant-design/icons';
 import { api } from '../api/client';
 import type { StepDetail, LearningPathDetail, Progress } from '../api/client';
@@ -250,12 +250,9 @@ const StepView: React.FC = () => {
             aria-label={railOnly ? 'Show steps' : 'Hide steps'}
           />
           {!railOnly && (
-            <>
-              <Button type="link" onClick={() => navigate(`/paths/${path.slug}`)} style={{ flex: 1, textAlign: 'left', padding: 0 }}>
-                ← {path.title}
-              </Button>
-              <Button type="text" icon={<CloseOutlined />} size="small" onClick={() => navigate(`/paths/${path.slug}`)} aria-label="Back to the path" />
-            </>
+            <Button type="link" onClick={() => navigate(`/paths/${path.slug}`)} title={path.title} style={{ flex: 1, minWidth: 0, justifyContent: 'flex-start', padding: 0 }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>← {path.title}</span>
+            </Button>
           )}
         </div>
         {!railOnly && stepMenu}

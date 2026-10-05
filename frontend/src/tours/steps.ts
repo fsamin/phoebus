@@ -14,7 +14,7 @@ export const dashboardSteps: Step[] = [
   },
   {
     target: '[data-tour="dashboard-stats"]',
-    content: 'These cards show your overall progress: steps completed, exercises attempted, and competencies earned.',
+    content: 'Your overall progress at a glance: steps completed, exercises attempted, and competencies earned.',
     placement: 'bottom',
   },
   {

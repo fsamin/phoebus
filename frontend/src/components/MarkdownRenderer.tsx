@@ -57,7 +57,7 @@ function Admonition({ type, children }: { type: string; children?: React.ReactNo
   const style = admonitionStyles[type] || admonitionStyles.info;
   return (
     <div style={{
-      borderLeft: `4px solid ${style.color}`,
+      border: `1px solid ${style.color}`,
       padding: '12px 16px',
       margin: '16px 0',
       background: 'var(--color-bg-elevated)',
