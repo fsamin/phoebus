@@ -45,7 +45,8 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ tour, steps }) => {
       }}
       styles={{
         options: {
-          primaryColor: '#ff7a45',
+          // Brand fill per theme: white on #ff7a45 fails AA, so light mode uses the darker fill
+          primaryColor: isDark ? '#ff7a45' : '#d4380d',
           zIndex: 10000,
           backgroundColor: isDark ? '#1f1f1f' : '#fff',
           textColor: isDark ? '#e0e0e0' : '#333',
@@ -59,6 +60,7 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ tour, steps }) => {
           padding: 20,
         },
         buttonNext: {
+          color: isDark ? '#141414' : '#fff',
           borderRadius: 6,
           padding: '8px 16px',
         },
@@ -66,7 +68,7 @@ const OnboardingTour: React.FC<OnboardingTourProps> = ({ tour, steps }) => {
           color: isDark ? '#aaa' : '#666',
         },
         buttonSkip: {
-          color: isDark ? '#888' : '#999',
+          color: isDark ? '#888' : '#666',
         },
       }}
     />

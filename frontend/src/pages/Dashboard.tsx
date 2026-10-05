@@ -49,16 +49,25 @@ const Dashboard: React.FC = () => {
 
   if (loading || !data) return <Spin size="large" style={{ display: 'block', marginTop: 100 }} />;
 
+  // First visit: nothing started yet, so counters and "welcome back" would be noise
+  const isNewLearner = !data.continue_learning && data.enrolled_paths.length === 0 && data.recent_activity.length === 0;
+
   return (
     <div>
       <OnboardingTour tour="dashboard" steps={dashboardSteps} />
       <Typography.Title level={1} style={{ fontSize: 30 }} data-tour="dashboard-welcome">
-        Welcome back, {user?.display_name || user?.username}!
+        {isNewLearner ? 'Welcome' : 'Welcome back'}, {user?.display_name || user?.username}!
       </Typography.Title>
       {/* One summary line: paths and competencies below already carry the detail */}
       <Typography.Paragraph type="secondary" data-tour="dashboard-stats">
-        {data.stats.steps_completed} steps completed · {data.stats.total_exercises} exercises attempted
-        {data.competencies.length > 0 && ` · ${data.competencies.filter((c) => c.acquired).length} of ${data.competencies.length} competencies`}
+        {isNewLearner ? (
+          'Pick a learning path in the catalog to get started. Your progress, competencies and activity will show up here.'
+        ) : (
+          <>
+            {data.stats.steps_completed} steps completed · {data.stats.total_exercises} exercises attempted
+            {data.competencies.length > 0 && ` · ${data.competencies.filter((c) => c.acquired).length} of ${data.competencies.length} competencies`}
+          </>
+        )}
       </Typography.Paragraph>
 
       {data.banner && <DashboardBanner {...data.banner} />}
@@ -156,8 +165,8 @@ const Dashboard: React.FC = () => {
         <Col xs={24} lg={12}>
           <Card title="My Learning Paths" style={{ marginBottom: 24 }} data-tour="dashboard-paths">
             {data.enrolled_paths.length === 0 ? (
-              <Empty description="No enrolled paths yet" image={Empty.PRESENTED_IMAGE_SIMPLE}>
-                <Button type="primary" onClick={() => navigate('/catalog')}>Browse Catalog</Button>
+              <Empty description="You haven't started a learning path yet." image={Empty.PRESENTED_IMAGE_SIMPLE}>
+                <Button type="primary" onClick={() => navigate('/catalog')}>Browse the catalog</Button>
               </Empty>
             ) : (
               <List
@@ -196,7 +205,7 @@ const Dashboard: React.FC = () => {
         <Col xs={24} lg={12}>
           <Card title="Recent Activity" data-tour="dashboard-activity">
             {data.recent_activity.length === 0 ? (
-              <Empty description="No activity yet" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+              <Empty description="Steps you start or complete will show up here." image={Empty.PRESENTED_IMAGE_SIMPLE} />
             ) : (
               <Timeline
                 items={data.recent_activity.map((a) => ({
