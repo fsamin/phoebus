@@ -18,13 +18,14 @@ interface TerminalStep {
 }
 
 interface TerminalExerciseProps {
+  title?: string;
   introduction: string;
   steps: TerminalStep[];
   onSubmit: (body: Record<string, unknown>) => Promise<Record<string, unknown>>;
   onComplete?: () => void;
 }
 
-const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps, onSubmit, onComplete }) => {
+const TerminalExercise: React.FC<TerminalExerciseProps> = ({ title, introduction, steps, onSubmit, onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [selected, setSelected] = useState('');
   const [feedback, setFeedback] = useState<Record<string, unknown> | null>(null);
@@ -107,6 +108,10 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
 
   return (
     <div style={{ maxWidth: 900 }}>
+      {/* The introduction carries the page heading; once it is gone, keep one */}
+      {title && !(introduction && currentStep === 0 && !completed) && (
+        <Typography.Title level={1} style={{ fontSize: 30, marginTop: 0 }}>{title}</Typography.Title>
+      )}
       {/* Context above terminal */}
       {introduction && currentStep === 0 && !completed && (
         <Typography.Paragraph type="secondary" style={{ marginBottom: 12 }}>

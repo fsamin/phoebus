@@ -1,5 +1,5 @@
 import React from 'react';
-import { Layout, Menu, Dropdown, Button, Space, Typography, Spin } from 'antd';
+import { Layout, Menu, Dropdown, Button, Space, Typography, Spin, Grid } from 'antd';
 import {
   BookOutlined,
   DashboardOutlined,
@@ -29,6 +29,9 @@ const AppLayout: React.FC = () => {
   const { forceRun } = useOnboardingContext();
   const navigate = useNavigate();
   const location = useLocation();
+  const isMobile = !Grid.useBreakpoint().md;
+  // Step pages lay out their own full-height view
+  const fullBleed = /^\/paths\/[^/]+\/steps\//.test(location.pathname);
 
   const handleReplayTour = () => {
     if (location.pathname === '/') forceRun('dashboard');
@@ -82,20 +85,22 @@ const AppLayout: React.FC = () => {
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Header style={{
-        display: 'flex', alignItems: 'center', padding: '0 24px',
+        display: 'flex', alignItems: 'center', padding: isMobile ? '0 12px' : '0 24px',
         background: 'var(--color-bg-header)',
         borderBottom: isDark ? '2px solid #ff7a45' : 'none',
       }}>
         <Link
           to="/"
           aria-label="Phœbus home"
-          style={{ display: 'flex', alignItems: 'center', marginRight: 32 }}
+          style={{ display: 'flex', alignItems: 'center', marginRight: isMobile ? 8 : 32, flexShrink: 0 }}
         >
           <FireOutlined style={{ fontSize: 24, color: '#ff7a45', marginRight: 8 }} />
           {/* Not a heading: each page owns its h1 */}
-          <span style={{ fontSize: 20, fontWeight: 600, lineHeight: 1.4, color: '#fff' }}>
-            Phœbus
-          </span>
+          {!isMobile && (
+            <span style={{ fontSize: 20, fontWeight: 600, lineHeight: 1.4, color: '#fff' }}>
+              Phœbus
+            </span>
+          )}
         </Link>
         <Menu
           theme="dark"
@@ -103,7 +108,8 @@ const AppLayout: React.FC = () => {
           selectedKeys={[currentKey]}
           items={menuItems}
           onClick={({ key }) => navigate(key)}
-          style={{ flex: 1, background: 'transparent' }}
+          // minWidth 0 lets the menu collapse overflowing items into "…" instead of pushing the buttons out
+          style={{ flex: 1, minWidth: 0, background: 'transparent' }}
         />
         {showTourButton && (
           <Button
@@ -143,12 +149,17 @@ const AppLayout: React.FC = () => {
             onClick: ({ key }) => { if (key === 'logout') logout(); },
           }}
         >
-          <Button type="text" icon={<UserOutlined />} style={{ color: '#fff' }}>
-            {user.display_name || user.username}
+          <Button
+            type="text"
+            icon={<UserOutlined />}
+            style={{ color: '#fff' }}
+            aria-label={isMobile ? `Account: ${user.display_name || user.username}` : undefined}
+          >
+            {!isMobile && (user.display_name || user.username)}
           </Button>
         </Dropdown>
       </Header>
-      <Content style={{ padding: '24px 48px' }}>
+      <Content style={fullBleed ? undefined : { padding: isMobile ? 16 : '24px 48px' }}>
         <Outlet />
       </Content>
     </Layout>

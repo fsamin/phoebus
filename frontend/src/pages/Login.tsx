@@ -166,8 +166,8 @@ const Login: React.FC = () => {
   }
 
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', background: 'var(--color-bg-login)' }}>
-      <Card style={{ width: 420 }}>
+    <main style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', padding: 16, boxSizing: 'border-box', background: 'var(--color-bg-login)' }}>
+      <Card style={{ width: '100%', maxWidth: 420 }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <FireOutlined style={{ fontSize: 48, color: 'var(--color-primary)' }} />
           <Typography.Title level={1} style={{ marginTop: 8, fontSize: 30 }}>Phœbus</Typography.Title>
@@ -211,7 +211,7 @@ const Login: React.FC = () => {
           showRegister ? registerForm : loginForm
         ) : null}
       </Card>
-    </div>
+    </main>
   );
 };
 

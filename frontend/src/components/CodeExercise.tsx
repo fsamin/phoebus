@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { Button, Alert, Typography, Tag, Tree, Radio, Space } from 'antd';
+import { Button, Alert, Typography, Tag, Tree, Radio, Space, Grid } from 'antd';
 import { FileOutlined, FolderOutlined, CheckCircleFilled, BugFilled, DiffOutlined, ArrowLeftOutlined, ArrowRightOutlined, ReloadOutlined } from '@ant-design/icons';
 import Editor, { DiffEditor } from '@monaco-editor/react';
 import MarkdownRenderer from './MarkdownRenderer';
@@ -148,6 +148,8 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
   const [submitting, setSubmitting] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [bottomPanelHeight, setBottomPanelHeight] = useState(200);
+  const isMobile = !Grid.useBreakpoint().md;
+  const clampHeight = (h: number) => Math.max(100, Math.min(500, h));
   const [disabledPatches, setDisabledPatches] = useState<Set<string>>(new Set());
   const editorRef = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
@@ -280,22 +282,22 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
     } finally { setSubmitting(false); }
   };
 
-  const handleResizeStart = (e: React.MouseEvent) => {
+  const handleResizeStart = (e: React.PointerEvent) => {
     e.preventDefault();
     resizingRef.current = true;
     const startY = e.clientY;
     const startHeight = bottomPanelHeight;
-    const onMove = (ev: MouseEvent) => {
+    const onMove = (ev: PointerEvent) => {
       if (!resizingRef.current) return;
-      setBottomPanelHeight(Math.max(100, Math.min(500, startHeight + (startY - ev.clientY))));
+      setBottomPanelHeight(clampHeight(startHeight + (startY - ev.clientY)));
     };
     const onUp = () => {
       resizingRef.current = false;
-      window.removeEventListener('mousemove', onMove);
-      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
     };
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
   };
 
   return (
@@ -327,7 +329,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         {/* File explorer */}
         <div style={{
-          width: 200, background: 'var(--color-bg-ide-secondary)', borderRight: '1px solid var(--color-border-ide)',
+          width: isMobile ? 120 : 200, background: 'var(--color-bg-ide-secondary)', borderRight: '1px solid var(--color-border-ide)',
           overflow: 'auto', flexShrink: 0, padding: '8px 0',
         }}>
           <div style={{ padding: '4px 12px 8px', color: 'var(--color-text-ide-secondary)', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1 }}>
@@ -384,7 +386,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
               onMount={handleEditorMount}
               options={{
                 readOnly: true,
-                minimap: { enabled: true, scale: 2, size: 'proportional' },
+                minimap: { enabled: !isMobile, scale: 2, size: 'proportional' },
                 fontSize: 14,
                 lineNumbers: 'on',
                 scrollBeyondLastLine: false,
@@ -401,11 +403,23 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
         </div>
       </div>
 
-      {/* Resize handle */}
+      {/* Resize handle: pointer (mouse, touch, pen) and arrow keys */}
       <div
-        onMouseDown={handleResizeStart}
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize the bottom panel"
+        aria-valuenow={bottomPanelHeight}
+        aria-valuemin={100}
+        aria-valuemax={500}
+        tabIndex={0}
+        onPointerDown={handleResizeStart}
+        onKeyDown={(e) => {
+          if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+          e.preventDefault();
+          setBottomPanelHeight((h) => clampHeight(h + (e.key === 'ArrowUp' ? 16 : -16)));
+        }}
         style={{
-          height: 4, background: 'var(--color-border-resize)', cursor: 'ns-resize', flexShrink: 0,
+          height: 8, background: 'var(--color-border-resize)', cursor: 'ns-resize', flexShrink: 0, touchAction: 'none',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >

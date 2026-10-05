@@ -112,6 +112,12 @@ const components: Components = {
       ),
     ])
   ),
+  // Wide tables scroll inside their own box instead of being clipped on small screens
+  table: ({ children }) => (
+    <div className="table-scroll" tabIndex={0}>
+      <table>{children}</table>
+    </div>
+  ),
   // Render video/audio files linked as images: ![alt](file.mp4)
   // Support image sizing via alt text: ![alt|300x200](file.png) or ![alt|50%](file.png)
   img: ({ src, alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) => {
