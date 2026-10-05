@@ -184,33 +184,33 @@ const PathOverview: React.FC = () => {
                 renderItem={(step: StepSummary) => {
                   const status = stepStatus(step.id, progress);
                   return (
-                    <List.Item
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => handleStartLearning(step.slug)}
-                      extra={
-                        <>
-                          {status === 'completed' ? (
-                            <CheckCircleOutlined style={{ color: 'var(--color-success)' }} />
-                          ) : status === 'in_progress' ? (
-                            <span><ClockCircleOutlined style={{ color: 'var(--color-warning)' }} /> <Typography.Text type="secondary" style={{ fontSize: 12 }}>← in progress</Typography.Text></span>
-                          ) : null}
-                        </>
-                      }
-                    >
-                      <List.Item.Meta
-                        avatar={stepIcon(step.type)}
-                        title={step.title}
-                        description={
-                          <span>
-                            <Tag>{step.type}</Tag>
-                            {step.estimated_duration && (
-                              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                                ⏱ {step.estimated_duration}
-                              </Typography.Text>
-                            )}
-                          </span>
-                        }
-                      />
+                    <List.Item>
+                      <Link
+                        to={`/paths/${path.slug}/steps/${step.slug}`}
+                        className="row-link"
+                        style={{ display: 'flex', alignItems: 'center' }}
+                        onClick={(e) => { e.preventDefault(); handleStartLearning(step.slug); }}
+                      >
+                        <List.Item.Meta
+                          avatar={stepIcon(step.type)}
+                          title={step.title}
+                          description={
+                            <span>
+                              <Tag>{step.type}</Tag>
+                              {step.estimated_duration && (
+                                <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                                  ⏱ {step.estimated_duration}
+                                </Typography.Text>
+                              )}
+                            </span>
+                          }
+                        />
+                        {status === 'completed' ? (
+                          <CheckCircleOutlined style={{ color: 'var(--color-success)' }} />
+                        ) : status === 'in_progress' ? (
+                          <span><ClockCircleOutlined style={{ color: 'var(--color-warning)' }} /> <Typography.Text type="secondary" style={{ fontSize: 12 }}>← in progress</Typography.Text></span>
+                        ) : null}
+                      </Link>
                     </List.Item>
                   );
                 }}
@@ -241,8 +241,8 @@ const PathOverview: React.FC = () => {
                   const depStatus = !dep.progress_total ? 'not_started'
                     : dep.progress_completed === dep.progress_total ? 'completed' : 'in_progress';
                   return (
-                    <List.Item style={{ padding: '8px 0', cursor: 'pointer' }} onClick={() => navigate(`/paths/${dep.slug}`)}>
-                      <div style={{ width: '100%' }}>
+                    <List.Item style={{ padding: '8px 0' }}>
+                      <Link to={`/paths/${dep.slug}`} className="row-link">
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                           {dep.icon && <span>{dep.icon}</span>}
                           <Typography.Text strong style={{ fontSize: 13 }}>
@@ -261,7 +261,7 @@ const PathOverview: React.FC = () => {
                             {dep.module_count} modules · {dep.step_count} steps
                           </Typography.Text>
                         </div>
-                      </div>
+                      </Link>
                     </List.Item>
                   );
                 }}

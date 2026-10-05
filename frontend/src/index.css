@@ -45,6 +45,7 @@
   --color-border-resize: #d9d9d9;
 
   --color-primary: #ff7a45;
+  --color-focus-ring: #d4380d;
   --color-link: #1890ff;
   --color-success: #52c41a;
   --color-warning: #faad14;
@@ -132,6 +133,7 @@
   --color-ide-disabled-border: #555;
 
   --monaco-theme: vs-dark;
+  --color-focus-ring: #ff7a45;
 }
 
 body {
@@ -165,6 +167,56 @@ body {
 }
 .terminal-cursor {
   animation: terminal-blink 1s step-end infinite;
+}
+
+/* Keyboard focus: Ant's default ring (colorPrimaryBorder) is too faint to see */
+:where(a, [tabindex]):not(.monaco-editor *):focus-visible,
+.ant-btn:focus-visible,
+.ant-menu-item:focus-visible,
+.ant-menu-submenu-title:focus-visible,
+.ant-radio-wrapper:has(:focus-visible),
+.ant-checkbox-wrapper:has(:focus-visible) {
+  outline: 2px solid var(--color-focus-ring) !important;
+  outline-offset: 2px;
+}
+
+/* Cards and list rows that navigate are rendered as links */
+.card-link,
+.row-link {
+  display: block;
+  width: 100%;
+  color: inherit;
+  border-radius: 8px;
+}
+.card-link {
+  height: 100%;
+}
+.card-link:hover,
+.row-link:hover {
+  color: inherit;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Monaco editor line decorations */

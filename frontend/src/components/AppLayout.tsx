@@ -16,7 +16,7 @@ import {
   ApartmentOutlined,
   NotificationOutlined,
 } from '@ant-design/icons';
-import { Outlet, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import { Outlet, useNavigate, useLocation, Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { useOnboardingContext } from '../contexts/OnboardingContext';
@@ -84,15 +84,16 @@ const AppLayout: React.FC = () => {
         background: isDark ? '#1a1a1a' : '#001529',
         borderBottom: isDark ? '2px solid #ff7a45' : 'none',
       }}>
-        <div
-          style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', marginRight: 32 }}
-          onClick={() => navigate('/')}
+        <Link
+          to="/"
+          aria-label="Phœbus home"
+          style={{ display: 'flex', alignItems: 'center', marginRight: 32 }}
         >
           <FireOutlined style={{ fontSize: 24, color: '#ff7a45', marginRight: 8 }} />
           <Typography.Title level={4} style={{ margin: 0, color: '#fff' }}>
             Phoebus
           </Typography.Title>
-        </div>
+        </Link>
         <Menu
           theme="dark"
           mode="horizontal"
@@ -108,6 +109,7 @@ const AppLayout: React.FC = () => {
             onClick={handleReplayTour}
             style={{ color: '#fff', marginRight: 4 }}
             title="Replay guided tour"
+            aria-label="Replay guided tour"
             data-tour="replay-tour"
           />
         )}
@@ -116,6 +118,8 @@ const AppLayout: React.FC = () => {
           icon={isDark ? <SunOutlined /> : <MoonOutlined />}
           onClick={toggle}
           style={{ color: '#fff', marginRight: 8 }}
+          title={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
+          aria-label={isDark ? 'Switch to light theme' : 'Switch to dark theme'}
         />
         <Dropdown
           menu={{

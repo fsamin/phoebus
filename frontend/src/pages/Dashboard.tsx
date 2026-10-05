@@ -4,7 +4,7 @@ import {
   CheckCircleOutlined, ClockCircleOutlined, TrophyOutlined,
   ExperimentOutlined, ArrowRightOutlined, SyncOutlined, UnorderedListOutlined,
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api/client';
 import type { BannerLevel } from '../api/client';
@@ -171,8 +171,8 @@ const Dashboard: React.FC = () => {
               <List
                 dataSource={data.enrolled_paths}
                 renderItem={(ep) => (
-                  <List.Item style={{ cursor: 'pointer' }} onClick={() => navigate(`/paths/${ep.path_slug}`)}>
-                    <div style={{ width: '100%' }}>
+                  <List.Item>
+                    <Link to={`/paths/${ep.path_slug}`} className="row-link">
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <Typography.Text strong>
                           {ep.path_icon && <span style={{ marginRight: 8 }}>{ep.path_icon}</span>}
@@ -181,7 +181,7 @@ const Dashboard: React.FC = () => {
                         <Typography.Text type="secondary">{ep.completed}/{ep.total}</Typography.Text>
                       </div>
                       <AntProgress percent={ep.total > 0 ? Math.round((ep.completed / ep.total) * 100) : 0} size="small" />
-                    </div>
+                    </Link>
                   </List.Item>
                 )}
               />
@@ -211,15 +211,13 @@ const Dashboard: React.FC = () => {
                   color: a.event === 'completed' ? 'green' : 'blue',
                   dot: a.event === 'completed' ? <CheckCircleOutlined /> : <ClockCircleOutlined />,
                   children: (
-                    <div
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => navigate(`/paths/${a.path_slug}/steps/${a.step_slug}`)}                    >
+                    <Link to={`/paths/${a.path_slug}/steps/${a.step_slug}`} className="row-link">
                       <Typography.Text>{a.event === 'completed' ? 'Completed' : 'Started'}: {a.step_title}</Typography.Text>
                       <br />
                       <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                         {a.path_title} · {new Date(a.timestamp).toLocaleString()}
                       </Typography.Text>
-                    </div>
+                    </Link>
                   ),
                 }))}
               />

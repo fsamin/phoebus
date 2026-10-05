@@ -214,19 +214,33 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
     decorationsRef.current = editor.deltaDecorations(decorationsRef.current, newDecorations);
   }, [selectedLines, phase, target, selectedFile]);
 
+  // Read by the editor listeners, which are registered once at mount
+  const canSelectLinesRef = useRef(false);
+  canSelectLinesRef.current = phase === 'identify' && !feedback;
+
   const handleEditorMount = (editor: any, monaco: any) => {
     editorRef.current = editor;
     monacoRef.current = monaco;
     editor.updateOptions({ readOnly: true, glyphMargin: phase === 'identify' });
+    const toggleLine = (lineNum: number) =>
+      setSelectedLines((prev) =>
+        prev.includes(lineNum) ? prev.filter((l) => l !== lineNum) : [...prev, lineNum]
+      );
     editor.onMouseDown((e: any) => {
-      if (phase !== 'identify' || feedback) return;
+      if (!canSelectLinesRef.current) return;
       const lineNum = e.target?.position?.lineNumber;
       if (!lineNum) return;
       if (e.target.type === 2 || e.target.type === 3 || e.target.type === 4) {
-        setSelectedLines((prev) =>
-          prev.includes(lineNum) ? prev.filter((l) => l !== lineNum) : [...prev, lineNum]
-        );
+        toggleLine(lineNum);
       }
+    });
+    editor.onKeyDown((e: any) => {
+      if (!canSelectLinesRef.current) return;
+      if (e.keyCode !== monaco.KeyCode.Space && e.keyCode !== monaco.KeyCode.Enter) return;
+      const lineNum = editor.getPosition()?.lineNumber;
+      if (!lineNum) return;
+      e.preventDefault();
+      toggleLine(lineNum);
     });
   };
 
@@ -456,8 +470,8 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <Typography.Text style={{ color: 'var(--color-text-ide)' }}>
-                Click line numbers to select problematic lines.
-                Selected: <strong>{selectedLines.length > 0 ? selectedLines.sort((a, b) => a - b).join(', ') : 'none'}</strong>
+                Click line numbers, or move to a line and press Space, to select problematic lines.
+                Selected: <strong aria-live="polite">{selectedLines.length > 0 ? [...selectedLines].sort((a, b) => a - b).join(', ') : 'none'}</strong>
               </Typography.Text>
               <Button type="primary" size="small" onClick={handleSubmitIdentify} loading={submitting} disabled={selectedLines.length === 0}>
                 Validate

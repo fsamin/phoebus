@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, Radio, Input, Button, Alert, Typography, Tag, Space, Divider } from 'antd';
+import { Card, Radio, Checkbox, Input, Button, Alert, Typography, Tag, Space, Divider } from 'antd';
 import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import MarkdownRenderer from './MarkdownRenderer';
 
@@ -95,40 +95,44 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit, onComplete }) => {
         q.multi_select ? (
           <Space direction="vertical" style={{ width: '100%' }}>
             <Typography.Text type="secondary">Select all that apply</Typography.Text>
-            {q.choices?.map((c) => {
-              const isSelected = selected.includes(c.text);
-              const fb = feedback?.choices_feedback as Array<{ text: string; correct: boolean; selected: boolean }> | undefined;
-              const choiceFb = fb?.find((f) => f.text === c.text);
-              let style: React.CSSProperties = {};
-              if (choiceFb) {
-                style = choiceFb.correct
-                  ? { background: 'var(--color-choice-correct-bg)', borderColor: 'var(--color-choice-correct-border)' }
-                  : choiceFb.selected
-                  ? { background: 'var(--color-choice-wrong-bg)', borderColor: 'var(--color-choice-wrong-border)' }
-                  : {};
-              }
-              return (
-                <div
-                  key={c.text}
-                  style={{
-                    padding: '8px 12px',
-                    border: '1px solid var(--color-border-input)',
-                    borderRadius: 6,
-                    cursor: feedback ? 'default' : 'pointer',
-                    ...style,
-                    ...(isSelected && !feedback ? { borderColor: 'var(--color-choice-selected-border)', background: 'var(--color-choice-selected-bg)' } : {}),
-                  }}
-                  onClick={() => {
-                    if (feedback) return;
-                    setSelected((prev) =>
-                      prev.includes(c.text) ? prev.filter((s) => s !== c.text) : [...prev, c.text]
-                    );
-                  }}
-                >
-                  {c.text}
-                </div>
-              );
-            })}
+            <Checkbox.Group
+              onChange={(values) => setSelected(values as string[])}
+              value={selected}
+              disabled={!!feedback}
+              style={{ width: '100%' }}
+            >
+              <Space direction="vertical" style={{ width: '100%' }}>
+                {q.choices?.map((c) => {
+                  const isSelected = selected.includes(c.text);
+                  const fb = feedback?.choices_feedback as Array<{ text: string; correct: boolean; selected: boolean }> | undefined;
+                  const choiceFb = fb?.find((f) => f.text === c.text);
+                  let style: React.CSSProperties = {};
+                  if (choiceFb) {
+                    style = choiceFb.correct
+                      ? { background: 'var(--color-choice-correct-bg)', borderColor: 'var(--color-choice-correct-border)' }
+                      : choiceFb.selected
+                      ? { background: 'var(--color-choice-wrong-bg)', borderColor: 'var(--color-choice-wrong-border)' }
+                      : {};
+                  }
+                  return (
+                    <Checkbox
+                      key={c.text}
+                      value={c.text}
+                      style={{
+                        display: 'flex',
+                        padding: '8px 12px',
+                        border: '1px solid var(--color-border-input)',
+                        borderRadius: 6,
+                        ...style,
+                        ...(isSelected && !feedback ? { borderColor: 'var(--color-choice-selected-border)', background: 'var(--color-choice-selected-bg)' } : {}),
+                      }}
+                    >
+                      {c.text}
+                    </Checkbox>
+                  );
+                })}
+              </Space>
+            </Checkbox.Group>
           </Space>
         ) : (
           <Radio.Group
@@ -153,7 +157,7 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit, onComplete }) => {
                   <Radio
                     key={c.text}
                     value={c.text}
-                    style={{ display: 'block', padding: '8px 12px', border: '1px solid var(--color-border-input)', borderRadius: 6, ...style }}
+                    style={{ display: 'flex', padding: '8px 12px', border: '1px solid var(--color-border-input)', borderRadius: 6, ...style }}
                   >
                     {c.text}
                   </Radio>

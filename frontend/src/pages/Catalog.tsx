@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Card, Row, Col, Typography, Tag, Input, Empty, Spin, Select, Progress as AntProgress } from 'antd';
 import { SearchOutlined, CheckCircleOutlined, WarningOutlined } from '@ant-design/icons';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Competency } from '../api/client';
 import { usePageTitle } from '../hooks/usePageTitle';
@@ -29,7 +29,6 @@ interface CatalogPath {
 
 const Catalog: React.FC = () => {
   usePageTitle('Catalog');
-  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [paths, setPaths] = useState<CatalogPath[]>([]);
   const [competencies, setCompetencies] = useState<Competency[]>([]);
@@ -219,62 +218,64 @@ const Catalog: React.FC = () => {
             const status = getPathStatus(path);
             return (
               <Col xs={24} sm={12} lg={8} key={path.id} {...(index === 0 ? { 'data-tour': 'catalog-cards' } : {})}>
-                <Card
-                  hoverable
-                  onClick={() => navigate(`/paths/${path.slug}`)}                  style={{ height: '100%' }}
-                >
-                  <Card.Meta
-                    title={
-                      <span>
-                        {path.icon && <span style={{ marginRight: 8 }}>{path.icon}</span>}
-                        {path.title}
-                      </span>
-                    }
-                    description={path.description}
-                  />
-                  <div style={{ marginTop: 12 }}>
-                    {path.tags?.map((tag) => <Tag key={tag}>{tag}</Tag>)}
-                  </div>
-                  {path.competencies_provided?.length > 0 && (
-                    <div style={{ marginTop: 8 }}>
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>Provides: </Typography.Text>
-                      {path.competencies_provided.map((c) => (
-                        <Tag key={c} color="geekblue" style={{ fontSize: 11 }}>{c}</Tag>
-                      ))}
+                <Link to={`/paths/${path.slug}`} className="card-link">
+                  <Card
+                    hoverable
+                    style={{ height: '100%' }}
+                  >
+                    <Card.Meta
+                      title={
+                        <span>
+                          {path.icon && <span style={{ marginRight: 8 }}>{path.icon}</span>}
+                          {path.title}
+                        </span>
+                      }
+                      description={path.description}
+                    />
+                    <div style={{ marginTop: 12 }}>
+                      {path.tags?.map((tag) => <Tag key={tag}>{tag}</Tag>)}
                     </div>
-                  )}
-                  {path.owners?.length > 0 && (
-                    <div style={{ marginTop: 8 }}>
-                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                        Instructor{path.owners.length > 1 ? 's' : ''}: {path.owners.join(', ')}
-                      </Typography.Text>
-                    </div>
-                  )}
-                  <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography.Text type="secondary">
-                      {path.module_count} modules · {path.step_count} steps
-                    </Typography.Text>
-                    {path.estimated_duration && (
-                      <Typography.Text type="secondary">⏱ {path.estimated_duration}</Typography.Text>
+                    {path.competencies_provided?.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>Provides: </Typography.Text>
+                        {path.competencies_provided.map((c) => (
+                          <Tag key={c} color="geekblue" style={{ fontSize: 11 }}>{c}</Tag>
+                        ))}
+                      </div>
                     )}
-                  </div>
-                  {status !== 'not_started' ? (
-                    <AntProgress percent={pct} size="small" style={{ marginTop: 8 }} />
-                  ) : (
-                    <Typography.Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
-                      Not started
-                    </Typography.Text>
-                  )}
-                  {path.prerequisites && path.prerequisites.length > 0 && (
-                    <div style={{ marginTop: 8 }}>
-                      {path.prerequisites_met ? (
-                        <Tag icon={<CheckCircleOutlined />} color="success">Prerequisites met</Tag>
-                      ) : (
-                        <Tag icon={<WarningOutlined />} color="warning">Prerequisites not met</Tag>
+                    {path.owners?.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                          Instructor{path.owners.length > 1 ? 's' : ''}: {path.owners.join(', ')}
+                        </Typography.Text>
+                      </div>
+                    )}
+                    <div style={{ marginTop: 12, display: 'flex', justifyContent: 'space-between' }}>
+                      <Typography.Text type="secondary">
+                        {path.module_count} modules · {path.step_count} steps
+                      </Typography.Text>
+                      {path.estimated_duration && (
+                        <Typography.Text type="secondary">⏱ {path.estimated_duration}</Typography.Text>
                       )}
                     </div>
-                  )}
-                </Card>
+                    {status !== 'not_started' ? (
+                      <AntProgress percent={pct} size="small" style={{ marginTop: 8 }} />
+                    ) : (
+                      <Typography.Text type="secondary" style={{ display: 'block', marginTop: 8 }}>
+                        Not started
+                      </Typography.Text>
+                    )}
+                    {path.prerequisites && path.prerequisites.length > 0 && (
+                      <div style={{ marginTop: 8 }}>
+                        {path.prerequisites_met ? (
+                          <Tag icon={<CheckCircleOutlined />} color="success">Prerequisites met</Tag>
+                        ) : (
+                          <Tag icon={<WarningOutlined />} color="warning">Prerequisites not met</Tag>
+                        )}
+                      </div>
+                    )}
+                  </Card>
+                </Link>
               </Col>
             );
           })}

@@ -41,7 +41,7 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
   }, []);
 
   useEffect(() => {
-    terminalEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    terminalEndRef.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }, [history, feedback, currentStep, selected]);
 
   const step = completed ? null : steps[currentStep];
@@ -131,6 +131,8 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
         ref={terminalRef}
         onKeyDown={handleKeyDown}
         tabIndex={0}
+        role="group"
+        aria-label="Terminal exercise. Use the up and down arrow keys to choose a command, then Enter to run it."
         style={{
           background: 'var(--color-bg-terminal)',
           borderRadius: 10,
@@ -140,7 +142,6 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
           overflow: 'hidden',
           border: '1px solid var(--color-terminal-border)',
           boxShadow: 'var(--terminal-shadow)',
-          outline: 'none',
         }}
       >
         {/* Title bar */}
@@ -158,6 +159,20 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
           <span style={{ marginLeft: 'auto', color: 'var(--color-terminal-muted)', fontSize: 12 }}>
             {completed ? 'Exercise Complete' : 'Terminal Exercise'}
           </span>
+        </div>
+
+        <div className="sr-only" aria-live="polite">
+          {completed
+            ? 'All steps completed successfully.'
+            : submitting
+            ? 'Executing.'
+            : feedback?.is_correct
+            ? 'Correct.'
+            : selected
+            ? `Selected command: ${selected}`
+            : feedback
+            ? `Incorrect. ${feedback.explanation as string}`
+            : ''}
         </div>
 
         {/* Terminal body */}

@@ -177,7 +177,7 @@ const StepView: React.FC = () => {
   // Auto-scroll sidebar to current step
   setTimeout(() => {
     const el = sidebarRef.current?.querySelector('.ant-menu-item-selected');
-    el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    el?.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }, 100);
 
   // Build sidebar menu items grouped by module
