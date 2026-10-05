@@ -287,9 +287,9 @@ const StepView: React.FC = () => {
 
           {/* Completed banner for lessons */}
           {step.type === 'lesson' && isCompleted && (
-            <div style={{ marginBottom: 16, padding: '8px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 16 }} />
-              <Typography.Text style={{ color: '#52c41a', fontWeight: 500 }}>Completed</Typography.Text>
+            <div style={{ marginBottom: 16, padding: '8px 16px', background: 'var(--color-choice-correct-bg)', border: '1px solid var(--color-choice-correct-border)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <CheckCircleOutlined style={{ color: 'var(--color-success-text)', fontSize: 16 }} />
+              <Typography.Text style={{ color: 'var(--color-success-text)', fontWeight: 500 }}>Completed</Typography.Text>
             </div>
           )}
 
@@ -331,7 +331,7 @@ const StepView: React.FC = () => {
           )}
 
           {/* Navigation footer */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 32, padding: '16px 0', borderTop: '1px solid #f0f0f0' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 32, padding: '16px 0', borderTop: '1px solid var(--color-border)' }}>
             {prevStep ? (
               <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(`/paths/${path.slug}/steps/${prevStep.slug}`)}>
                 {prevStep.title}

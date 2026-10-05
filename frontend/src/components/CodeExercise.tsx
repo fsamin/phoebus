@@ -312,7 +312,7 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {showDiffEditor ? <DiffOutlined style={{ color: 'var(--color-primary)', fontSize: 13 }} /> : <FileOutlined style={{ color: 'var(--color-text-ide)', fontSize: 13 }} />}
           <Typography.Text style={{ color: 'var(--color-text-ide)', fontSize: 13 }}>{selectedFile}</Typography.Text>
-          {showDiffEditor && <Tag color="var(--color-primary)" style={{ fontSize: 11, lineHeight: '18px', padding: '0 6px' }}>DIFF</Tag>}
+          {showDiffEditor && <Tag style={{ background: 'var(--color-primary-fill)', color: 'var(--color-on-primary)', borderColor: 'transparent', fontSize: 11, lineHeight: '18px', padding: '0 6px' }}>DIFF</Tag>}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {completed && <Tag color="success" icon={<CheckCircleFilled />}>Completed</Tag>}

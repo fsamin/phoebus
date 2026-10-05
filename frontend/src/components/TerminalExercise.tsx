@@ -122,7 +122,7 @@ const TerminalExercise: React.FC<TerminalExerciseProps> = ({ introduction, steps
       {/* Step counter */}
       {!completed && (
         <div style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Tag color="var(--color-primary)">Step {currentStep + 1}/{steps.length}</Tag>
+          <Tag style={{ background: 'var(--color-primary-fill)', color: 'var(--color-on-primary)', borderColor: 'transparent' }}>Step {currentStep + 1}/{steps.length}</Tag>
         </div>
       )}
 

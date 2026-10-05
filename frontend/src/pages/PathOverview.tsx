@@ -133,7 +133,7 @@ const PathOverview: React.FC = () => {
                   {completedSteps > 0 ? 'Continue Learning' : 'Start Learning'}
                 </Button>
               )}
-              {isPathCompleted && <Tag color="green" icon={<CheckCircleOutlined />}>Path Completed</Tag>}
+              {isPathCompleted && <Tag color="success" icon={<CheckCircleOutlined />}>Path Completed</Tag>}
             </div>
             <div style={{ marginTop: 12 }}>
               {path.tags?.map((tag) => <Tag key={tag}>{tag}</Tag>)}
@@ -248,7 +248,7 @@ const PathOverview: React.FC = () => {
                           <Typography.Text strong style={{ fontSize: 13 }}>
                             {dep.title}
                           </Typography.Text>
-                          <ArrowRightOutlined style={{ fontSize: 10, color: '#8c8c8c', marginLeft: 'auto' }} />
+                          <ArrowRightOutlined style={{ fontSize: 10, color: 'var(--color-text-secondary)', marginLeft: 'auto' }} />
                         </div>
                         <div style={{ marginTop: 4 }}>
                           <AntProgress

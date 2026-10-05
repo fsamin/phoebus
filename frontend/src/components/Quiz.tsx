@@ -3,6 +3,17 @@ import { Card, Radio, Checkbox, Input, Button, Alert, Typography, Tag, Space, Di
 import { CheckCircleOutlined, CloseCircleOutlined } from '@ant-design/icons';
 import MarkdownRenderer from './MarkdownRenderer';
 
+// Shown after submit so that correctness is not conveyed by colour alone
+function ChoiceMark({ fb }: { fb?: { correct: boolean; selected: boolean } }) {
+  if (fb?.correct) {
+    return <span style={{ marginLeft: 8, color: 'var(--color-success-text)' }}><CheckCircleOutlined /> Correct answer</span>;
+  }
+  if (fb?.selected) {
+    return <span style={{ marginLeft: 8, color: 'var(--color-danger-text)' }}><CloseCircleOutlined /> Your answer</span>;
+  }
+  return null;
+}
+
 interface QuizQuestion {
   text: string;
   type: 'multiple-choice' | 'short-answer';
@@ -118,6 +129,7 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit, onComplete }) => {
                     <Checkbox
                       key={c.text}
                       value={c.text}
+                      className="quiz-choice"
                       style={{
                         display: 'flex',
                         padding: '8px 12px',
@@ -128,6 +140,7 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit, onComplete }) => {
                       }}
                     >
                       {c.text}
+                      <ChoiceMark fb={choiceFb} />
                     </Checkbox>
                   );
                 })}
@@ -157,9 +170,11 @@ const Quiz: React.FC<QuizProps> = ({ questions, onSubmit, onComplete }) => {
                   <Radio
                     key={c.text}
                     value={c.text}
+                    className="quiz-choice"
                     style={{ display: 'flex', padding: '8px 12px', border: '1px solid var(--color-border-input)', borderRadius: 6, ...style }}
                   >
                     {c.text}
+                    <ChoiceMark fb={choiceFb} />
                   </Radio>
                 );
               })}

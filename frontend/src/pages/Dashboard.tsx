@@ -192,7 +192,7 @@ const Dashboard: React.FC = () => {
           {data.competencies.length > 0 && (
             <Card title="Competencies" style={{ marginBottom: 24 }} data-tour="dashboard-competencies">
               {data.competencies.map((c, i) => (
-                <Tag key={i} color={c.acquired ? 'green' : 'default'} style={{ marginBottom: 4 }}>
+                <Tag key={i} color={c.acquired ? 'success' : 'default'} style={{ marginBottom: 4 }}>
                   {c.acquired ? '✅' : '⬜'} {c.name}
                 </Tag>
               ))}

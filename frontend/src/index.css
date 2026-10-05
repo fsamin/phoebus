@@ -21,7 +21,7 @@
 
   --color-terminal-border: rgba(0, 0, 0, 0.12);
   --color-terminal-titlebar: rgba(0, 0, 0, 0.06);
-  --color-terminal-muted: rgba(255, 255, 255, 0.35);
+  --color-terminal-muted: rgba(255, 255, 255, 0.6);
   --color-terminal-prompt: #6ec6ff;
   --color-terminal-separator: rgba(255, 255, 255, 0.08);
   --color-terminal-selection: rgba(110, 198, 255, 0.12);
@@ -46,12 +46,17 @@
 
   --color-primary: #ff7a45;
   --color-focus-ring: #d4380d;
+  /* Filled primary surfaces: Ant colorPrimary and the text drawn on it */
+  --color-primary-fill: #d4380d;
+  --color-on-primary: #ffffff;
   --color-link: #1890ff;
   --color-success: #52c41a;
   --color-warning: #faad14;
   --color-danger: #ff4d4f;
   --color-info: #1890ff;
   --color-note: #722ed1;
+  --color-success-text: #237804;
+  --color-danger-text: #a8071a;
 
   --color-choice-selected-bg: #e6f7ff;
   --color-choice-selected-border: #1890ff;
@@ -94,7 +99,7 @@
 
   --color-terminal-border: rgba(255, 255, 255, 0.08);
   --color-terminal-titlebar: rgba(255, 255, 255, 0.05);
-  --color-terminal-muted: rgba(255, 255, 255, 0.4);
+  --color-terminal-muted: rgba(255, 255, 255, 0.6);
   --color-terminal-prompt: #ff9a6c;
   --color-terminal-separator: rgba(255, 255, 255, 0.1);
   --color-terminal-selection: rgba(255, 122, 69, 0.15);
@@ -103,7 +108,7 @@
   --terminal-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
 
   --color-text-primary: rgba(255, 255, 255, 0.87);
-  --color-text-secondary: rgba(255, 255, 255, 0.45);
+  --color-text-secondary: rgba(255, 255, 255, 0.65);
   --color-text-ide: #cccccc;
   --color-text-ide-secondary: #bbbbbb;
   --color-text-ide-explorer: #cccccc;
@@ -123,6 +128,8 @@
   --color-choice-correct-border: #52c41a;
   --color-choice-wrong-bg: #2a1215;
   --color-choice-wrong-border: #ff4d4f;
+  --color-success-text: #73d13d;
+  --color-danger-text: #ff7875;
 
   --color-ide-tree-hover: #2a2d2e;
   --color-ide-tree-selected: #37373d;
@@ -134,6 +141,8 @@
 
   --monaco-theme: vs-dark;
   --color-focus-ring: #ff7a45;
+  --color-primary-fill: #ff7a45;
+  --color-on-primary: #141414;
 }
 
 body {
@@ -178,6 +187,15 @@ body {
 .ant-checkbox-wrapper:has(:focus-visible) {
   outline: 2px solid var(--color-focus-ring) !important;
   outline-offset: 2px;
+}
+
+/* Answered quiz choices are disabled but must stay readable */
+.quiz-choice.ant-radio-wrapper-disabled,
+.quiz-choice.ant-checkbox-wrapper-disabled,
+.quiz-choice.ant-radio-wrapper-disabled .ant-radio-label,
+.quiz-choice.ant-checkbox-wrapper-disabled .ant-checkbox-label {
+  color: var(--color-text-primary);
+  cursor: default;
 }
 
 /* Cards and list rows that navigate are rendered as links */
@@ -316,7 +334,7 @@ body {
   border-radius: 4px;
   font-family: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Consolas', monospace;
   font-size: 0.9em;
-  color: #d63384;
+  color: #c41d7f;
 }
 
 /* Dark theme: code block colors (override github.css) */

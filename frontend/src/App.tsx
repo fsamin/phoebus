@@ -36,7 +36,36 @@ function ThemedApp() {
   const { isDark } = useTheme();
   return (
     <ConfigProvider theme={{
-      token: { colorPrimary: '#ff7a45' },
+      // Contrast (WCAG AA): white text on Phœbus Flame is only 2.6:1, so light mode uses a deeper
+      // Flame and dark mode keeps Flame with dark text on filled surfaces.
+      token: isDark
+        ? {
+            colorPrimary: '#ff7a45',
+            colorLink: '#69b1ff',
+            colorTextDescription: 'rgba(255, 255, 255, 0.6)',
+            colorTextPlaceholder: 'rgba(255, 255, 255, 0.5)',
+          }
+        : {
+            colorPrimary: '#d4380d',
+            colorLink: '#0958d9',
+            colorTextDescription: 'rgba(0, 0, 0, 0.6)',
+            colorTextPlaceholder: 'rgba(0, 0, 0, 0.54)',
+            colorSuccessText: '#237804',
+            colorWarningText: '#874d00',
+            colorErrorText: '#a8071a',
+          },
+      // Tags draw their text with the status colours and the palette's 7th shade, both too light.
+      components: isDark
+        ? {
+            Button: { primaryColor: '#141414', colorError: '#ff7875' },
+            Menu: { darkItemSelectedColor: '#141414', itemSelectedColor: '#ffb899' },
+            Tag: { colorInfo: '#69b1ff', geekblue7: '#85a5ff' },
+          }
+        : {
+            Button: { colorError: '#cf1322' },
+            Menu: { itemSelectedColor: '#ad2102' },
+            Tag: { colorSuccess: '#237804', colorInfo: '#0958d9', colorWarning: '#874d00', colorError: '#a8071a' },
+          },
       algorithm: isDark ? antTheme.darkAlgorithm : antTheme.defaultAlgorithm,
     }}>
       <AuthProvider>

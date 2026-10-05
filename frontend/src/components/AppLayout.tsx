@@ -81,7 +81,7 @@ const AppLayout: React.FC = () => {
     <Layout style={{ minHeight: '100vh' }}>
       <Header style={{
         display: 'flex', alignItems: 'center', padding: '0 24px',
-        background: isDark ? '#1a1a1a' : '#001529',
+        background: 'var(--color-bg-header)',
         borderBottom: isDark ? '2px solid #ff7a45' : 'none',
       }}>
         <Link
