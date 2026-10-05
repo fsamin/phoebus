@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { Button, Card, Row, Col, Typography, Tag, Input, Empty, Spin, Select, Progress as AntProgress } from 'antd';
-import { SearchOutlined, CheckCircleOutlined, WarningOutlined } from '@ant-design/icons';
+import { SearchOutlined, CheckCircleOutlined, WarningOutlined, FieldTimeOutlined } from '@ant-design/icons';
 import { Link, useSearchParams } from 'react-router-dom';
 import { api } from '../api/client';
 import type { Competency } from '../api/client';
@@ -265,7 +265,7 @@ const Catalog: React.FC = () => {
                         {path.module_count} modules · {path.step_count} steps
                       </Typography.Text>
                       {path.estimated_duration && (
-                        <Typography.Text type="secondary">⏱ {path.estimated_duration}</Typography.Text>
+                        <Typography.Text type="secondary"><FieldTimeOutlined aria-label="Estimated duration" /> {path.estimated_duration}</Typography.Text>
                       )}
                     </div>
                     {status !== 'not_started' ? (

@@ -316,7 +316,7 @@ const CatalogDAG: React.FC<CatalogDAGProps> = ({ paths, edges: depEdges }) => {
   }, []);
 
   if (paths.length === 0) {
-    return <div style={{ textAlign: 'center', padding: 40, color: '#8c8c8c' }}>No learning paths match your filters.</div>;
+    return <div style={{ textAlign: 'center', padding: 40, color: 'var(--color-text-secondary)' }}>No learning paths match your filters.</div>;
   }
 
   return (

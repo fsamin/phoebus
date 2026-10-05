@@ -151,7 +151,7 @@ const StepView: React.FC = () => {
     } else if (path) {
       // Last step — show congratulations
       Modal.success({
-        title: '🎉 Congratulations!',
+        title: 'Congratulations!',
         content: `You've completed all steps in "${path.title}". Well done!`,
         okText: 'Back to Overview',
         onOk: () => navigate(`/paths/${path.slug}`),
@@ -238,7 +238,6 @@ const StepView: React.FC = () => {
         width: railOnly ? 48 : sidebarWidth, flexShrink: 0, display: 'flex',
         background: 'var(--color-bg-sidebar)', borderRight: '1px solid var(--color-border)', position: 'relative',
         height: '100%', overflow: 'hidden',
-        transition: collapsed ? 'width 0.2s' : undefined,
       }}>
         <div style={{ flex: 1, overflow: 'auto' }}>
         <div ref={sidebarRef} style={{ height: '100%', overflow: 'auto' }}>

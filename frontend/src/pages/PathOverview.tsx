@@ -5,7 +5,7 @@ import {
 import {
   CheckCircleOutlined, ClockCircleOutlined,
   FileTextOutlined, QuestionCircleOutlined, CodeOutlined, DesktopOutlined,
-  WarningOutlined, ExclamationCircleOutlined, ArrowRightOutlined,
+  WarningOutlined, ExclamationCircleOutlined, ArrowRightOutlined, FieldTimeOutlined,
 } from '@ant-design/icons';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { api } from '../api/client';
@@ -132,7 +132,7 @@ const PathOverview: React.FC = () => {
                 <Typography.Text type="secondary">
                   {completedSteps}/{allSteps.length} steps completed
                   {' · '}{path.modules.length} modules
-                  {path.estimated_duration ? ` · ⏱ ${path.estimated_duration}` : ''}
+                  {path.estimated_duration && <> · <FieldTimeOutlined aria-label="Estimated duration" /> {path.estimated_duration}</>}
                 </Typography.Text>
               </div>
               {!isPathCompleted && nextStep && (
@@ -206,7 +206,7 @@ const PathOverview: React.FC = () => {
                             <Tag>{stepTypeLabel[step.type] ?? step.type}</Tag>
                             {step.estimated_duration && (
                               <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-                                ⏱ {step.estimated_duration}
+                                <FieldTimeOutlined aria-label="Estimated duration" /> {step.estimated_duration}
                               </Typography.Text>
                             )}
                           </span>
@@ -261,7 +261,7 @@ const PathOverview: React.FC = () => {
                             percent={depProgress}
                             size="small"
                             showInfo={false}
-                            strokeColor={depStatus === 'completed' ? '#52c41a' : depStatus === 'in_progress' ? '#fa8c16' : '#d9d9d9'}
+                            strokeColor={depStatus === 'completed' ? 'var(--color-success)' : depStatus === 'in_progress' ? 'var(--color-warning)' : 'var(--color-border-input)'}
                           />
                           <Typography.Text type="secondary" style={{ fontSize: 11 }}>
                             {dep.module_count} modules · {dep.step_count} steps
@@ -280,7 +280,7 @@ const PathOverview: React.FC = () => {
       <Modal
         title={
           <span>
-            <ExclamationCircleOutlined style={{ color: '#faad14', marginRight: 8 }} />
+            <ExclamationCircleOutlined style={{ color: 'var(--color-warning)', marginRight: 8 }} />
             Prerequisites Not Met
           </span>
         }
@@ -307,7 +307,7 @@ const PathOverview: React.FC = () => {
                 {item.met ? (
                   <CheckCircleOutlined style={{ color: 'var(--color-success)', marginRight: 8 }} />
                 ) : (
-                  <WarningOutlined style={{ color: '#faad14', marginRight: 8 }} />
+                  <WarningOutlined style={{ color: 'var(--color-warning)', marginRight: 8 }} />
                 )}
                 <strong>{item.competency}</strong>
                 {item.provider && (

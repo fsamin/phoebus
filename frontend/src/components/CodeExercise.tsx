@@ -430,7 +430,6 @@ const CodeExercise: React.FC<CodeExerciseProps> = ({ mode, description, target, 
       <div className="ide-bottom-panel" style={{
         height: bottomPanelHeight, background: 'var(--color-bg-ide-panel)', borderTop: '1px solid var(--color-border-ide)',
         overflow: 'auto', flexShrink: 0, padding: '12px 16px', color: 'var(--color-text-ide)',
-        transition: 'height 0.2s ease',
       }}>
         {completed ? (
           <div>
