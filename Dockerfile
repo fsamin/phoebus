@@ -19,7 +19,7 @@ RUN CGO_ENABLED=0 go build -ldflags "-s -w \
     -X github.com/fsamin/phoebus/internal/version.Date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
     -o /phoebus ./cmd/phoebus
 
-FROM alpine:3.21
+FROM alpine:3.24
 RUN apk add --no-cache ca-certificates git openssh-client
 COPY --from=builder /phoebus /usr/local/bin/phoebus
 EXPOSE 8080
