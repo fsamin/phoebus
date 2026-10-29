@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
-import { Card, Row, Col, Typography, List, Tag, Spin, Empty, Progress as AntProgress, Timeline, Statistic, Button, message, Space, Tooltip } from 'antd';
+import { Card, Row, Col, Typography, List, Tag, Spin, Empty, Progress as AntProgress, Timeline, Button, message, Space, Tooltip } from 'antd';
 import {
-  CheckCircleOutlined, ClockCircleOutlined, TrophyOutlined,
-  ExperimentOutlined, ArrowRightOutlined, SyncOutlined, UnorderedListOutlined,
+  CheckCircleOutlined, ClockCircleOutlined,
+  ArrowRightOutlined, SyncOutlined, UnorderedListOutlined,
 } from '@ant-design/icons';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../api/client';
 import type { BannerLevel } from '../api/client';
@@ -49,18 +49,32 @@ const Dashboard: React.FC = () => {
 
   if (loading || !data) return <Spin size="large" style={{ display: 'block', marginTop: 100 }} />;
 
+  // First visit: nothing started yet, so counters and "welcome back" would be noise
+  const isNewLearner = !data.continue_learning && data.enrolled_paths.length === 0 && data.recent_activity.length === 0;
+
   return (
     <div>
       <OnboardingTour tour="dashboard" steps={dashboardSteps} />
-      <Typography.Title level={2} data-tour="dashboard-welcome">
-        Welcome back, {user?.display_name || user?.username}!
+      <Typography.Title level={1} style={{ fontSize: 30 }} data-tour="dashboard-welcome">
+        {isNewLearner ? 'Welcome' : 'Welcome back'}, {user?.display_name || user?.username}!
       </Typography.Title>
+      {/* One summary line: paths and competencies below already carry the detail */}
+      <Typography.Paragraph type="secondary" data-tour="dashboard-stats">
+        {isNewLearner ? (
+          'Pick a learning path in the catalog to get started. Your progress, competencies and activity will show up here.'
+        ) : (
+          <>
+            {data.stats.steps_completed} steps completed · {data.stats.total_exercises} exercises attempted
+            {data.competencies.length > 0 && ` · ${data.competencies.filter((c) => c.acquired).length} of ${data.competencies.length} competencies`}
+          </>
+        )}
+      </Typography.Paragraph>
 
       {data.banner && <DashboardBanner {...data.banner} />}
 
       {/* Continue Learning */}
       {data.continue_learning && (
-        <Card style={{ marginBottom: 24, borderLeft: '4px solid var(--color-primary)' }} data-tour="dashboard-continue">
+        <Card style={{ marginBottom: 24 }} data-tour="dashboard-continue">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <div>
               <Typography.Text type="secondary">Continue Learning</Typography.Text>
@@ -146,33 +160,20 @@ const Dashboard: React.FC = () => {
         </Card>
       )}
 
-      {/* Stats */}
-      <Row gutter={[16, 16]} style={{ marginBottom: 24 }} data-tour="dashboard-stats">
-        <Col xs={24} sm={8}>
-          <Card><Statistic title="Steps Completed" value={data.stats.steps_completed} prefix={<CheckCircleOutlined />} /></Card>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Card><Statistic title="Exercises Attempted" value={data.stats.total_exercises} prefix={<ExperimentOutlined />} /></Card>
-        </Col>
-        <Col xs={24} sm={8}>
-          <Card><Statistic title="Competencies" value={`${data.competencies.filter(c => c.acquired).length}/${data.competencies.length}`} prefix={<TrophyOutlined />} /></Card>
-        </Col>
-      </Row>
-
       <Row gutter={[16, 16]}>
         {/* Enrolled Paths */}
         <Col xs={24} lg={12}>
           <Card title="My Learning Paths" style={{ marginBottom: 24 }} data-tour="dashboard-paths">
             {data.enrolled_paths.length === 0 ? (
-              <Empty description="No enrolled paths yet" image={Empty.PRESENTED_IMAGE_SIMPLE}>
-                <Button type="primary" onClick={() => navigate('/catalog')}>Browse Catalog</Button>
+              <Empty description="You haven't started a learning path yet." image={Empty.PRESENTED_IMAGE_SIMPLE}>
+                <Button type="primary" onClick={() => navigate('/catalog')}>Browse the catalog</Button>
               </Empty>
             ) : (
               <List
                 dataSource={data.enrolled_paths}
                 renderItem={(ep) => (
-                  <List.Item style={{ cursor: 'pointer' }} onClick={() => navigate(`/paths/${ep.path_slug}`)}>
-                    <div style={{ width: '100%' }}>
+                  <List.Item>
+                    <Link to={`/paths/${ep.path_slug}`} className="row-link">
                       <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                         <Typography.Text strong>
                           {ep.path_icon && <span style={{ marginRight: 8 }}>{ep.path_icon}</span>}
@@ -181,7 +182,7 @@ const Dashboard: React.FC = () => {
                         <Typography.Text type="secondary">{ep.completed}/{ep.total}</Typography.Text>
                       </div>
                       <AntProgress percent={ep.total > 0 ? Math.round((ep.completed / ep.total) * 100) : 0} size="small" />
-                    </div>
+                    </Link>
                   </List.Item>
                 )}
               />
@@ -192,8 +193,8 @@ const Dashboard: React.FC = () => {
           {data.competencies.length > 0 && (
             <Card title="Competencies" style={{ marginBottom: 24 }} data-tour="dashboard-competencies">
               {data.competencies.map((c, i) => (
-                <Tag key={i} color={c.acquired ? 'green' : 'default'} style={{ marginBottom: 4 }}>
-                  {c.acquired ? '✅' : '⬜'} {c.name}
+                <Tag key={i} color={c.acquired ? 'success' : 'default'} icon={c.acquired ? <CheckCircleOutlined aria-label="Acquired" /> : undefined} style={{ marginBottom: 4 }}>
+                  {c.name}
                 </Tag>
               ))}
             </Card>
@@ -204,22 +205,20 @@ const Dashboard: React.FC = () => {
         <Col xs={24} lg={12}>
           <Card title="Recent Activity" data-tour="dashboard-activity">
             {data.recent_activity.length === 0 ? (
-              <Empty description="No activity yet" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+              <Empty description="Steps you start or complete will show up here." image={Empty.PRESENTED_IMAGE_SIMPLE} />
             ) : (
               <Timeline
                 items={data.recent_activity.map((a) => ({
                   color: a.event === 'completed' ? 'green' : 'blue',
                   dot: a.event === 'completed' ? <CheckCircleOutlined /> : <ClockCircleOutlined />,
                   children: (
-                    <div
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => navigate(`/paths/${a.path_slug}/steps/${a.step_slug}`)}                    >
+                    <Link to={`/paths/${a.path_slug}/steps/${a.step_slug}`} className="row-link">
                       <Typography.Text>{a.event === 'completed' ? 'Completed' : 'Started'}: {a.step_title}</Typography.Text>
                       <br />
                       <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                         {a.path_title} · {new Date(a.timestamp).toLocaleString()}
                       </Typography.Text>
-                    </div>
+                    </Link>
                   ),
                 }))}
               />

@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Layout, Menu, Spin, Button, Typography, Popconfirm, message, Modal } from 'antd';
+import { Layout, Menu, Spin, Button, Typography, Popconfirm, message, Modal, Result, Grid, Drawer } from 'antd';
 import {
   ArrowLeftOutlined, ArrowRightOutlined, MenuFoldOutlined, MenuUnfoldOutlined,
   FileTextOutlined, QuestionCircleOutlined, DesktopOutlined, CodeOutlined,
-  CheckCircleOutlined, ClockCircleOutlined, CloseOutlined,
+  CheckCircleOutlined, ClockCircleOutlined,
 } from '@ant-design/icons';
 import { api } from '../api/client';
 import type { StepDetail, LearningPathDetail, Progress } from '../api/client';
@@ -13,8 +13,6 @@ import MarkdownRenderer from '../components/MarkdownRenderer';
 import Quiz from '../components/Quiz';
 import TerminalExercise from '../components/TerminalExercise';
 import CodeExercise from '../components/CodeExercise';
-
-const { Content } = Layout;
 
 const stepIcon = (type: string) => {
   switch (type) {
@@ -33,8 +31,13 @@ const StepView: React.FC = () => {
   const [step, setStep] = useState<StepDetail | null>(null);
   const [progress, setProgress] = useState<Progress[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [collapsed, setCollapsed] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [navOpen, setNavOpen] = useState(false);
+  // Phones get a rail with a drawer: a 280px sidebar would leave no room for the step
+  const isMobile = !Grid.useBreakpoint().md;
   const [exerciseCompleted, setExerciseCompleted] = useState(false);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const resizingRef = useRef(false);
@@ -45,6 +48,7 @@ const StepView: React.FC = () => {
   useEffect(() => {
     if (!pathId || !stepId) return;
     setLoading(true);
+    setLoadError(false);
     setExerciseCompleted(false);
     scrollTrackedRef.current = false;
     Promise.all([
@@ -61,8 +65,9 @@ const StepView: React.FC = () => {
           api.updateProgress(s.id, 'in_progress').catch(() => {});
         }
       })
+      .catch(() => setLoadError(true))
       .finally(() => setLoading(false));
-  }, [pathId, stepId]);
+  }, [pathId, stepId, reloadKey]);
 
   // Scroll tracking for lessons: mark in_progress at 75% scroll
   useEffect(() => {
@@ -146,7 +151,7 @@ const StepView: React.FC = () => {
     } else if (path) {
       // Last step — show congratulations
       Modal.success({
-        title: '🎉 Congratulations!',
+        title: 'Congratulations!',
         content: `You've completed all steps in "${path.title}". Well done!`,
         okText: 'Back to Overview',
         onOk: () => navigate(`/paths/${path.slug}`),
@@ -172,12 +177,26 @@ const StepView: React.FC = () => {
     window.location.reload();
   };
 
+  if (loadError) {
+    return (
+      <Result
+        status="error"
+        title="We couldn't load this step."
+        subTitle="Check your connection and try again."
+        extra={[
+          <Button key="retry" type="primary" onClick={() => setReloadKey((k) => k + 1)}>Retry</Button>,
+          <Button key="back" onClick={() => navigate(`/paths/${pathId}`)}>Back to the path</Button>,
+        ]}
+      />
+    );
+  }
+
   if (loading || !path || !step) return <Spin size="large" style={{ display: 'block', marginTop: 100 }} />;
 
   // Auto-scroll sidebar to current step
   setTimeout(() => {
     const el = sidebarRef.current?.querySelector('.ant-menu-item-selected');
-    el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    el?.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
   }, 100);
 
   // Build sidebar menu items grouped by module
@@ -200,65 +219,78 @@ const StepView: React.FC = () => {
 
   const exerciseData = step.exercise_data as Record<string, unknown> | undefined;
   const isCompleted = getStepStatus(step.id) === 'completed';
+  const railOnly = collapsed || isMobile;
+  const clampWidth = (w: number) => Math.max(180, Math.min(500, w));
+
+  const stepMenu = (
+    <Menu
+      mode="inline"
+      selectedKeys={[step.slug || stepId || '']}
+      openKeys={path.modules.map((m) => m.id)}
+      items={sidebarItems}
+      onClick={({ key }) => { setNavOpen(false); navigate(`/paths/${path.slug}/steps/${key}`); }}
+    />
+  );
 
   return (
-    <Layout style={{ height: 'calc(100vh - 64px)', margin: '-24px -48px', flexDirection: 'row', overflow: 'hidden' }}>
+    <Layout style={{ height: 'calc(100vh - 64px)', flexDirection: 'row', overflow: 'hidden' }}>
       <div style={{
-        width: collapsed ? 48 : sidebarWidth, flexShrink: 0, display: 'flex',
+        width: railOnly ? 48 : sidebarWidth, flexShrink: 0, display: 'flex',
         background: 'var(--color-bg-sidebar)', borderRight: '1px solid var(--color-border)', position: 'relative',
         height: '100%', overflow: 'hidden',
-        transition: collapsed ? 'width 0.2s' : undefined,
       }}>
         <div style={{ flex: 1, overflow: 'auto' }}>
         <div ref={sidebarRef} style={{ height: '100%', overflow: 'auto' }}>
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div style={{ padding: railOnly ? '12px 8px' : '12px 16px', borderBottom: '1px solid var(--color-border)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <Button
             type="text"
-            icon={collapsed ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
-            onClick={() => setCollapsed(!collapsed)}
+            icon={railOnly ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+            onClick={() => (isMobile ? setNavOpen(true) : setCollapsed(!collapsed))}
+            aria-label={railOnly ? 'Show steps' : 'Hide steps'}
           />
-          {!collapsed && (
-            <>
-              <Button type="link" onClick={() => navigate(`/paths/${path.slug}`)} style={{ flex: 1, textAlign: 'left', padding: 0 }}>
-                ← {path.title}
-              </Button>
-              <Button type="text" icon={<CloseOutlined />} size="small" onClick={() => navigate(`/paths/${path.slug}`)} />
-            </>
+          {!railOnly && (
+            <Button type="link" onClick={() => navigate(`/paths/${path.slug}`)} title={path.title} style={{ flex: 1, minWidth: 0, justifyContent: 'flex-start', padding: 0 }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>← {path.title}</span>
+            </Button>
           )}
         </div>
-        {!collapsed && (
-          <Menu
-            mode="inline"
-            selectedKeys={[step.slug || stepId || '']}
-            openKeys={path.modules.map((m) => m.id)}
-            items={sidebarItems}
-            onClick={({ key }) => navigate(`/paths/${path.slug}/steps/${key}`)}
-          />
-        )}
+        {!railOnly && stepMenu}
         </div>
         </div>
-        {/* Resize handle */}
-        {!collapsed && (
+        {/* Resize handle: pointer (mouse, touch, pen) and arrow keys */}
+        {!railOnly && (
           <div
-            onMouseDown={(e) => {
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize the step list"
+            aria-valuenow={sidebarWidth}
+            aria-valuemin={180}
+            aria-valuemax={500}
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+              e.preventDefault();
+              setSidebarWidth((w) => clampWidth(w + (e.key === 'ArrowRight' ? 16 : -16)));
+            }}
+            onPointerDown={(e) => {
               e.preventDefault();
               resizingRef.current = true;
               const startX = e.clientX;
               const startW = sidebarWidth;
-              const onMove = (ev: MouseEvent) => {
+              const onMove = (ev: PointerEvent) => {
                 if (!resizingRef.current) return;
-                setSidebarWidth(Math.max(180, Math.min(500, startW + ev.clientX - startX)));
+                setSidebarWidth(clampWidth(startW + ev.clientX - startX));
               };
               const onUp = () => {
                 resizingRef.current = false;
-                window.removeEventListener('mousemove', onMove);
-                window.removeEventListener('mouseup', onUp);
+                window.removeEventListener('pointermove', onMove);
+                window.removeEventListener('pointerup', onUp);
               };
-              window.addEventListener('mousemove', onMove);
-              window.addEventListener('mouseup', onUp);
+              window.addEventListener('pointermove', onMove);
+              window.addEventListener('pointerup', onUp);
             }}
             style={{
-              width: 4, cursor: 'col-resize', background: 'transparent',
+              width: 4, cursor: 'col-resize', background: 'transparent', touchAction: 'none',
               position: 'absolute', right: 0, top: 0, bottom: 0, zIndex: 10,
             }}
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-resize-handle-hover)')}
@@ -266,7 +298,20 @@ const StepView: React.FC = () => {
           />
         )}
       </div>
-      <Content ref={contentRef} style={step.type === 'code-exercise' ? { padding: 0, overflow: 'hidden' } : { padding: 24, overflow: 'auto' }}>
+      {isMobile && (
+        <Drawer
+          open={navOpen}
+          onClose={() => setNavOpen(false)}
+          placement="left"
+          size={Math.min(320, window.innerWidth - 48)}
+          title={<Button type="link" onClick={() => navigate(`/paths/${path.slug}`)} style={{ padding: 0 }}>← {path.title}</Button>}
+          styles={{ body: { padding: 0 } }}
+        >
+          {stepMenu}
+        </Drawer>
+      )}
+      {/* Not a Layout.Content: AppLayout already renders the page's main landmark */}
+      <div ref={contentRef} style={step.type === 'code-exercise' ? { flex: 1, minWidth: 0, overflow: 'hidden' } : { flex: 1, minWidth: 0, padding: isMobile ? 16 : 24, overflow: 'auto' }}>
         {step.type === 'code-exercise' && exerciseData ? (
           <CodeExercise
             mode={exerciseData.mode as string || 'A'}
@@ -283,13 +328,22 @@ const StepView: React.FC = () => {
             onReset={handleReset}
           />
         ) : (
-        <div style={{ maxWidth: 900, margin: '0 auto' }}>
+        <div style={step.type === 'lesson' ? { maxWidth: '65ch', margin: '0 auto', fontSize: 16 } : { maxWidth: 900, margin: '0 auto' }}>
+          {currentIdx >= 0 && (
+            <Typography.Text type="secondary" style={{ display: 'block', marginBottom: 8 }}>
+              {allSteps[currentIdx].moduleTitle} · Step {currentIdx + 1} of {allSteps.length}
+            </Typography.Text>
+          )}
+          {/* Lessons and terminal introductions carry their own h1 in the Markdown */}
+          {step.type === 'quiz' && (
+            <Typography.Title level={1} style={{ fontSize: 30, marginTop: 0 }}>{step.title}</Typography.Title>
+          )}
 
           {/* Completed banner for lessons */}
           {step.type === 'lesson' && isCompleted && (
-            <div style={{ marginBottom: 16, padding: '8px 16px', background: '#f6ffed', border: '1px solid #b7eb8f', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-              <CheckCircleOutlined style={{ color: '#52c41a', fontSize: 16 }} />
-              <Typography.Text style={{ color: '#52c41a', fontWeight: 500 }}>Completed</Typography.Text>
+            <div style={{ marginBottom: 16, padding: '8px 16px', background: 'var(--color-choice-correct-bg)', border: '1px solid var(--color-choice-correct-border)', borderRadius: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <CheckCircleOutlined style={{ color: 'var(--color-success-text)', fontSize: 16 }} />
+              <Typography.Text style={{ color: 'var(--color-success-text)', fontWeight: 500 }}>Completed</Typography.Text>
             </div>
           )}
 
@@ -311,6 +365,7 @@ const StepView: React.FC = () => {
 
           {step.type === 'terminal-exercise' && exerciseData && (
             <TerminalExercise
+              title={step.title}
               introduction={exerciseData.introduction as string || ''}
               steps={(exerciseData.steps as Record<string, unknown>[]).map((s) => s as any)}
               onSubmit={handleSubmitAttempt}
@@ -324,14 +379,14 @@ const StepView: React.FC = () => {
           {/* Reset button for exercises */}
           {step.type !== 'lesson' && (
             <div style={{ marginTop: 24, textAlign: 'center' }}>
-              <Popconfirm title="Reset this exercise? Your previous attempts will be preserved." onConfirm={handleReset}>
+              <Popconfirm title="Reset this exercise? Your previous attempts will be preserved." okText="Reset" cancelText="Keep my progress" onConfirm={handleReset}>
                 <Button danger>Reset Exercise</Button>
               </Popconfirm>
             </div>
           )}
 
           {/* Navigation footer */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 32, padding: '16px 0', borderTop: '1px solid #f0f0f0' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'space-between', marginTop: 32, padding: '16px 0', borderTop: '1px solid var(--color-border)' }}>
             {prevStep ? (
               <Button icon={<ArrowLeftOutlined />} onClick={() => navigate(`/paths/${path.slug}/steps/${prevStep.slug}`)}>
                 {prevStep.title}
@@ -357,28 +412,24 @@ const StepView: React.FC = () => {
                 </Button>
               )
             ) : (
-              nextStep ? (
+              <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', alignItems: 'center', gap: 12, marginLeft: 'auto' }}>
+                {!isCompleted && !exerciseCompleted && (
+                  <Typography.Text type="secondary" id="next-step-hint">Finish the exercise to continue</Typography.Text>
+                )}
                 <Button
                   type="primary"
                   disabled={!isCompleted && !exerciseCompleted}
-                  onClick={() => navigate(`/paths/${path.slug}/steps/${nextStep.slug}`)}
+                  aria-describedby={!isCompleted && !exerciseCompleted ? 'next-step-hint' : undefined}
+                  onClick={() => navigate(nextStep ? `/paths/${path.slug}/steps/${nextStep.slug}` : `/paths/${path.slug}`)}
                 >
-                  {nextStep.title} <ArrowRightOutlined />
+                  {nextStep ? <>{nextStep.title} <ArrowRightOutlined /></> : 'Back to Overview'}
                 </Button>
-              ) : (
-                <Button
-                  type="primary"
-                  disabled={!isCompleted && !exerciseCompleted}
-                  onClick={() => navigate(`/paths/${path.slug}`)}
-                >
-                  Back to Overview
-                </Button>
-              )
+              </div>
             )}
           </div>
         </div>
         )}
-      </Content>
+      </div>
     </Layout>
   );
 };
